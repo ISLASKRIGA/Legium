@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legium | Sistema de Gestión Jurídica Premium</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js CDN for interactive reports -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-icon">
+          <!-- Balance Scale SVG Icon -->
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2v20M2 13h20M6 13c0 3 2.5 5.5 5.5 5.5S17 16 17 13M6 13c0-3 2.5-5.5 5.5-5.5S17 10 17 13M3 13h3m12 0h3M12 5l-2-2h4l-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="brand-name">Legium<span class="brand-tag">.</span></span>
+      </div>
+
+      <ul class="sidebar-menu">
+        <li class="menu-item active" data-tab="dashboard">
+          <a href="#dashboard">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li class="menu-item" data-tab="cases">
+          <a href="#cases">
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Expedientes</span>
+          </a>
+        </li>
+        <li class="menu-item" data-tab="clients">
+          <a href="#clients">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li class="menu-item" data-tab="reports">
+          <a href="#reports">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <span>Reportes</span>
+          </a>
+        </li>
+        <li class="menu-item" data-tab="it-admin" id="menu-it-admin">
+          <a href="#it-admin">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span>TI Administrador</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="user-badge" id="current-user-badge">
+          <div class="avatar" id="current-user-avatar">AT</div>
+          <div class="user-info">
+            <span class="user-name" id="current-user-name">Ing. Alejandro Torres</span>
+            <span class="user-role" id="current-user-role">TI Administrador</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-toggle" id="mobile-toggle">☰</button>
+          <div class="search-container">
+            <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" class="search-input" id="universal-search" placeholder="Buscar expedientes, clientes, abogados...">
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Role Simulator -->
+          <div class="role-simulator">
+            <span class="role-simulator-label">Simular Rol:</span>
+            <select class="role-select" id="simulator-role-select">
+              <option value="usr-04">TI Administrador</option>
+              <option value="usr-01">Socio Principal</option>
+              <option value="usr-02">Abogado Senior</option>
+              <option value="usr-03">Abogado Junior</option>
+            </select>
+          </div>
+
+          <!-- Notification Bell -->
+          <button class="notification-bell" id="notification-bell">
+            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="notification-badge" id="noti-badge"></span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Page Views -->
+      <div class="page-container">
+        
+        <!-- 1. DASHBOARD VIEW -->
+        <section class="view-panel active" id="view-dashboard">
+          <div class="section-header">
+            <div>
+              <span class="metric-trend up">Bienvenido a Legium</span>
+              <h2 class="serif" style="font-size: 26px; margin-top: 4px;">Panel de Control</h2>
+            </div>
+            <span class="badge badge-active" style="padding: 6px 12px;" id="dashboard-live-indicator">● Conectado en Tiempo Real</span>
+          </div>
+
+          <!-- Welcome Banner Card -->
+          <div class="glass-card welcome-banner" style="background: linear-gradient(135deg, rgba(0, 122, 255, 0.04), rgba(184, 134, 11, 0.04)); border: 1.5px solid rgba(0, 122, 255, 0.12); margin-bottom: 24px; padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+            <div style="flex-grow: 1; min-width: 280px;">
+              <h3 class="serif" style="font-size: 20px; color: var(--text-primary); margin-bottom: 4px;">¡Hola, <span id="welcome-user-name">Usuario</span>!</h3>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; max-width: 650px;">Este es el centro digital de tu despacho. Hemos simplificado todo para que sea extremadamente intuitivo:</p>
+              <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+                <a href="#cases" class="badge badge-active" style="text-decoration: none; cursor: pointer; background: rgba(0, 122, 255, 0.08); color: var(--primary-blue); padding: 6px 12px; border-radius: 99px; font-weight: 600; font-size: 11.5px;">📂 Expedientes</a>
+                <a href="#clients" class="badge badge-active" style="text-decoration: none; cursor: pointer; background: rgba(52, 199, 89, 0.08); color: var(--success); padding: 6px 12px; border-radius: 99px; font-weight: 600; font-size: 11.5px;">👥 Clientes</a>
+                <a href="#reports" class="badge badge-active" style="text-decoration: none; cursor: pointer; background: rgba(184, 134, 11, 0.08); color: var(--primary-gold); padding: 6px 12px; border-radius: 99px; font-weight: 600; font-size: 11.5px;">📈 Reportes</a>
+              </div>
+            </div>
+            <div style="width: 50px; height: 50px; border-radius: 50%; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">✨</div>
+          </div>
+
+          <!-- Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="glass-card metric-card">
+              <div class="metric-header">
+                <span class="metric-title">Casos Activos</span>
+                <div class="metric-icon">
+                  <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metric-active-cases">0</div>
+              <div class="metric-sub">Bajo seguimiento judicial</div>
+            </div>
+
+            <div class="glass-card metric-card">
+              <div class="metric-header">
+                <span class="metric-title">En Apelación</span>
+                <div class="metric-icon">
+                  <svg viewBox="0 0 24 24"><path d="M23 18l-9-9 9-9M1 18l9-9-9-9"/></svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metric-appealing-cases">0</div>
+              <div class="metric-sub">En tribunales superiores</div>
+            </div>
+
+            <div class="glass-card metric-card">
+              <div class="metric-header">
+                <span class="metric-title">Total Clientes</span>
+                <div class="metric-icon">
+                  <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metric-total-clients">0</div>
+              <div class="metric-sub">Corporativos y personas</div>
+            </div>
+
+            <div class="glass-card metric-card">
+              <div class="metric-header">
+                <span class="metric-title">Ingresos Mensuales</span>
+                <div class="metric-icon">
+                  <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+              </div>
+              <div class="metric-value" id="metric-total-revenue">$0</div>
+              <div class="metric-sub">Cobros registrados junio</div>
+            </div>
+          </div>
+
+          <!-- Dashboard Content -->
+          <div class="dashboard-layout">
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+              <!-- Milestones Card -->
+              <div class="glass-card">
+                <div class="section-header">
+                  <h3 class="section-title">Próximos Hitos Judiciales</h3>
+                </div>
+                <div class="table-responsive">
+                  <table class="custom-table" id="dashboard-milestones-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Expediente</th>
+                        <th>Hito Programado</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Rendered by JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Key Tasks Card -->
+              <div class="glass-card">
+                <div class="section-header">
+                  <h3 class="section-title">Mis Tareas Pendientes</h3>
+                </div>
+                <div class="tasks-list" id="dashboard-tasks-container">
+                  <!-- Rendered by JS -->
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+              <!-- Session Details Card -->
+              <div class="glass-card">
+                <div class="section-header">
+                  <h3 class="section-title">Sesión y Privilegios</h3>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                    <span style="color: var(--text-secondary);">Rol Actual:</span>
+                    <span class="user-role" id="dash-session-role">TI Administrador</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                    <span style="color: var(--text-secondary);">Acceso a Expedientes:</span>
+                    <span class="badge badge-active" id="dash-perm-cases">TOTAL</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                    <span style="color: var(--text-secondary);">Gestión Financiera:</span>
+                    <span class="badge badge-active" id="dash-perm-finance">HABILITADA</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                    <span style="color: var(--text-secondary);">Configuración TI:</span>
+                    <span class="badge badge-active" id="dash-perm-ti">ACCESO TOTAL</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Audit Logs Card -->
+              <div class="glass-card">
+                <div class="section-header">
+                  <h3 class="section-title">Seguridad (Auditoría)</h3>
+                </div>
+                <div class="audit-logs-list" id="dashboard-logs-container" style="max-height: 250px;">
+                  <!-- Rendered by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. CASES VIEW -->
+        <section class="view-panel" id="view-cases">
+          
+          <!-- Cases List Panel -->
+          <div id="cases-list-panel">
+            <div class="section-header">
+              <div>
+                <span class="metric-trend up">Archivo Digital</span>
+                <h2 class="serif" style="font-size: 26px; margin-top: 4px;">Expedientes Jurídicos</h2>
+              </div>
+              <button class="btn btn-primary" id="btn-open-create-case-modal">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuevo Expediente
+              </button>
+            </div>
+
+            <!-- iOS Segmented Filters Bar -->
+            <div class="glass-card filter-bar">
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <span class="health-label" style="margin-left: 2px;">Área Jurídica</span>
+                <div class="segmented-filters" id="segmented-filter-area">
+                  <div class="segment-item active" data-value="Todas">Todas</div>
+                  <div class="segment-item" data-value="Civil">Civil</div>
+                  <div class="segment-item" data-value="Penal">Penal</div>
+                  <div class="segment-item" data-value="Laboral">Laboral</div>
+                  <div class="segment-item" data-value="Tributario">Tributario</div>
+                  <div class="segment-item" data-value="Corporativo">Corporativo</div>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <span class="health-label" style="margin-left: 2px;">Estado Procesal</span>
+                <div class="segmented-filters" id="segmented-filter-status">
+                  <div class="segment-item active" data-value="Todos">Todos</div>
+                  <div class="segment-item" data-value="Activo">Activos</div>
+                  <div class="segment-item" data-value="En Apelación">Apelación</div>
+                  <div class="segment-item" data-value="Cerrado">Cerrados</div>
+                  <div class="segment-item" data-value="Suspendido">Suspendidos</div>
+                </div>
+              </div>
+
+              <div style="flex-grow: 1;"></div>
+              
+              <span class="metric-sub" id="cases-count-label" style="align-self: flex-end; padding-bottom: 8px;">Mostrando 8 expedientes</span>
+            </div>
+
+            <!-- Cases Table -->
+            <div class="glass-card">
+              <div class="table-responsive">
+                <table class="custom-table" id="cases-table">
+                  <thead>
+                    <tr>
+                      <th>Código ID</th>
+                      <th>Carátula / Caso</th>
+                      <th>Cliente</th>
+                      <th>Área</th>
+                      <th>Estado</th>
+                      <th>Abogado Asignado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Rendered by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Case Detail Panel -->
+          <div id="case-detail-panel" style="display: none;">
+            <div class="section-header">
+              <button class="btn btn-secondary btn-sm" id="btn-back-to-cases">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Volver a la Lista
+              </button>
+              <div>
+                <span class="badge" id="detail-case-badge-status">ACTIVO</span>
+              </div>
+            </div>
+
+            <div class="detail-layout">
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- General Info -->
+                <div class="glass-card">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-color); padding-bottom: 14px; margin-bottom: 16px;">
+                    <div>
+                      <span class="metric-trend up" id="detail-case-id">LEG-2026-001</span>
+                      <h2 class="serif" id="detail-case-title" style="font-size: 22px; margin-top: 4px;">Demanda de Reivindicación Alfa vs. Beta</h2>
+                    </div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                    <div>
+                      <span class="health-label">Cliente</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-client">Constructora Alfa S.A.</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Contraparte</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-opposing">Corporación Beta S.A.</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Abogado Contraparte</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-opposing-lawyer">Estudio Silva & Asociados</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Área de Práctica</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-area">Civil</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Tribunal / Sede</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-court">2° Juzgado Civil de Santiago</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Juez a Cargo</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-judge">Dra. Patricia Ortiz</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Abogado Legium</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-lawyer">Dr. Carlos Mendoza</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Fecha de Inicio</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-case-start-date">2026-01-15</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span class="health-label">Descripción de la Causa</span>
+                    <p style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px;" id="detail-case-desc">
+                      Detalles del caso legal...
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Timeline -->
+                <div class="glass-card">
+                  <div class="section-header">
+                    <h3 class="section-title">Línea de Tiempo Procesal</h3>
+                    <button class="btn btn-secondary btn-sm" id="btn-add-milestone">Registrar Hito</button>
+                  </div>
+                  <div class="timeline" id="detail-case-timeline">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Tasks -->
+                <div class="glass-card">
+                  <div class="section-header">
+                    <h3 class="section-title">Tareas del Expediente</h3>
+                    <button class="btn btn-secondary btn-sm" id="btn-add-task">Nueva Tarea</button>
+                  </div>
+                  <div class="tasks-list" id="detail-case-tasks">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="glass-card">
+                  <div class="section-header">
+                    <h3 class="section-title">Notas Internas</h3>
+                  </div>
+                  
+                  <div class="notes-container" id="detail-case-notes">
+                    <!-- Rendered by JS -->
+                  </div>
+
+                  <div style="margin-top: 12px;">
+                    <textarea class="form-control" id="note-input" placeholder="Añadir una nota interna confidencial..." style="font-size: 13px; min-height: 70px;"></textarea>
+                    <button class="btn btn-primary btn-sm" id="btn-save-note" style="margin-top: 8px; width: 100%;">Guardar Nota</button>
+                  </div>
+                </div>
+
+                <!-- Documentos del Expediente -->
+                <div class="glass-card">
+                  <div class="section-header">
+                    <h3 class="section-title">Documentos PDF</h3>
+                  </div>
+                  <div class="file-upload-zone" id="pdf-drop-zone" style="border: 2px dashed var(--border-color); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.01); transition: all var(--transition-fast);">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="var(--primary-blue)" stroke-width="2.2" fill="none" style="margin: 0 auto 8px; display: block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <p style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">Arrastra un PDF aquí o haz clic</p>
+                    <span style="font-size: 10.5px; color: var(--text-muted);">Formatos admitidos: PDF (Máx. 10MB)</span>
+                    <input type="file" id="case-pdf-input" accept="application/pdf" style="display: none;">
+                  </div>
+                  <div class="document-list" id="detail-case-documents" style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. CLIENTS VIEW -->
+        <section class="view-panel" id="view-clients">
+          
+          <!-- Clients List Panel -->
+          <div id="clients-list-panel">
+            <div class="section-header">
+              <div>
+                <span class="metric-trend up">Directorio</span>
+                <h2 class="serif" style="font-size: 26px; margin-top: 4px;">Clientes Legium</h2>
+              </div>
+              <button class="btn btn-primary" id="btn-open-create-client-modal">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuevo Cliente
+              </button>
+            </div>
+
+            <!-- Clients Table -->
+            <div class="glass-card">
+              <div class="table-responsive">
+                <table class="custom-table" id="clients-table">
+                  <thead>
+                    <tr>
+                      <th>Nombre / Razón Social</th>
+                      <th>Tipo</th>
+                      <th>Identificación Tributaria</th>
+                      <th>Contacto Principal</th>
+                      <th>Correo Electrónico</th>
+                      <th>Teléfono</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Rendered by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Client Detail Panel -->
+          <div id="client-detail-panel" style="display: none;">
+            <div class="section-header">
+              <button class="btn btn-secondary btn-sm" id="btn-back-to-clients">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Volver a la Lista
+              </button>
+              <div>
+                <span class="badge" id="detail-client-badge-type">CORPORATIVO</span>
+              </div>
+            </div>
+
+            <div class="detail-layout">
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- General Info -->
+                <div class="glass-card">
+                  <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 14px; margin-bottom: 16px;">
+                    <span class="metric-trend up" id="detail-client-id">CLI-01</span>
+                    <h2 class="serif" id="detail-client-name" style="font-size: 22px; margin-top: 4px;">Constructora Alfa S.A.</h2>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+                    <div>
+                      <span class="health-label">Identificación Tributaria (RFC/RUT)</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-client-rfc">CALF900812-A10</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Representante / Contacto</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-client-contact">Ing. Luis Fuentes</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Teléfono</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-client-phone">+56 9 8765 4321</p>
+                    </div>
+                    <div>
+                      <span class="health-label">Correo Electrónico</span>
+                      <p style="font-weight: 600; margin-top: 2px;" id="detail-client-email">legal@constructoraalfa.com</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Associated Cases -->
+                <div class="glass-card">
+                  <h3 class="section-title" style="margin-bottom: 14px;">Expedientes Asociados</h3>
+                  <div class="table-responsive">
+                    <table class="custom-table" id="client-cases-table">
+                      <thead>
+                        <tr>
+                          <th>Código</th>
+                          <th>Carátula / Caso</th>
+                          <th>Área</th>
+                          <th>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <!-- Rendered by JS -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Side: Consolidated Documents -->
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="glass-card">
+                  <h3 class="section-title" style="margin-bottom: 14px;">Documentos Consolidados (PDF)</h3>
+                  <div class="document-list" id="detail-client-documents">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. REPORTS VIEW -->
+        <section class="view-panel" id="view-reports">
+          <!-- Security block wrapper -->
+          <div id="reports-blocked-overlay">
+            <div class="section-header">
+              <div>
+                <span class="metric-trend up">Analítica Avanzada</span>
+                <h2 class="serif" style="font-size: 26px; margin-top: 4px;">Reportes e Inteligencia de Negocios</h2>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-export-pdf" onclick="alert('Simulación de Exportación: Reporte PDF generado correctamente.')">Exportar Reporte</button>
+            </div>
+
+            <!-- Metrics -->
+            <div class="metrics-grid">
+              <div class="glass-card metric-card">
+                <div class="metric-title">Facturación Anual Proyectada</div>
+                <div class="metric-value" id="report-projected-revenue">$37,300,000</div>
+                <div class="metric-sub">Bajo estimaciones Q1-Q2</div>
+              </div>
+              <div class="glass-card metric-card">
+                <div class="metric-title">Cuentas por Cobrar</div>
+                <div class="metric-value" id="report-pending-collection">$12,800,000</div>
+                <div class="metric-sub">Facturas pendientes de pago</div>
+              </div>
+              <div class="glass-card metric-card">
+                <div class="metric-title">Promedio Tarifa Horaria</div>
+                <div class="metric-value">$85,000</div>
+                <div class="metric-sub">Ponderado por roles jurídicos</div>
+              </div>
+              <div class="glass-card metric-card">
+                <div class="metric-title">Tasa de Éxito en Juicios</div>
+                <div class="metric-value">82%</div>
+                <div class="metric-sub">Casos con resolución favorable</div>
+              </div>
+            </div>
+
+            <!-- Charts Layout -->
+            <div class="reports-layout">
+              <div class="glass-card">
+                <h3 class="section-title" style="margin-bottom: 16px;">Distribución de Casos por Área</h3>
+                <div class="chart-container">
+                  <canvas id="chart-cases-area"></canvas>
+                </div>
+              </div>
+
+              <div class="glass-card">
+                <h3 class="section-title" style="margin-bottom: 16px;">Rendimiento de Facturación Q2</h3>
+                <div class="chart-container">
+                  <canvas id="chart-billing-performance"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lawyer Performance Table -->
+            <div class="glass-card">
+              <div class="section-header">
+                <h3 class="section-title">Desempeño Operativo y Cobros por Abogado</h3>
+              </div>
+              <div class="table-responsive">
+                <table class="custom-table" id="reports-lawyers-table">
+                  <thead>
+                    <tr>
+                      <th>Abogado</th>
+                      <th>Rol</th>
+                      <th>Casos Asignados</th>
+                      <th>Horas Registradas</th>
+                      <th>Facturado del Mes</th>
+                      <th>Tasa de Cobro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Rendered by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. IT ADMIN VIEW -->
+        <section class="view-panel" id="view-it-admin">
+          <!-- Security Block Wrapper -->
+          <div id="it-blocked-overlay">
+            <div class="section-header">
+              <div>
+                <span class="metric-trend down">Consola del Administrador</span>
+                <h2 class="serif" style="font-size: 26px; margin-top: 4px;">Administración del Sistema de TI</h2>
+              </div>
+            </div>
+
+            <div class="ti-layout">
+              <!-- Left Column: Status & Users -->
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Infrastructure health status -->
+                <div class="glass-card">
+                  <h3 class="section-title" style="margin-bottom: 14px;">Estado de Salud de la Infraestructura</h3>
+                  <div class="system-health-grid">
+                    <div class="health-item">
+                      <span class="health-label">Base de Datos SQL</span>
+                      <div class="health-status-row">
+                        <div class="health-indicator pulsing" id="health-db-indicator"></div>
+                        <span class="health-value">ONLINE</span>
+                      </div>
+                    </div>
+                    <div class="health-item">
+                      <span class="health-label">Latencia de API</span>
+                      <div class="health-status-row">
+                        <div class="health-indicator pulsing" id="health-latency-indicator"></div>
+                        <span class="health-value" id="health-latency-value">12 ms</span>
+                      </div>
+                    </div>
+                    <div class="health-item">
+                      <span class="health-label">Almacenamiento AWS S3</span>
+                      <div class="health-status-row">
+                        <div class="health-indicator"></div>
+                        <span class="health-value">34.2 GB (8%)</span>
+                      </div>
+                    </div>
+                    <div class="health-item">
+                      <span class="health-label">Estado de Backups</span>
+                      <div class="health-status-row">
+                        <div class="health-indicator"></div>
+                        <span class="health-value" id="health-backup-status">ACTIVO (15:00)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Controls -->
+                  <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn btn-secondary" style="justify-content: center;" id="btn-it-backup">
+                      💾 Forzar Respaldo del Sistema
+                    </button>
+                    <button class="btn btn-secondary" style="justify-content: center;" id="btn-it-latency">
+                      ⚡ Simular Alta Latencia de Red
+                    </button>
+                    <button class="btn btn-danger" style="justify-content: center;" id="btn-it-reset">
+                      🚨 Restablecer Base de Datos de Fábrica
+                    </button>
+                  </div>
+                </div>
+
+                <!-- User Management -->
+                <div class="glass-card">
+                  <div class="section-header">
+                    <h3 class="section-title">Control de Accesos y Cuentas de Usuario</h3>
+                    <button class="btn btn-secondary btn-sm" id="btn-open-create-user-modal">Nuevo Usuario</button>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="custom-table" id="it-users-table">
+                      <thead>
+                        <tr>
+                          <th>Usuario</th>
+                          <th>Rol de Seguridad</th>
+                          <th>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <!-- Rendered by JS -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Audit Logs -->
+              <div style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="glass-card" style="flex-grow: 1; display: flex; flex-direction: column; min-height: 500px;">
+                  <div class="section-header">
+                    <h3 class="section-title">Registro de Auditoría de Seguridad (Audit Logs)</h3>
+                    <span class="badge badge-active" style="font-size: 9px; padding: 2px 6px;">En vivo</span>
+                  </div>
+                  <div class="audit-logs-list" id="it-logs-container" style="max-height: 500px; flex-grow: 1;">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+
+
+  <!-- ==================== iOS SHEET MODALS ==================== -->
+  
+  <!-- 1. CREATE CASE MODAL -->
+  <div class="modal" id="modal-create-case">
+    <div class="modal-content">
+      <div class="ios-grabber"></div>
+      <div class="modal-header">
+        <h3 class="modal-title">Registrar Nuevo Expediente</h3>
+        <button class="modal-close" data-close="modal-create-case">Cancelar</button>
+      </div>
+      <form id="form-create-case">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="case-title-input">Carátula / Nombre del Caso</label>
+            <input type="text" class="form-control" id="case-title-input" required placeholder="Ej. Juicio de Arrendamiento Gómez vs. Valdés">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="case-client-select">Cliente</label>
+              <select class="form-control" id="case-client-select" required>
+                <!-- Loaded dynamically -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="case-area-select">Área Legal</label>
+              <select class="form-control" id="case-area-select" required>
+                <option value="Civil">Civil</option>
+                <option value="Penal">Penal</option>
+                <option value="Laboral">Laboral</option>
+                <option value="Tributario">Tributario</option>
+                <option value="Corporativo">Corporativo</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="case-opposing-input">Contraparte</label>
+              <input type="text" class="form-control" id="case-opposing-input" placeholder="Ej. Juan Pérez / Empresa S.A.">
+            </div>
+            <div class="form-group">
+              <label for="case-opposing-lawyer-input">Abogado Contraparte</label>
+              <input type="text" class="form-control" id="case-opposing-lawyer-input" placeholder="Ej. Estudio Jurídico Gomez & Cía">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="case-court-input">Tribunal / Sede</label>
+              <input type="text" class="form-control" id="case-court-input" required placeholder="Ej. 1er Juzgado de Letras de Trabajo">
+            </div>
+            <div class="form-group">
+              <label for="case-judge-input">Juez a Cargo</label>
+              <input type="text" class="form-control" id="case-judge-input" placeholder="Ej. Don Ricardo Morales">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="case-lawyer-select">Abogado Asignado</label>
+              <select class="form-control" id="case-lawyer-select" required>
+                <!-- Loaded dynamically -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="case-start-date-input">Fecha de Apertura</label>
+              <input type="date" class="form-control" id="case-start-date-input" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="case-desc-input">Resumen General de los Hechos</label>
+            <textarea class="form-control" id="case-desc-input" required placeholder="Escriba los antecedentes claves de la demanda o defensa jurídica..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Registrar Expediente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. CREATE CLIENT MODAL -->
+  <div class="modal" id="modal-create-client">
+    <div class="modal-content">
+      <div class="ios-grabber"></div>
+      <div class="modal-header">
+        <h3 class="modal-title">Registrar Nuevo Cliente</h3>
+        <button class="modal-close" data-close="modal-create-client">Cancelar</button>
+      </div>
+      <form id="form-create-client">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="client-name-input">Nombre Completo o Razón Social</label>
+            <input type="text" class="form-control" id="client-name-input" required placeholder="Ej. Inversiones Pacífico S.A. o Juan Valenzuela">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="client-type-select">Tipo de Persona</label>
+              <select class="form-control" id="client-type-select" required>
+                <option value="Corporativo">Corporativo (Persona Jurídica)</option>
+                <option value="Individual">Individual (Persona Física)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="client-rfc-input">Identificación Tributaria (RFC/RUT)</label>
+              <input type="text" class="form-control" id="client-rfc-input" required placeholder="Ej. IPAC890912-XX2">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="client-contact-input">Representante / Contacto</label>
+              <input type="text" class="form-control" id="client-contact-input" required placeholder="Ej. Don Antonio Ríos">
+            </div>
+            <div class="form-group">
+              <label for="client-phone-input">Teléfono</label>
+              <input type="tel" class="form-control" id="client-phone-input" required placeholder="Ej. +56 9 8877 6655">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="client-email-input">Correo Electrónico de Contacto</label>
+            <input type="email" class="form-control" id="client-email-input" required placeholder="Ej. contacto@empresa.com">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Registrar Cliente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. ADD MILESTONE MODAL -->
+  <div class="modal" id="modal-create-milestone">
+    <div class="modal-content">
+      <div class="ios-grabber"></div>
+      <div class="modal-header">
+        <h3 class="modal-title">Registrar Hito Procesal</h3>
+        <button class="modal-close" data-close="modal-create-milestone">Cancelar</button>
+      </div>
+      <form id="form-create-milestone">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="milestone-date-input">Fecha del Hito</label>
+              <input type="date" class="form-control" id="milestone-date-input" required>
+            </div>
+            <div class="form-group">
+              <label for="milestone-completed-select">¿Hito Concluido?</label>
+              <select class="form-control" id="milestone-completed-select" required>
+                <option value="false">Programado / Pendiente</option>
+                <option value="true">Realizado / Concluido</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="milestone-title-input">Título del Evento Procesal</label>
+            <input type="text" class="form-control" id="milestone-title-input" required placeholder="Ej. Recepción de Sentencia de Apelación">
+          </div>
+          <div class="form-group">
+            <label for="milestone-desc-input">Detalles / Anotaciones Adicionales</label>
+            <textarea class="form-control" id="milestone-desc-input" required placeholder="Describa brevemente qué ocurrió o qué se espera en este hito..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Registrar Hito</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. ADD TASK MODAL -->
+  <div class="modal" id="modal-create-task">
+    <div class="modal-content">
+      <div class="ios-grabber"></div>
+      <div class="modal-header">
+        <h3 class="modal-title">Crear Tarea del Expediente</h3>
+        <button class="modal-close" data-close="modal-create-task">Cancelar</button>
+      </div>
+      <form id="form-create-task">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="task-title-input">Descripción de la Tarea</label>
+            <input type="text" class="form-control" id="task-title-input" required placeholder="Ej. Solicitar firmas en Notaría">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="task-lawyer-select">Responsable Asignado</label>
+              <select class="form-control" id="task-lawyer-select" required>
+                <!-- Loaded dynamically -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="task-date-input">Fecha Límite</label>
+              <input type="date" class="form-control" id="task-date-input" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Crear Tarea</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. VIEW PDF MODAL -->
+  <div class="modal" id="modal-view-pdf">
+    <div class="modal-content" style="max-width: 800px;">
+      <div class="ios-grabber"></div>
+      <div class="modal-header">
+        <h3 class="modal-title" id="pdf-viewer-title">Visualizar Documento</h3>
+        <button class="modal-close" data-close="modal-view-pdf">Cerrar</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <div id="pdf-viewer-container" style="width: 100%; height: 70vh; background-color: rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center;">
+          <iframe id="pdf-viewer-iframe" style="width: 100%; height: 100%; border: none; display: none;"></iframe>
+          <div id="pdf-viewer-fallback" style="text-align: center; padding: 40px; display: none;">
+            <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--primary-gold)" stroke-width="2" fill="none" style="margin: 0 auto 12px; display: block;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <h4 style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">Vista Previa de Metadatos</h4>
+            <p style="font-size: 12.5px; color: var(--text-secondary); max-width: 340px; margin: 0 auto 16px;">El archivo PDF físico ya no está cargado en la sesión del navegador. Los metadatos del documento siguen guardados de forma segura en LocalStorage.</p>
+            <button class="btn btn-primary btn-sm" id="btn-reupload-pdf-viewer">Cargar Archivo Físico</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. CREATE USER MODAL -->
+  <div class="modal" id="modal-create-user">
+    <div class="modal-content">
+      <div class="ios-grabber"></div>
+      <div class="modal-header">
+        <h3 class="modal-title">Registrar Nuevo Usuario</h3>
+        <button class="modal-close" data-close="modal-create-user">Cancelar</button>
+      </div>
+      <form id="form-create-user">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="user-name-input">Nombre Completo</label>
+            <input type="text" class="form-control" id="user-name-input" required placeholder="Ej. Dra. Valentina Paz">
+          </div>
+          
+          <div class="form-group">
+            <label for="user-email-input">Correo Electrónico</label>
+            <input type="email" class="form-control" id="user-email-input" required placeholder="Ej. valentina.paz@legium.law">
+          </div>
+
+          <div class="form-group">
+            <label for="user-role-select">Rol / Permisos de Seguridad</label>
+            <select class="form-control" id="user-role-select" required>
+              <option value="TI Administrador">TI Administrador</option>
+              <option value="Socio Principal">Socio Principal</option>
+              <option value="Abogado Senior">Abogado Senior</option>
+              <option value="Abogado Junior" selected>Abogado Junior</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Crear Usuario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ALERTS TOAST CONTAINER -->
+  <div class="alert-popup-container" id="alert-container"></div>
+
+  <!-- Load DB, Charts and Main Logic -->
+  <script type="module" src="./data.js"></script>
+  <script type="module" src="./charts.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
