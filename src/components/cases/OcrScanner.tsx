@@ -115,6 +115,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const startCamera = async () => {
     try {
       stopCamera();
+      // Try environment-facing camera first (ideal for phone scanning documents)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
@@ -122,9 +123,20 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       setHasCamera(true);
       setForceSimulator(false);
     } catch (err) {
-      console.warn('Camera unavailable, using document simulator.', err);
-      setHasCamera(false);
-      setForceSimulator(true);
+      console.warn('Environment camera failed, trying fallback constraints...', err);
+      try {
+        // Fallback for laptops/desktops without back cameras
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        setCameraStream(fallbackStream);
+        setHasCamera(true);
+        setForceSimulator(false);
+      } catch (fallbackErr) {
+        console.warn('All camera constraints failed, using simulator.', fallbackErr);
+        setHasCamera(false);
+        setForceSimulator(true);
+      }
     }
   };
 
@@ -351,30 +363,54 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       setOcrProgress(100);
       setOcrStatus('Texto extraído correctamente.');
 
-      // Try to parse metadata from OCR text
-      // Common patterns in Chilean legal documents
-      const nameMatch = rawText.match(/(?:demandante|trabajador)[:\s]+([\w\s,\.]+?)(?:\n|,|domiciliad)/i);
-      const amountMatch = rawText.match(/\$([\d.,]+(?:\s*CLP)?)/i);
-      const courtMatch = rawText.match(/(?:juzgado|tribunal)[^\n]{0,60}/i);
-      const judgeMatch = rawText.match(/(?:juez|magistrad|dra?\.|lic\.)[^\n]{0,50}/i);
+      // Initialize default values for the parsed results
+      let parsedName = '';
+      let parsedAmount = 'Por determinar';
+      let parsedCourt = '1° Juzgado de Letras del Trabajo';
+      let parsedJudge = 'Por designar';
+      let parsedDesc = rawText.substring(0, 250).trim() || 'Sin texto extraído en el escaneo';
 
-      if (nameMatch?.[1]?.trim()) setWorkerName(nameMatch[1].trim());
-      if (amountMatch?.[0]) setClaimAmount(amountMatch[0].trim());
-      if (courtMatch?.[0]) setCourt(courtMatch[0].trim());
-      if (judgeMatch?.[0]) setJudge(judgeMatch[0].trim());
+      // Advanced parser for real scanned photographs
+      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      
+      // Look for worker/demandante name
+      const nameMatch = rawText.match(/(?:demandante|trabajador|contrade|persona|don|doña)[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,40})/i);
+      if (nameMatch && nameMatch[1]) {
+        parsedName = nameMatch[1].trim();
+      } else {
+        // Fallback: search for first line that looks like a name (capitalized words)
+        const nameLine = lines.find(l => /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/.test(l));
+        if (nameLine) parsedName = nameLine;
+      }
 
-      // Set description to first meaningful paragraph
-      const firstParagraph = rawText
-        .split('\n')
-        .map(l => l.trim())
-        .filter(l => l.length > 40)
-        .slice(0, 3)
-        .join(' ');
-      if (firstParagraph) setDescription(firstParagraph.slice(0, 300));
+      // Look for amount
+      const amountMatch = rawText.match(/(\d+[\d\.,]*\s*(?:CLP|\$|pesos))/i) || rawText.match(/(\$\s*\d+[\d\.,]*)/i);
+      if (amountMatch) {
+        parsedAmount = amountMatch[1].trim();
+      }
+
+      // Look for court
+      const courtMatch = rawText.match(/(?:juzgado|tribunal|corte)[^\n]{0,50}/i);
+      if (courtMatch) {
+        parsedCourt = courtMatch[0].trim();
+      }
+
+      // Update state dynamically with the actual scanned text data
+      setWorkerName(parsedName || 'Trabajador Detectado');
+      setClaimAmount(parsedAmount);
+      setCourt(parsedCourt);
+      setJudge(parsedJudge);
+      setDescription(parsedDesc);
 
       setTimeout(() => setStep('ocr-confirm'), 500);
     } catch (err) {
       console.error('Tesseract OCR error:', err);
+      // If OCR fails completely, clear fields and let user input manually
+      setWorkerName('Demanda Escaneada');
+      setClaimAmount('Por determinar');
+      setCourt('Juzgado del Trabajo');
+      setJudge('Por designar');
+      setDescription('No se pudo procesar el texto automáticamente. Ingrese descripción.');
       setOcrStatus('Error en OCR. Puedes editar los campos manualmente.');
       setTimeout(() => setStep('ocr-confirm'), 1200);
     }
