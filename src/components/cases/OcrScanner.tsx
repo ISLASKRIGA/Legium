@@ -1,7 +1,7 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2 } from 'lucide-react';
 import { cropImage, createSearchablePdf } from '../../utils/scannerPdf';
-import { getPdfStorageKey } from '../../utils/pdfStorage';
+import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
 
 interface OcrScannerProps {
@@ -20,7 +20,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [flashActive, setFlashActive] = useState(false);
   const [scannerMsg, setScannerMsg] = useState('CamScanner: Buscando bordes de hoja...');
   const [sheetDetected, setSheetDetected] = useState(false);
-  const [forceSimulator, setForceSimulator] = useState(true); // Default to simulator to avoid black camera streams
+  const [forceSimulator, setForceSimulator] = useState(false); // Try real camera first; fall back to simulator if unavailable
 
   // SVG Edge coordinates for real-time CamScanner simulation
   const [edgePoints, setEdgePoints] = useState({
@@ -37,13 +37,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatus, setOcrStatus] = useState('Iniciando motor de reconocimiento OCR...');
 
-  // Extracted Metadata Form
-  const [workerName, setWorkerName] = useState('Juan Pablo MartÃ­nez DÃ­az');
+  // Extracted Metadata Form - editable by user after OCR
+  const [workerName, setWorkerName] = useState('Juan Pablo Martínez Díaz');
   const [claimAmount, setClaimAmount] = useState('18,500,000 CLP');
-  const [court, setCourt] = useState('1Â° Juzgado de Letras del Trabajo de Santiago');
-  const [judge, setJudge] = useState('Dra. Eliana RodrÃ­guez');
+  const [court, setCourt] = useState('1° Juzgado de Letras del Trabajo de Santiago');
+  const [judge, setJudge] = useState('Dra. Eliana Rodríguez');
   const [description, setDescription] = useState(
-    'Demanda laboral de tutela laboral por vulneraciÃ³n de derechos fundamentales con ocasiÃ³n del despido injustificado e indemnizaciÃ³n de perjuicios. Se reclaman recargos legales y aÃ±os de servicio.'
+    'Demanda laboral de tutela laboral por vulneración de derechos fundamentales con ocasión del despido injustificado e indemnización de perjuicios. Se reclaman recargos legales y años de servicio.'
   );
   const [fileName, setFileName] = useState('Documento_Escaneado.pdf');
 
@@ -59,13 +59,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [dragHandle, setDragHandle] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!forceSimulator) {
-      startCamera();
-    }
+    // Always try real camera on mount; fall back to simulator on error (handled in startCamera)
+    startCamera();
     return () => {
       stopCamera();
     };
-  }, [forceSimulator]);
+  }, []);
 
   // Simulating CamScanner real-time edge detection drift
   useEffect(() => {
@@ -355,6 +354,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
       const docId = 'doc-' + Date.now();
       const uploadDate = new Date().toISOString().split('T')[0];
+
+      // ✅ FIX: Persist PDF to localStorage so it survives modal close/reopen
+      await savePdfBlob(docId, pdfBlob);
+
       const newDoc: DocumentItem = {
         id: docId,
         name: fileName.endsWith('.pdf') ? fileName : fileName + '.pdf',
@@ -367,7 +370,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
       const newCase: Case = {
         id: caseId,
-        title: 'Demanda Laboral: ' + workerName + ' vs. Constructora Alfa',
+        title: (workerName.trim() ? workerName : 'Trabajador') + ' vs. Constructora Alfa',
         clientId: currentUser.clientId || 'cli-01',
         clientName: 'Constructora Alfa S.A.',
         opposingParty: workerName,
@@ -389,10 +392,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           }
         ],
         tasks: [
-          { id: 'tsk-' + Date.now().toString().slice(-4), title: 'Contestar demanda laboral en tribunal', dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], assignedTo: 'usr-03', completed: false }
+          { id: 'tsk-' + Date.now().toString().slice(-4), title: 'Revisar y contestar demanda laboral en tribunal', dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], assignedTo: 'usr-03', completed: false }
         ],
         notes: [
-          { id: 'nt-001', date: uploadDate + ' 12:00', author: 'OCR Extraccion Inteligente', text: 'Metadatos extraidos de la demanda: Cuantia economica: ' + claimAmount + '. Tribunal asignado: ' + court + '.' }
+          { id: 'nt-' + Date.now(), date: uploadDate + ' ' + new Date().toTimeString().slice(0, 5), author: 'OCR Extraccion Inteligente', text: 'Metadatos extraidos de la demanda. Cuantia economica: ' + claimAmount + '. Tribunal: ' + court + '.' }
         ],
         documents: [newDoc]
       };

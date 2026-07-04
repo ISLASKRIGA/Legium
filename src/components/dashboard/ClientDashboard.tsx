@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert } from 'lucide-react';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
@@ -63,22 +63,21 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
   });
 
   const handleOcrComplete = async (newCase: Case, newDoc: DocumentItem, fileBlob: Blob) => {
-    const storageKey = await savePdfBlob(newDoc.id, fileBlob);
-    const storedCase = {
-      ...newCase,
-      documents: newCase.documents.map((doc) =>
-        doc.id === newDoc.id ? { ...doc, storageKey } : doc
-      )
-    };
-
-    onAddCase(storedCase);
-    onAddLog('Cliente Ing. Luis Fuentes registro nueva demanda laboral via OCR (' + newCase.id + ')', 'Success');
-    onShowToast('Demanda Ingresada', 'La demanda de ' + newCase.opposingParty + ' se ingreso con exito y quedo almacenada como PDF OCR.', 'success');
+    // ✅ FIX: Persist the PDF blob to localStorage so it can be viewed later
+    try {
+      await savePdfBlob(newDoc.id, fileBlob);
+    } catch (e) {
+      console.warn('Could not persist PDF to localStorage:', e);
+    }
+    onAddCase(newCase);
+    onAddLog(`Cliente ${currentUser.name} registró nuevo documento laboral vía OCR (${newCase.id})`, 'Success');
+    onShowToast('Documento Ingresado', `El expediente de ${newCase.opposingParty} se creó con éxito y está disponible en su carpeta.`, 'success');
     setActiveModal('none');
   };
 
   const handleViewPDF = (docId: string, docName: string) => {
     setActiveDocName(docName);
+    // ✅ FIX: Use getPdfObjectUrl which reads from localStorage if session URL is gone
     const url = getPdfObjectUrl(docId);
     setActiveDocUrl(url || '');
     setActiveModal('pdf');
