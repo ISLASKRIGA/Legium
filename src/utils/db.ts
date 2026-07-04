@@ -13,112 +13,112 @@ export const DEFAULT_CLIENTS: Client[] = [
   { id: "cli-01", name: "Constructora Alfa S.A.", email: "legal@constructoraalfa.com", phone: "+56 9 8765 4321", type: "Corporativo", rfc: "CALF900812-A10", contactPerson: "Ing. Luis Fuentes" },
   { id: "cli-02", name: "Inversiones del Norte S.A.S.", email: "contacto@inversionesnorte.cl", phone: "+56 9 1234 5678", type: "Corporativo", rfc: "INOR150320-TX9", contactPerson: "Sra. Clara Belmar" },
   { id: "cli-03", name: "BioTecno Labs S.A.", email: "patentes@biotecnolabs.com", phone: "+56 2 2456 7890", type: "Corporativo", rfc: "BLAB201105-3R8", contactPerson: "Dr. Hugo Valencia" },
-  { id: "cli-04", name: "María Elena Gómez", email: "maria.gomez@gmail.com", phone: "+56 9 9988 7766", type: "Individual", rfc: "GOME750614-XYZ", contactPerson: "María Elena Gómez" },
-  { id: "cli-05", name: "Roberto Díaz", email: "roberto.diaz.p@outlook.com", phone: "+56 9 5544 3322", type: "Individual", rfc: "DIAR820921-H22", contactPerson: "Roberto Díaz" },
-  { id: "cli-06", name: "Andrés Larraín", email: "andres.larrain@yahoo.com", phone: "+56 9 4433 2211", type: "Individual", rfc: "LARA880402-K99", contactPerson: "Andrés Larraín" }
+  { id: "cli-04", name: "Servicios de Retail Express Ltda.", email: "legal@retailexpress.cl", phone: "+56 9 9988 7766", type: "Corporativo", rfc: "REXP750614-XYZ", contactPerson: "Sra. María Elena Gómez" },
+  { id: "cli-05", name: "Distribuidora Logística Rápida S.A.", email: "legal@logisticalrapida.cl", phone: "+56 9 5544 3322", type: "Corporativo", rfc: "LRAP820921-H22", contactPerson: "Don Roberto Díaz" },
+  { id: "cli-06", name: "Agrícola Ganadera El Campo S.A.", email: "legal@ganaderaelcampo.cl", phone: "+56 9 4433 2211", type: "Corporativo", rfc: "CAMP880402-K99", contactPerson: "Don Andrés Larraín" }
 ];
 
 export const DEFAULT_CASES: Case[] = [
   {
     id: "LEG-2026-001",
-    title: "Demanda de Reivindicación Alfa vs. Beta",
+    title: "Tutela por Accidente del Trabajo - Rojas vs. Alfa",
     clientId: "cli-01",
     clientName: "Constructora Alfa S.A.",
-    opposingParty: "Corporación Beta S.A.",
+    opposingParty: "Eduardo Rojas Muñoz (Ex Carpintero)",
     opposingLawyer: "Estudio Jurídico Silva & Asociados",
-    practiceArea: "Civil",
+    practiceArea: "Laboral",
     status: "Activo",
-    court: "2° Juzgado Civil de Santiago",
+    court: "2° Juzgado de Letras del Trabajo de Santiago",
     judge: "Dra. Patricia Ortiz",
     assignedLawyerId: "usr-01",
     assignedLawyerName: "Dr. Carlos Mendoza",
     startDate: "2026-01-15",
-    description: "Juicio reivindicatorio sobre terreno en Colina. Disputa de límites de deslindes tras nueva topografía municipal. Constructora Alfa exige restitución del paño norte de 1,200 metros cuadrados.",
+    description: "Defensa corporativa frente a demanda de tutela laboral por accidente laboral grave en obra de Colina. El trabajador reclama indemnización por daño moral por la suma de $45.000.000 CLP alegando falta de medidas de protección.",
     timeline: [
-      { date: "2026-01-15", title: "Presentación de Demanda", desc: "Se ingresa el escrito de demanda en la corte de origen.", completed: true },
-      { date: "2026-02-04", title: "Notificación al Demandado", desc: "El receptor judicial efectúa la notificación a Corporación Beta S.A.", completed: true },
-      { date: "2026-03-01", title: "Contestación de Demanda", desc: "La demandada presenta sus excepciones y contesta negando los hechos.", completed: true },
-      { date: "2026-06-25", title: "Audiencia de Conciliación", desc: "Citación a comparendo de conciliación obligatorio fijado por el tribunal.", completed: false },
-      { date: "2026-07-20", title: "Término Probatorio", desc: "Apertura del periodo para presentar pruebas y testigos.", completed: false }
+      { date: "2026-01-15", title: "Ingreso de Demanda", desc: "Se notifica la demanda de tutela en las oficinas centrales de Alfa.", completed: true },
+      { date: "2026-02-04", title: "Contestación de Demanda", desc: "Se contesta negando la negligencia laboral y acreditando entrega de EPP.", completed: true },
+      { date: "2026-03-01", title: "Inspección de Faena", desc: "La Inspección del Trabajo evacúa informe favorable de condiciones de seguridad.", completed: true },
+      { date: "2026-06-25", title: "Audiencia Preparatoria", desc: "Fijación del objeto del juicio y ofrecimiento de pruebas.", completed: false },
+      { date: "2026-07-20", title: "Audiencia de Juicio", desc: "Juicio oral y declaración de peritos y testigos.", completed: false }
     ],
     tasks: [
-      { id: "tsk-001", title: "Preparar minuta de conciliación", dueDate: "2026-06-23", assignedTo: "usr-02", completed: false },
-      { id: "tsk-002", title: "Coordinar perito topógrafo judicial", dueDate: "2026-06-18", assignedTo: "usr-03", completed: true },
-      { id: "tsk-003", title: "Pagar tasas de receptoría judicial", dueDate: "2026-01-20", assignedTo: "usr-03", completed: true }
+      { id: "tsk-001", title: "Preparar minuta y carpetas de entrega de EPP", dueDate: "2026-06-23", assignedTo: "usr-02", completed: false },
+      { id: "tsk-002", title: "Coordinar declaración de prevencionista de riesgos", dueDate: "2026-06-18", assignedTo: "usr-03", completed: true },
+      { id: "tsk-003", title: "Pagar honorarios a receptor por notificaciones de testigos", dueDate: "2026-01-20", assignedTo: "usr-03", completed: true }
     ],
     notes: [
-      { id: "nt-001", date: "2026-02-05 10:30", author: "Dr. Carlos Mendoza", text: "El cliente insiste en que no aceptará un acuerdo inferior al 80% del terreno en disputa." },
-      { id: "nt-002", date: "2026-03-02 16:15", author: "Dra. Sofía Valenzuela", text: "La contestación de la contraparte es débil en cuanto a la inscripción de dominio de 1994. Tenemos ventaja documental." }
+      { id: "nt-001", date: "2026-02-05 10:30", author: "Dr. Carlos Mendoza", text: "El gerente indica que no llegaremos a acuerdo extrajudicial pues el accidente ocurrió por negligencia del trabajador al quitarse el arnés." },
+      { id: "nt-002", date: "2026-03-02 16:15", author: "Dra. Sofía Valenzuela", text: "El informe de la Inspección ratifica que los arneses estaban debidamente firmados en las hojas de control de EPP." }
     ],
     documents: []
   },
   {
     id: "LEG-2026-002",
-    title: "Defensa Penal - Supuesto Delito Tributario",
+    title: "Despido Indirecto y Horas Extras - Díaz vs. Logística Rápida",
     clientId: "cli-05",
-    clientName: "Roberto Díaz",
-    opposingParty: "Servicio de Impuestos Internos / Ministerio Público",
-    opposingLawyer: "Fiscalía Centro Norte - Fiscal de Delitos Económicos",
-    practiceArea: "Penal",
+    clientName: "Distribuidora Logística Rápida S.A.",
+    opposingParty: "Roberto Díaz Prado (Ex Chofer)",
+    opposingLawyer: "Defensoría Laboral (Oficina Metropolitana)",
+    practiceArea: "Laboral",
     status: "Activo",
-    court: "8° Juzgado de Garantía de Santiago",
+    court: "1° Juzgado de Letras del Trabajo de Santiago",
     judge: "Dr. Marcelo Gaete",
     assignedLawyerId: "usr-02",
     assignedLawyerName: "Dra. Sofía Valenzuela",
     startDate: "2026-03-10",
-    description: "Defensa de Roberto Díaz en investigación formalizada por supuesta emisión de facturas ideológicamente falsas e infracciones del código tributario. Monto imputado: $120.000.000 CLP.",
+    description: "Defensa corporativa ante demanda de autodespido por acoso laboral y cobro de horas extraordinarias de despacho de carga pesada. Monto en disputa: $18.200.000 CLP.",
     timeline: [
-      { date: "2026-03-10", title: "Formalización de la Investigación", desc: "El tribunal fija plazo de investigación de 120 días y decreta firma mensual.", completed: true },
-      { date: "2026-04-12", title: "Entrega de Peritaje Contable Privado", desc: "Ingreso de informe forense contable propio para desmentir dolo.", completed: true },
-      { date: "2026-07-10", title: "Audiencia de Cierre de Investigación", desc: "Vencimiento del plazo judicial. Se discutirá sobreseimiento o preparación de juicio.", completed: false }
+      { date: "2026-03-10", title: "Notificación de Autodespido", desc: "Llega carta del trabajador alegando cese de funciones por incumplimiento contractual.", completed: true },
+      { date: "2026-04-12", title: "Comparendo en Inspección", desc: "Se asiste a mediación administrativa; se frustra por falta de bases de acuerdo.", completed: true },
+      { date: "2026-07-10", title: "Audiencia Preparatoria", desc: "Citación a tribunal para resolver excepciones y ratificar pruebas de jornada.", completed: false }
     ],
     tasks: [
-      { id: "tsk-004", title: "Reunión con el perito contable para afinar anexos", dueDate: "2026-06-24", assignedTo: "usr-02", completed: false },
-      { id: "tsk-005", title: "Solicitar copias autorizadas de carpeta fiscal", dueDate: "2026-03-12", assignedTo: "usr-03", completed: true }
+      { id: "tsk-004", title: "Extraer planillas de marcas de GPS de los camiones", dueDate: "2026-06-24", assignedTo: "usr-02", completed: false },
+      { id: "tsk-005", title: "Recopilar libro de firmas y registros biométricos", dueDate: "2026-03-12", assignedTo: "usr-03", completed: true }
     ],
     notes: [
-      { id: "nt-003", date: "2026-03-11 09:00", author: "Dra. Sofía Valenzuela", text: "El fiscal se mostró abierto a una salida alternativa si se repara el 50% del perjuicio estimado. El cliente está evaluando créditos." }
+      { id: "nt-003", date: "2026-03-11 09:00", author: "Dra. Sofía Valenzuela", text: "Las marcas de GPS demuestran que el chofer tomaba descansos extendidos en ruta. Eso desmiente las 40 horas extras semanales que reclama." }
     ],
     documents: []
   },
   {
     id: "LEG-2026-003",
-    title: "Reestructuración y Fusión Corporativa",
+    title: "Negociación Colectiva - Sindicato vs. Inversiones del Norte",
     clientId: "cli-02",
     clientName: "Inversiones del Norte S.A.S.",
-    opposingParty: "N/A - Mutuo Acuerdo con Grupo Sur S.A.",
-    opposingLawyer: "Estudio Cariola & Cía",
-    practiceArea: "Corporativo",
+    opposingParty: "Sindicato Interempresa N° 1 de Operadores",
+    opposingLawyer: "Estudio Cariola & Cía (Asesores Sindicato)",
+    practiceArea: "Laboral",
     status: "Cerrado",
-    court: "Notaría Pública N° 45 de Santiago",
-    judge: "N/A - Trámite Notarial",
+    court: "Inspección Provincial del Trabajo de Iquique",
+    judge: "N/A - Mediación del Trabajo",
     assignedLawyerId: "usr-01",
     assignedLawyerName: "Dr. Carlos Mendoza",
     startDate: "2026-02-01",
-    description: "Proceso de absorción y fusión de Grupo Sur S.A. por parte de Inversiones del Norte S.A.S. Incluye Due Diligence contable y legal de activos, transferencia de patentes y marcas, y redacción de nuevos estatutos corporativos.",
+    description: "Asesoría corporativa integral en proceso de negociación colectiva reglada. Mediación de buenos oficios para evitar huelga legal y redacción de nuevo contrato colectivo de trabajo a 3 años.",
     timeline: [
-      { date: "2026-02-01", title: "Inicio de Due Diligence", desc: "Revisión documental de pasivos, contratos de trabajo y licencias del absorbido.", completed: true },
-      { date: "2026-03-15", title: "Firma de Promesa de Fusión", desc: "Firma preliminar del protocolo de fusión y acuerdo de confidencialidad.", completed: true },
-      { date: "2026-05-10", title: "Aprobación de Juntas de Accionistas", desc: "Sesión extraordinaria de juntas de ambas sociedades aprobando la operación.", completed: true },
-      { date: "2026-06-05", title: "Firma de Escritura Pública e Inscripción", desc: "Redacción final y firma en notaría. Inscripción en Conservador de Comercio y publicación en Diario Oficial.", completed: true }
+      { date: "2026-02-01", title: "Presentación del Proyecto", desc: "El sindicato presenta el proyecto de contrato colectivo.", completed: true },
+      { date: "2026-03-15", title: "Respuesta de la Empresa", desc: "Se formula la respuesta patronal ofreciendo reajustabilidad por IPC.", completed: true },
+      { date: "2026-05-10", title: "Periodo de Buenos Oficios", desc: "Solicitud de mediación ante la Inspección para afinar bonos de término de conflicto.", completed: true },
+      { date: "2026-06-05", title: "Firma de Contrato Colectivo", desc: "Firma en Inspección del Trabajo dando término formal al proceso.", completed: true }
     ],
     tasks: [
-      { id: "tsk-006", title: "Publicar extracto de fusión en Diario Oficial", dueDate: "2026-06-10", assignedTo: "usr-03", completed: true },
-      { id: "tsk-007", title: "Inscripción en Registro de Comercio de Santiago", dueDate: "2026-06-08", assignedTo: "usr-03", completed: true },
-      { id: "tsk-008", title: "Elaborar borrador final de contrato de fusión", dueDate: "2026-04-20", assignedTo: "usr-01", completed: true }
+      { id: "tsk-006", title: "Registrar contrato colectivo ante la Inspección del Trabajo", dueDate: "2026-06-10", assignedTo: "usr-03", completed: true },
+      { id: "tsk-007", title: "Enviar liquidación con bonos a contabilidad", dueDate: "2026-06-08", assignedTo: "usr-03", completed: true },
+      { id: "tsk-008", title: "Elaborar última versión del acuerdo colectivo transado", dueDate: "2026-04-20", assignedTo: "usr-01", completed: true }
     ],
     notes: [
-      { id: "nt-004", date: "2026-05-11 11:00", author: "Dr. Carlos Mendoza", text: "Fusión aprobada unánimemente. Los socios quedaron muy conformes con el control de pasivos laborales que recomendamos." }
+      { id: "nt-004", date: "2026-05-11 11:00", author: "Dr. Carlos Mendoza", text: "Logramos un acuerdo excelente. El sindicato aceptó congelar el bono de escolaridad a cambio del seguro de salud complementario." }
     ],
     documents: []
   },
   {
     id: "LEG-2026-004",
-    title: "Demanda Laboral por Despido Injustificado",
+    title: "Tutela de Derechos y Despido - Gómez vs. Retail Express",
     clientId: "cli-04",
-    clientName: "María Elena Gómez",
-    opposingParty: "Retail Multitiendas Falabella S.A.",
-    opposingLawyer: "Abogados Internos Falabella",
+    clientName: "Servicios de Retail Express Ltda.",
+    opposingParty: "María Elena Gómez (Ex Jefa de Tienda)",
+    opposingLawyer: "Centro de Defensoría Laboral",
     practiceArea: "Laboral",
     status: "Activo",
     court: "1° Juzgado de Letras del Trabajo de Santiago",
@@ -126,138 +126,138 @@ export const DEFAULT_CASES: Case[] = [
     assignedLawyerId: "usr-03",
     assignedLawyerName: "Lic. Mateo Ríos",
     startDate: "2026-04-05",
-    description: "Demanda laboral por tutela de derechos fundamentales y despido injustificado tras 8 años de servicio como Gerente de Tienda. Se solicita indemnización por años de servicio, recargo legal y daño moral. Total reclamado: $45.000.000 CLP.",
+    description: "Demanda laboral por tutela de derechos fundamentales y despido injustificado. La ex-empleada acusa discriminación de género y solicita indemnizaciones y recargos por un total de $35.000.000 CLP.",
     timeline: [
-      { date: "2026-04-05", title: "Mediación frustrada en Inspección del Trabajo", desc: "Cierre de etapa administrativa. Se levanta acta sin acuerdo por incomparecencia del empleador.", completed: true },
-      { date: "2026-04-22", title: "Ingreso de la Demanda Laboral", desc: "Se presenta el escrito vía portal judicial electrónico.", completed: true },
-      { date: "2026-05-30", title: "Audiencia Preparatoria", desc: "Se ofrecen los medios de prueba (documental, confesional y testimonial) y se fija fecha de juicio.", completed: true },
-      { date: "2026-07-15", title: "Audiencia de Juicio del Trabajo", desc: "Rendición de pruebas presencial ante la jueza y fallo de primera instancia.", completed: false }
+      { date: "2026-04-05", title: "Mediación Inspección", desc: "Comparendo administrativo cerrado sin acuerdo por diferencias en montos.", completed: true },
+      { date: "2026-04-22", title: "Notificación de Demanda Judicial", desc: "Se recibe notificación de tutela laboral y cobro de prestaciones.", completed: true },
+      { date: "2026-05-30", title: "Audiencia Preparatoria", desc: "Ofrecimiento de testimonios y peritaje psicológico de la actora.", completed: true },
+      { date: "2026-07-15", title: "Audiencia de Juicio", desc: "Fijada audiencia para rendir prueba documental y alegatos.", completed: false }
     ],
     tasks: [
-      { id: "tsk-009", title: "Citación a testigos de la demandante para preparar declaraciones", dueDate: "2026-07-05", assignedTo: "usr-03", completed: false },
-      { id: "tsk-010", title: "Redactar y adjuntar objeciones a la contestación de Falabella", dueDate: "2026-05-18", assignedTo: "usr-03", completed: true }
+      { id: "tsk-009", title: "Preparar testimonios de los supervisores de área", dueDate: "2026-07-05", assignedTo: "usr-03", completed: false },
+      { id: "tsk-010", title: "Redactar y presentar escrito de contestación", dueDate: "2026-05-18", assignedTo: "usr-03", completed: true }
     ],
     notes: [
-      { id: "nt-005", date: "2026-04-23 15:40", author: "Lic. Mateo Ríos", text: "María Elena aportó pantallazos de WhatsApp claves que demuestran el acoso laboral (mobbing). Eso sustenta fuertemente la tutela de derechos." }
+      { id: "nt-005", date: "2026-04-23 15:40", author: "Lic. Mateo Ríos", text: "La actora presenta conversaciones informales. Acreditaremos que las medidas de amonestación respondieron estrictamente a faltas de caja auditadas." }
     ],
     documents: []
   },
   {
     id: "LEG-2026-005",
-    title: "Reclamación Tributaria contra Liquidación del SII",
+    title: "Reclamación de Multas de Inspección - Inversiones del Norte S.A.S.",
     clientId: "cli-02",
     clientName: "Inversiones del Norte S.A.S.",
-    opposingParty: "Servicio de Impuestos Internos (SII)",
-    opposingLawyer: "Cuerpo de Abogados de la Dirección Regional Metropolitana SII",
-    practiceArea: "Tributario",
+    opposingParty: "Inspección Provincial del Trabajo de Santiago",
+    opposingLawyer: "Cuerpo Jurídico de la Dirección del Trabajo",
+    practiceArea: "Laboral",
     status: "En Apelación",
-    court: "Tribunal Tributario y Aduanero (TTA) Metropolitano",
+    court: "Tribunal de Letras del Trabajo de Iquique",
     judge: "Don Hernán Silva",
     assignedLawyerId: "usr-01",
     assignedLawyerName: "Dr. Carlos Mendoza",
     startDate: "2025-08-10",
-    description: "Reclamación judicial en contra de la liquidación de impuestos N° 204-205 que rechaza gastos de asesoría externa de ejercicios comerciales 2023-2024. SII reclama el pago de diferencias impositivas por un total de $78.500.000 CLP.",
+    description: "Reclamación judicial de multas administrativas aplicadas por la Inspección del Trabajo por supuestas infracciones a las jornadas laborales de descanso de choferes de despacho.",
     timeline: [
-      { date: "2025-08-10", title: "Presentación del Reclamo", desc: "Presentación del escrito ante el TTA dentro del plazo de 90 días.", completed: true },
-      { date: "2025-11-20", title: "Sentencia de Primera Instancia", desc: "El TTA rechaza parcialmente el reclamo, manteniendo la liquidación en un 60%.", completed: true },
-      { date: "2025-12-15", title: "Recurso de Apelación", desc: "Legium presenta recurso ante la Corte de Apelaciones de Santiago.", completed: true },
-      { date: "2026-07-02", title: "Alegatos en Corte de Apelaciones", desc: "Vista de la causa en la Primera Sala. El socio principal defenderá los alegatos oralmente.", completed: false }
+      { date: "2025-08-10", title: "Ingreso de Reclamación de Multa", desc: "Presentación de reclamo de multa administrativa ante el juzgado.", completed: true },
+      { date: "2025-11-20", title: "Sentencia de Primera Instancia", desc: "El tribunal acoge parcialmente rebajando la multa en un 70%.", completed: true },
+      { date: "2025-12-15", title: "Recurso de Apelación", desc: "Interposición de apelación ante la Corte solicitando nulidad total.", completed: true },
+      { date: "2026-07-02", title: "Alegatos en Corte de Apelaciones", desc: "Causa en tabla para alegatos de nulidad administrativa.", completed: false }
     ],
     tasks: [
-      { id: "tsk-011", title: "Preparar minuta de alegatos para la apelación", dueDate: "2026-06-28", assignedTo: "usr-01", completed: false },
-      { id: "tsk-012", title: "Monitorear estado de la tabla judicial diariamente", dueDate: "2026-06-20", assignedTo: "usr-03", completed: true }
+      { id: "tsk-011", title: "Preparar minuta y minutas de fallos TTA análogos", dueDate: "2026-06-28", assignedTo: "usr-01", completed: false },
+      { id: "tsk-012", title: "Monitorear tabla de alegatos en la Corte", dueDate: "2026-06-20", assignedTo: "usr-03", completed: true }
     ],
     notes: [
-      { id: "nt-006", date: "2025-11-22 17:00", author: "Dr. Carlos Mendoza", text: "La sentencia del TTA tiene una contradicción grave sobre la justificación del gasto en la pág 14. Ese será nuestro foco principal en la Corte de Apelaciones." }
+      { id: "nt-006", date: "2025-11-22 17:00", author: "Dr. Carlos Mendoza", text: "La sentencia incurre en error de cómputo del artículo 22. Apelaremos con buenas expectativas." }
     ],
     documents: []
   },
   {
     id: "LEG-2026-006",
-    title: "Propiedad Intelectual - Registro Patente Biotecnológica",
+    title: "Desafuero Sindical Dirigente - BioTecno vs. Valencia",
     clientId: "cli-03",
     clientName: "BioTecno Labs S.A.",
-    opposingParty: "Instituto Nacional de Propiedad Industrial (INAPI)",
-    opposingLawyer: "Defensores de Marcas / Dirección Jurídica INAPI",
-    practiceArea: "Corporativo",
+    opposingParty: "Hugo Valencia Cid (Dirigente Sindicato)",
+    opposingLawyer: "Asesoría Jurídica Sindicato BioTecno",
+    practiceArea: "Laboral",
     status: "Activo",
-    court: "Tribunal de Propiedad Industrial",
+    court: "2° Juzgado de Letras del Trabajo de Santiago",
     judge: "Junta de Vocales INAPI",
     assignedLawyerId: "usr-02",
     assignedLawyerName: "Dra. Sofía Valenzuela",
     startDate: "2025-10-05",
-    description: "Proceso de apelación y contestación de observaciones sustantivas por el registro de la patente del compuesto de síntesis enzimática 'Biolase-X9'. INAPI formuló reparos por supuesta falta de novedad inventiva frente a un registro europeo anterior.",
+    description: "Juicio de desafuero sindical por faltas injustificadas y abandono de labores de dirigente sindical. Se solicita autorización judicial para desvincular sin pago de indemnización por fuero.",
     timeline: [
-      { date: "2025-10-05", title: "Ingreso de Solicitud de Patente", desc: "Registro técnico y pago de derechos.", completed: true },
-      { date: "2026-01-20", title: "Informe de Perito INAPI", desc: "El perito formula observaciones alegando cercanía con patentes europeas.", completed: true },
-      { date: "2026-02-18", title: "Contestación de Observaciones", desc: "Se ingresa escrito técnico desglosando la diferencia estructural del compuesto.", completed: true },
-      { date: "2026-07-30", title: "Resolución Final de Concesión", desc: "Fecha esperada para dictamen de aceptación o rechazo definitivo.", completed: false }
+      { date: "2025-10-05", title: "Ingreso de la Causa", desc: "Se presenta la demanda de desafuero judicial.", completed: true },
+      { date: "2026-01-20", title: "Fijación de Hechos a Probar", desc: "El tribunal determina puntos de prueba sobre las inasistencias.", completed: true },
+      { date: "2026-02-18", title: "Contestación del Demandado", desc: "El dirigente alega que las ausencias correspondían a horas de fuero sindical.", completed: true },
+      { date: "2026-07-30", title: "Audiencia de Juicio", desc: "Rendición de bitácoras de asistencia y firmas de registro.", completed: false }
     ],
     tasks: [
-      { id: "tsk-013", title: "Revisar traducciones de la patente de comparación de la UE", dueDate: "2026-06-25", assignedTo: "usr-02", completed: false },
-      { id: "tsk-014", title: "Pagar honorarios adicionales al perito de la firma", dueDate: "2026-02-05", assignedTo: "usr-03", completed: true }
+      { id: "tsk-013", title: "Obtener bitácoras firmadas e informes de Recursos Humanos", dueDate: "2026-06-25", assignedTo: "usr-02", completed: false },
+      { id: "tsk-014", title: "Certificar inasistencias con Notario Público", dueDate: "2026-02-05", assignedTo: "usr-03", completed: true }
     ],
     notes: [
-      { id: "nt-007", date: "2026-01-22 12:00", author: "Dra. Sofía Valenzuela", text: "El perito de INAPI no entendió el proceso de catalización a temperatura ambiente. Preparamos un anexo gráfico con el equipo de I+D de BioTecno Labs." }
+      { id: "nt-007", date: "2026-01-22 12:00", author: "Dra. Sofía Valenzuela", text: "El dirigente no avisó con las 48 horas reglamentarias para hacer uso de sus horas de fuero. Contamos con los correos de RRHH de respaldo." }
     ],
     documents: []
   },
   {
     id: "LEG-2026-007",
-    title: "Divorcio por Mutuo Acuerdo - Larraín / Silva",
+    title: "Cobro de Cotizaciones y Ley Bustos - Larraín vs. El Campo S.A.",
     clientId: "cli-06",
-    clientName: "Andrés Larraín",
-    opposingParty: "Camila Silva",
-    opposingLawyer: "Dra. Mónica Rosas",
-    practiceArea: "Civil",
+    clientName: "Agrícola Ganadera El Campo S.A.",
+    opposingParty: "Andrés Larraín Soto (Ex Capataz)",
+    opposingLawyer: "Defensa Laboral de Buin",
+    practiceArea: "Laboral",
     status: "Cerrado",
-    court: "2° Juzgado de Familia de Santiago",
+    court: "Juzgado de Letras de Buin",
     judge: "Don Sergio Villalobos",
     assignedLawyerId: "usr-03",
     assignedLawyerName: "Lic. Mateo Ríos",
     startDate: "2026-03-01",
-    description: "Causa de divorcio de mutuo acuerdo con cese de convivencia superior a un año. Incluye redacción de acuerdo de relaciones mutuas, régimen de alimentos, cuidado personal de hijos y régimen comunicacional, además de compensación económica pactada.",
+    description: "Demanda por despido injustificado y cobro de cotizaciones provisionales adeudadas (nulidad del despido - Ley Bustos). Defensa corporativa de la empresa acreditando pago total mediante cartolas previsionales.",
     timeline: [
-      { date: "2026-03-01", title: "Presentación de la Solicitud Conjunta", desc: "Ingreso de la solicitud y del instrumento de Acuerdo de Relaciones Mutuas.", completed: true },
-      { date: "2026-04-10", title: "Audiencia de Juicio y Conciliación", desc: "Se ratifica el cese de convivencia con prueba testimonial y se rinde el acuerdo ante el juez.", completed: true },
-      { date: "2026-04-25", title: "Dictación de Sentencia de Divorcio", desc: "El juez dicta sentencia acogiendo el divorcio y decretando la subinscripción en el Registro Civil.", completed: true },
-      { date: "2026-05-15", title: "Subinscripción de Divorcio", desc: "El Conservador del Registro Civil inscribe la nulidad matrimonial al margen de la partida de matrimonio.", completed: true }
+      { date: "2026-03-01", title: "Notificación de Nulidad", desc: "El ex capataz demanda pidiendo nulidad del despido por cotizaciones impagas.", completed: true },
+      { date: "2026-04-10", title: "Audiencia Única de Juicio", desc: "Se exhiben planillas Previred e informes de AFP con timbres de pago oportuno.", completed: true },
+      { date: "2026-04-25", title: "Sentencia Absolutoria", desc: "El tribunal rechaza la nulidad del despido y absuelve a Agrícola El Campo S.A.", completed: true },
+      { date: "2026-05-15", title: "Archivo de la Causa", desc: "Se archiva el expediente judicial tras no presentarse recursos de nulidad.", completed: true }
     ],
     tasks: [
-      { id: "tsk-015", title: "Obtener certificado de matrimonio subinscrito y entregar al cliente", dueDate: "2026-05-20", assignedTo: "usr-03", completed: true },
-      { id: "tsk-016", title: "Recopilar firmas de testigos para declaración jurada", dueDate: "2026-03-05", assignedTo: "usr-03", completed: true }
+      { id: "tsk-015", title: "Retirar certificado de ejecutoria de la sentencia", dueDate: "2026-05-20", assignedTo: "usr-03", completed: true },
+      { id: "tsk-016", title: "Solicitar cartolas históricas a AFP Capital e IPS", dueDate: "2026-03-05", assignedTo: "usr-03", completed: true }
     ],
     notes: [
-      { id: "nt-008", date: "2026-04-10 13:00", author: "Lic. Mateo Ríos", text: "El acuerdo fue homologado sin reparos por el juez de familia. Caso cerrado eficientemente." }
+      { id: "nt-008", date: "2026-04-10 13:00", author: "Lic. Mateo Ríos", text: "La contraparte se desistió del cobro al ver el certificado oficial de Previred que ingresamos. Victoria limpia para el cliente." }
     ],
     documents: []
   },
   {
     id: "LEG-2026-008",
-    title: "Demanda de Competencia Desleal Alfa vs. Constructora Beta",
+    title: "Prácticas Antisindicales - Sindicato N° 2 vs. Alfa",
     clientId: "cli-01",
     clientName: "Constructora Alfa S.A.",
-    opposingParty: "Constructora Beta S.A. y ex-socios",
+    opposingParty: "Sindicato Nacional de Trabajadores de la Construcción",
     opposingLawyer: "Estudio Barros & Errázuriz",
-    practiceArea: "Corporativo",
+    practiceArea: "Laboral",
     status: "Suspendido",
-    court: "Tribunal de Defensa de la Libre Competencia",
+    court: "2° Juzgado de Letras del Trabajo de Santiago",
     judge: "Ministro Presidente Javier Tapia",
     assignedLawyerId: "usr-01",
     assignedLawyerName: "Dr. Carlos Mendoza",
     startDate: "2025-11-12",
-    description: "Demanda civil de indemnización de perjuicios por actos de competencia desleal, consistentes en el desvío sistemático de clientes y aprovechamiento de información confidencial de licitaciones por parte de ex-gerentes clave que migraron a Beta S.A. Daño estimado: $250.000.000 CLP.",
+    description: "Defensa corporativa ante denuncia de Inspección del Trabajo por supuesta práctica antisindical. El sindicato acusa discriminación por extensión de beneficios de contrato colectivo a trabajadores no sindicalizados.",
     timeline: [
-      { date: "2025-11-12", title: "Presentación de la Demanda de Competencia Desleal", desc: "Demanda interpuesta en el TDLC con solicitud de medidas prejudiciales.", completed: true },
-      { date: "2025-12-05", title: "Aceptación de Medida Prejudicial precautoria", desc: "El tribunal ordena la exhibición de correos del servidor de la demandada.", completed: true },
-      { date: "2026-03-10", title: "Suspensión de Común Acuerdo por Negociación", desc: "Se presenta escrito solicitando la suspensión del procedimiento por 90 días para explorar acuerdo extrajudicial.", completed: true }
+      { date: "2025-11-12", title: "Notificación de Denuncia", desc: "Ingresa la denuncia de la Inspección con citación a tribunal.", completed: true },
+      { date: "2025-12-05", title: "Audiencia de Contestación", desc: "Se contesta negando dolo antisindical y justificando beneficios por desempeño general.", completed: true },
+      { date: "2026-03-10", title: "Apertura de Mesa de Acuerdo", desc: "Suspensión del juicio para negociar protocolo de extensión de beneficios consensual.", completed: true }
     ],
     tasks: [
-      { id: "tsk-017", title: "Redactar borrador de acuerdo transaccional confidencial", dueDate: "2026-06-25", assignedTo: "usr-01", completed: false },
-      { id: "tsk-018", title: "Analizar reporte de auditoría sobre fuga de información", dueDate: "2025-11-20", assignedTo: "usr-02", completed: true }
+      { id: "tsk-017", title: "Redactar borrador de acuerdo de extensión de beneficios", dueDate: "2026-06-25", assignedTo: "usr-01", completed: false },
+      { id: "tsk-018", title: "Preparar liquidaciones históricas comparadas", dueDate: "2025-11-20", assignedTo: "usr-02", completed: true }
     ],
     notes: [
-      { id: "nt-009", date: "2026-03-12 10:00", author: "Dr. Carlos Mendoza", text: "El plazo de suspensión vence en junio. Nos reuniremos el 23 con los directores de Alfa para ver si aceptamos su oferta de indemnización." }
+      { id: "nt-009", date: "2026-03-12 10:00", author: "Dr. Carlos Mendoza", text: "Si el sindicato acepta el protocolo propuesto en la mesa de negociación, la Inspección desistirá de la multa. Estamos afinando redacción." }
     ],
     documents: []
   }
@@ -311,6 +311,17 @@ export const LegiumDB = {
   },
 
   initialize: function(): void {
+    // If any cases have non-Laboral practice areas, force override with new labor seed cases
+    const currentCases = this.get<Case[]>("cases", DEFAULT_CASES);
+    const hasNonLaboral = currentCases.some(c => c.practiceArea !== 'Laboral');
+    if (hasNonLaboral) {
+      localStorage.removeItem("legium_cases");
+      localStorage.removeItem("legium_clients");
+      localStorage.removeItem("legium_users");
+      localStorage.removeItem("legium_logs");
+      localStorage.removeItem("legium_financials");
+    }
+
     const users = this.get<User[]>("users", DEFAULT_USERS);
     // Sync default users if any are missing from pre-existing localStorage
     let usersUpdated = false;

@@ -30,14 +30,13 @@ export const CasesView: React.FC<CasesViewProps> = ({
   activeCaseId,
   setActiveCaseId
 }) => {
-  const [selectedArea, setSelectedArea] = useState<PracticeArea | 'Todas'>('Todas');
   const [selectedStatus, setSelectedStatus] = useState<CaseStatus | 'Todos'>('Todos');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Form states
   const [caseTitle, setCaseTitle] = useState('');
   const [caseClient, setCaseClient] = useState('');
-  const [caseArea, setCaseArea] = useState<PracticeArea>('Civil');
+  const caseArea: PracticeArea = 'Laboral';
   const [caseOpposing, setCaseOpposing] = useState('');
   const [caseOpposingLawyer, setCaseOpposingLawyer] = useState('');
   const [caseCourt, setCaseCourt] = useState('');
@@ -62,9 +61,8 @@ export const CasesView: React.FC<CasesViewProps> = ({
       c.clientName.toLowerCase().includes(query) ||
       c.assignedLawyerName.toLowerCase().includes(query) ||
       matchesDocName;
-    const matchesArea = selectedArea === 'Todas' || c.practiceArea === selectedArea;
     const matchesStatus = selectedStatus === 'Todos' || c.status === selectedStatus;
-    return matchesSearch && matchesArea && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   const handleCreateCaseSubmit = (e: React.FormEvent) => {
@@ -159,19 +157,10 @@ export const CasesView: React.FC<CasesViewProps> = ({
         {/* iOS Segmented Filters Bar */}
         <div className="glass-card filter-bar" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span className="health-label" style={{ marginLeft: '2px' }}>Área Jurídica</span>
-            <div className="segmented-filters" id="segmented-filter-area">
-              {areas.map((area) => (
-                <div
-                  key={area}
-                  className={`segment-item ${selectedArea === area ? 'active' : ''}`}
-                  onClick={() => setSelectedArea(area)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {area}
-                </div>
-              ))}
-            </div>
+            <span className="health-label" style={{ marginLeft: '2px' }}>Especialidad del Despacho</span>
+            <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--primary-blue)', padding: '6px 12px', background: 'rgba(0,122,255,0.06)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Scale size={14} /> Defensa Laboral Corporativa
+            </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -276,38 +265,21 @@ export const CasesView: React.FC<CasesViewProps> = ({
                   />
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Cliente</label>
-                    <select
-                      className="form-control"
-                      value={caseClient}
-                      onChange={(e) => setCaseClient(e.target.value)}
-                      required
-                    >
-                      <option value="" disabled>Seleccione un cliente...</option>
-                      {clients.map((cl) => (
-                        <option key={cl.id} value={cl.id}>
-                          {cl.name} ({cl.type})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Área Legal</label>
-                    <select
-                      className="form-control"
-                      value={caseArea}
-                      onChange={(e) => setCaseArea(e.target.value as PracticeArea)}
-                      required
-                    >
-                      <option value="Civil">Civil</option>
-                      <option value="Penal">Penal</option>
-                      <option value="Laboral">Laboral</option>
-                      <option value="Tributario">Tributario</option>
-                      <option value="Corporativo">Corporativo</option>
-                    </select>
-                  </div>
+                <div className="form-group">
+                  <label>Cliente Corporativo</label>
+                  <select
+                    className="form-control"
+                    value={caseClient}
+                    onChange={(e) => setCaseClient(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Seleccione un cliente corporativo...</option>
+                    {clients.map((cl) => (
+                      <option key={cl.id} value={cl.id}>
+                        {cl.name} ({cl.type})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-row">
