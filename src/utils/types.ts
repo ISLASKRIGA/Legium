@@ -1,4 +1,4 @@
-export type UserRole = 'TI Administrador' | 'Socio Principal' | 'Abogado Senior' | 'Abogado Junior' | 'Cliente';
+﻿export type UserRole = 'TI Administrador' | 'Socio Principal' | 'Abogado Senior' | 'Abogado Junior' | 'Cliente';
 
 export interface User {
   id: string;
@@ -49,9 +49,11 @@ export interface DocumentItem {
   name: string;
   size: string;
   uploadDate: string;
+  ocrText?: string;
+  storageKey?: string;
 }
 
-export type CaseStatus = 'Activo' | 'En Apelación' | 'Cerrado' | 'Suspendido';
+export type CaseStatus = 'Activo' | 'En ApelaciÃ³n' | 'Cerrado' | 'Suspendido';
 export type PracticeArea = 'Civil' | 'Penal' | 'Laboral' | 'Tributario' | 'Corporativo';
 
 export interface Case {
@@ -101,3 +103,4 @@ export interface Financials {
   summary: FinancialSummary;
   monthlyRevenue: MonthlyRevenue[];
 }
+

@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Image as ImageIcon } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+import { cropImage, createSearchablePdf, DEFAULT_SCANNED_OCR_TEXT } from '../../utils/scannerPdf';
+import { getPdfStorageKey } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
 
 interface DocumentScannerProps {
@@ -16,6 +17,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const [flashActive, setFlashActive] = useState(false);
   const [scannerMsg, setScannerMsg] = useState('Coloque el documento en el recuadro');
   const [fileName, setFileName] = useState(`Documento_Escaneado_${Date.now().toString().slice(-4)}.pdf`);
+  const [ocrText, setOcrText] = useState(DEFAULT_SCANNED_OCR_TEXT);
 
   // Video Ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -47,11 +49,11 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         videoRef.current.srcObject = stream;
       }
       setHasCamera(true);
-      setScannerMsg('Escáner de Cámara Activo');
+      setScannerMsg('EscÃ¡ner de CÃ¡mara Activo');
     } catch (err) {
       console.warn('No webcam access or no camera found, using simulator.', err);
       setHasCamera(false);
-      setScannerMsg('Modo Simulación: Cámara no detectada');
+      setScannerMsg('Modo SimulaciÃ³n: CÃ¡mara no detectada');
     }
   };
 
@@ -128,15 +130,15 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         'En Santiago de Chile, a 4 de julio de 2026, las partes comparecientes',
         'acuerdan y ratifican los hitos pactados en el marco del procedimiento.',
         '',
-        'SECCIÓN PRIMERA - DE LAS OBLIGACIONES:',
-        'El demandante conviene en acompañar todos los documentos requeridos,',
+        'SECCIÃ“N PRIMERA - DE LAS OBLIGACIONES:',
+        'El demandante conviene en acompaÃ±ar todos los documentos requeridos,',
         'incluyendo comprobantes de transferencia y copias de deslindes.',
         '',
-        'SECCIÓN SEGUNDA - DE LOS PLAZOS:',
+        'SECCIÃ“N SEGUNDA - DE LOS PLAZOS:',
         'Los plazos fatales acordados para responder traslados se fijan en',
-        'un término máximo de 5 días hábiles a contar de esta notificación.',
+        'un tÃ©rmino mÃ¡ximo de 5 dÃ­as hÃ¡biles a contar de esta notificaciÃ³n.',
         '',
-        'Firma y Constancia Legal de Aceptación Digital:',
+        'Firma y Constancia Legal de AceptaciÃ³n Digital:',
         '____________________________________________'
       ];
 
@@ -268,54 +270,31 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     };
   }, [isDragging]);
 
-  // Convert to PDF
-  const convertAndSave = () => {
+  // Convert to searchable OCR PDF
+  const convertAndSave = async () => {
     if (!capturedImage) return;
     setStep('saving');
 
-    // Create Image to crop
-    const img = new Image();
-    img.src = capturedImage;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Calculate crop bounds
-        const startX = (cropBox.left / 100) * img.width;
-        const startY = (cropBox.top / 100) * img.height;
-        const cropW = (cropBox.width / 100) * img.width;
-        const cropH = (cropBox.height / 100) * img.height;
+    try {
+      const croppedImage = await cropImage(capturedImage, cropBox, 'contrast(1.18) brightness(1.04)', 0.88);
+      const pdfBlob = createSearchablePdf(croppedImage, ocrText);
+      const sizeKB = (pdfBlob.size / 1024).toFixed(1);
+      const docId = 'doc-' + Date.now();
 
-        canvas.width = cropW;
-        canvas.height = cropH;
+      const newDoc: DocumentItem = {
+        id: docId,
+        name: fileName.endsWith('.pdf') ? fileName : fileName + '.pdf',
+        size: sizeKB + ' KB',
+        uploadDate: new Date().toISOString().split('T')[0],
+        ocrText,
+        storageKey: getPdfStorageKey(docId)
+      };
 
-        // Draw cropped portion
-        ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
-        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-        // Generate PDF using jsPDF
-        const pdf = new jsPDF({
-          orientation: cropW > cropH ? 'landscape' : 'portrait',
-          unit: 'px',
-          format: [cropW, cropH]
-        });
-
-        pdf.addImage(croppedDataUrl, 'JPEG', 0, 0, cropW, cropH);
-
-        // Create Blob and document object
-        const pdfBlob = pdf.output('blob');
-        const sizeKB = (pdfBlob.size / 1024).toFixed(1);
-
-        const newDoc: DocumentItem = {
-          id: `doc-${Date.now()}`,
-          name: fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`,
-          size: `${sizeKB} KB`,
-          uploadDate: new Date().toISOString().split('T')[0]
-        };
-
-        onScanComplete(newDoc, pdfBlob);
-      }
-    };
+      onScanComplete(newDoc, pdfBlob);
+    } catch (err) {
+      console.error('Error converting scan to OCR PDF', err);
+      setStep('crop');
+    }
   };
 
   return (
@@ -341,10 +320,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               >
                 <ImageIcon size={44} style={{ color: 'var(--primary-gold)', marginBottom: '12px' }} />
                 <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
-                  Simulador de Escáner Activado
+                  Simulador de EscÃ¡ner Activado
                 </p>
                 <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
-                  La cámara no está disponible. Al hacer clic en "Capturar" se generará un documento formal de demostración procesal.
+                  La cÃ¡mara no estÃ¡ disponible. Al hacer clic en "Capturar" se generarÃ¡ un documento formal de demostraciÃ³n procesal.
                 </p>
               </div>
             )}
@@ -488,10 +467,17 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           </div>
           <h4 style={{ fontWeight: '700', marginBottom: '6px' }}>Generando Archivo PDF</h4>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '280px' }}>
-            Aplicando filtros de contraste judicial, recortando márgenes y empaquetando en formato vectorial.
+            Aplicando filtros de contraste judicial, recortando mÃ¡rgenes y empaquetando en formato vectorial.
           </p>
         </div>
       )}
     </div>
   );
 };
+
+
+
+
+
+
+

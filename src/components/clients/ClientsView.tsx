@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Plus, ArrowLeft, Building2, User as UserIcon, FileText } from 'lucide-react';
 import { Client, Case, User, DocumentItem } from '../../utils/types';
+import { getPdfObjectUrl } from '../../utils/pdfStorage';
 
 interface ClientsViewProps {
   clients: Client[];
@@ -69,7 +70,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
     onAddClient(newClient);
     onAddLog(`Registro de nuevo cliente ${clientName} (${clientType})`, 'Success');
-    onShowToast('Cliente Registrado', `El cliente ${clientName} fue añadido al directorio.`, 'success');
+    onShowToast('Cliente Registrado', `El cliente ${clientName} fue aÃ±adido al directorio.`, 'success');
 
     // Reset form
     setClientName('');
@@ -82,13 +83,8 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
   const handleViewPDF = (docId: string, docName: string) => {
     setActiveDocName(docName);
-    const sessionUrls = (window as any).pdfSessionUrls;
-    const url = sessionUrls ? sessionUrls.get(docId) : null;
-    if (url) {
-      setActiveDocUrl(url);
-    } else {
-      setActiveDocUrl('');
-    }
+    const url = getPdfObjectUrl(docId);
+    setActiveDocUrl(url || '');
     setIsPdfModalOpen(true);
   };
 
@@ -137,7 +133,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                   <div>
-                    <span className="health-label">Identificación Tributaria (RFC/RUT)</span>
+                    <span className="health-label">IdentificaciÃ³n Tributaria (RFC/RUT)</span>
                     <p style={{ fontWeight: 600, marginTop: '2px', fontSize: '13.5px' }}>{selectedClient.rfc}</p>
                   </div>
                   <div>
@@ -145,11 +141,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                     <p style={{ fontWeight: 600, marginTop: '2px', fontSize: '13.5px' }}>{selectedClient.contactPerson}</p>
                   </div>
                   <div>
-                    <span className="health-label">Teléfono</span>
+                    <span className="health-label">TelÃ©fono</span>
                     <p style={{ fontWeight: 600, marginTop: '2px', fontSize: '13.5px' }}>{selectedClient.phone}</p>
                   </div>
                   <div>
-                    <span className="health-label">Correo Electrónico</span>
+                    <span className="health-label">Correo ElectrÃ³nico</span>
                     <p style={{ fontWeight: 600, marginTop: '2px', fontSize: '13.5px' }}>{selectedClient.email}</p>
                   </div>
                 </div>
@@ -162,9 +158,9 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                   <table className="custom-table" id="client-cases-table">
                     <thead>
                       <tr>
-                        <th>Código</th>
-                        <th>Carátula / Caso</th>
-                        <th>Área</th>
+                        <th>CÃ³digo</th>
+                        <th>CarÃ¡tula / Caso</th>
+                        <th>Ãrea</th>
                         <th>Estado</th>
                       </tr>
                     </thead>
@@ -190,7 +186,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                               <span className={`badge ${
                                 cc.status === 'Cerrado' 
                                   ? 'badge-closed' 
-                                  : cc.status === 'En Apelación' 
+                                  : cc.status === 'En ApelaciÃ³n' 
                                   ? 'badge-appealing' 
                                   : cc.status === 'Suspendido' 
                                   ? 'badge-suspended' 
@@ -226,7 +222,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                         <div className="doc-info">
                           <div className="doc-name" title={doc.name}>{doc.name}</div>
                           <div className="doc-meta">
-                            {doc.size} • {doc.uploadDate} <br />
+                            {doc.size} â€¢ {doc.uploadDate} <br />
                             <span style={{ fontSize: '10px', color: 'var(--primary-gold)' }}>Caso: {caseId}</span>
                           </div>
                         </div>
@@ -261,13 +257,13 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
               <table className="custom-table" id="clients-table">
                 <thead>
                   <tr>
-                    <th>Nombre / Razón Social</th>
+                    <th>Nombre / RazÃ³n Social</th>
                     <th>Tipo</th>
-                    <th>Identificación Tributaria</th>
+                    <th>IdentificaciÃ³n Tributaria</th>
                     <th>Contacto Principal</th>
-                    <th>Correo Electrónico</th>
-                    <th>Teléfono</th>
-                    <th>Acción</th>
+                    <th>Correo ElectrÃ³nico</th>
+                    <th>TelÃ©fono</th>
+                    <th>AcciÃ³n</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -320,14 +316,14 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
             <form onSubmit={handleCreateClientSubmit}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label>Nombre Completo o Razón Social</label>
+                  <label>Nombre Completo o RazÃ³n Social</label>
                   <input
                     type="text"
                     className="form-control"
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     required
-                    placeholder="Ej. Inversiones Pacífico S.A. o Juan Valenzuela"
+                    placeholder="Ej. Inversiones PacÃ­fico S.A. o Juan Valenzuela"
                   />
                 </div>
 
@@ -340,12 +336,12 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                       onChange={(e) => setClientType(e.target.value as 'Corporativo' | 'Individual')}
                       required
                     >
-                      <option value="Corporativo">Corporativo (Persona Jurídica)</option>
-                      <option value="Individual">Individual (Persona Física)</option>
+                      <option value="Corporativo">Corporativo (Persona JurÃ­dica)</option>
+                      <option value="Individual">Individual (Persona FÃ­sica)</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Identificación Tributaria (RFC/RUT)</label>
+                    <label>IdentificaciÃ³n Tributaria (RFC/RUT)</label>
                     <input
                       type="text"
                       className="form-control"
@@ -366,11 +362,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                       value={clientContact}
                       onChange={(e) => setClientContact(e.target.value)}
                       required
-                      placeholder="Ej. Don Antonio Ríos"
+                      placeholder="Ej. Don Antonio RÃ­os"
                     />
                   </div>
                   <div className="form-group">
-                    <label>Teléfono</label>
+                    <label>TelÃ©fono</label>
                     <input
                       type="tel"
                       className="form-control"
@@ -383,7 +379,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                 </div>
 
                 <div className="form-group">
-                  <label>Correo Electrónico de Contacto</label>
+                  <label>Correo ElectrÃ³nico de Contacto</label>
                   <input
                     type="email"
                     className="form-control"
@@ -422,7 +418,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                     <FileText size={48} style={{ color: 'var(--primary-gold)', margin: '0 auto 12px', display: 'block' }} />
                     <h4 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>Vista Previa de Metadatos</h4>
                     <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '340px', margin: '0 auto 16px' }}>
-                      El archivo PDF físico ya no está cargado en la sesión del navegador. Los metadatos siguen guardados de forma segura en LocalStorage.
+                      El archivo PDF fÃ­sico ya no estÃ¡ cargado en la sesiÃ³n del navegador. Los metadatos siguen guardados de forma segura en LocalStorage.
                     </p>
                   </div>
                 )}
@@ -434,3 +430,4 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
     </section>
   );
 };
+

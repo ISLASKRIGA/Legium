@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert } from 'lucide-react';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
+import { getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
 
 interface ClientDashboardProps {
   currentUser: User;
@@ -61,23 +62,25 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
     });
   });
 
-  const handleOcrComplete = (newCase: Case, newDoc: DocumentItem, fileBlob: Blob) => {
-    // Add new case
-    onAddCase(newCase);
-    onAddLog(`Cliente Ing. Luis Fuentes registró nueva demanda laboral vía OCR (${newCase.id})`, 'Success');
-    onShowToast('Demanda Ingresada', `La demanda de ${newCase.opposingParty} se ingresó con éxito.`, 'success');
+  const handleOcrComplete = async (newCase: Case, newDoc: DocumentItem, fileBlob: Blob) => {
+    const storageKey = await savePdfBlob(newDoc.id, fileBlob);
+    const storedCase = {
+      ...newCase,
+      documents: newCase.documents.map((doc) =>
+        doc.id === newDoc.id ? { ...doc, storageKey } : doc
+      )
+    };
+
+    onAddCase(storedCase);
+    onAddLog('Cliente Ing. Luis Fuentes registro nueva demanda laboral via OCR (' + newCase.id + ')', 'Success');
+    onShowToast('Demanda Ingresada', 'La demanda de ' + newCase.opposingParty + ' se ingreso con exito y quedo almacenada como PDF OCR.', 'success');
     setActiveModal('none');
   };
 
   const handleViewPDF = (docId: string, docName: string) => {
     setActiveDocName(docName);
-    const sessionUrls = (window as any).pdfSessionUrls;
-    const url = sessionUrls ? sessionUrls.get(docId) : null;
-    if (url) {
-      setActiveDocUrl(url);
-    } else {
-      setActiveDocUrl('');
-    }
+    const url = getPdfObjectUrl(docId);
+    setActiveDocUrl(url || '');
     setActiveModal('pdf');
   };
 
@@ -112,7 +115,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
       <div className="metrics-grid">
         <div className="glass-card metric-card">
           <div className="metric-header">
-            <span className="metric-title">Causas en Asesoría</span>
+            <span className="metric-title">Causas en AsesorÃ­a</span>
             <div className="metric-icon" style={{ color: 'var(--primary-blue)' }}>
               <Briefcase size={20} />
             </div>
@@ -129,7 +132,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
             </div>
           </div>
           <div className="metric-value">{activeCasesCount}</div>
-          <div className="metric-sub">Casos en tramitación laboral</div>
+          <div className="metric-sub">Casos en tramitaciÃ³n laboral</div>
         </div>
 
         <div className="glass-card metric-card">
@@ -203,7 +206,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
               {/* Read-Only Timeline */}
               <div style={{ marginTop: '16px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Calendar size={15} style={{ color: 'var(--primary-gold)' }} /> Línea de Tiempo Procesal
+                  <Calendar size={15} style={{ color: 'var(--primary-gold)' }} /> LÃ­nea de Tiempo Procesal
                 </h4>
                 <div className="timeline" style={{ maxHeight: '180px', overflowY: 'auto' }}>
                   {selectedCase.timeline.map((t, idx) => (
@@ -230,7 +233,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                       </div>
                       <div className="doc-info">
                         <div className="doc-name">{doc.name}</div>
-                        <div className="doc-meta">{doc.size} • {doc.uploadDate}</div>
+                        <div className="doc-meta">{doc.size} â€¢ {doc.uploadDate}</div>
                       </div>
                       <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name)}>
                         Visualizar
@@ -250,9 +253,9 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                 <table className="custom-table">
                   <thead>
                     <tr>
-                      <th>Código</th>
+                      <th>CÃ³digo</th>
                       <th>Causa / Trabajador</th>
-                      <th>Área</th>
+                      <th>Ãrea</th>
                       <th>Estado</th>
                       <th>Acciones</th>
                     </tr>
@@ -276,7 +279,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                           </td>
                           <td>{c.practiceArea}</td>
                           <td>
-                            <span className={`badge ${c.status === 'Cerrado' ? 'badge-closed' : c.status === 'En Apelación' ? 'badge-appealing' : 'badge-active'}`}>
+                            <span className={`badge ${c.status === 'Cerrado' ? 'badge-closed' : c.status === 'En ApelaciÃ³n' ? 'badge-appealing' : 'badge-active'}`}>
                               {c.status}
                             </span>
                           </td>
@@ -314,7 +317,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                   <div className="doc-info" style={{ minWidth: 0 }}>
                     <div className="doc-name" style={{ fontSize: '12.5px' }} title={doc.name}>{doc.name}</div>
                     <div className="doc-meta" style={{ fontSize: '10.5px' }}>
-                      {doc.size} • {doc.uploadDate} <br />
+                      {doc.size} â€¢ {doc.uploadDate} <br />
                       <span style={{ color: 'var(--primary-gold)', fontSize: '9px' }}>Exp: {caseId}</span>
                     </div>
                   </div>
@@ -369,7 +372,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                     <FileText size={48} style={{ color: 'var(--primary-gold)', margin: '0 auto 12px', display: 'block' }} />
                     <h4 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>Vista Previa de Metadatos</h4>
                     <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '340px', margin: '0 auto 16px' }}>
-                      El archivo PDF físico ya no está cargado en la sesión del navegador. Los metadatos siguen guardados de forma segura en LocalStorage.
+                      El archivo PDF fÃ­sico ya no estÃ¡ cargado en la sesiÃ³n del navegador. Los metadatos siguen guardados de forma segura en LocalStorage.
                     </p>
                   </div>
                 )}
@@ -381,3 +384,6 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
     </div>
   );
 };
+
+
+
