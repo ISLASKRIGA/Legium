@@ -1,8 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2 } from 'lucide-react';
+import Tesseract from 'tesseract.js';
 import { cropImage, createSearchablePdf } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
+import { useDocumentDetection, QuadPoints } from '../../hooks/useDocumentDetection';
+import { uploadPdfToSupabase, saveDocumentRecord } from '../../utils/supabaseClient';
 
 interface OcrScannerProps {
   currentUser: User;
@@ -18,24 +21,26 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
-  const [scannerMsg, setScannerMsg] = useState('CamScanner: Buscando bordes de hoja...');
+  const [scannerMsg, setScannerMsg] = useState('Apunta la cámara al documento...');
   const [sheetDetected, setSheetDetected] = useState(false);
-  const [forceSimulator, setForceSimulator] = useState(false); // Try real camera first; fall back to simulator if unavailable
+  const [detectionConfidence, setDetectionConfidence] = useState(0);
+  const [autoCapturing, setAutoCapturing] = useState(false);
+  const [forceSimulator, setForceSimulator] = useState(false);
+  const autoCapCountRef = useRef(0); // frames with high confidence
 
-  // SVG Edge coordinates for real-time CamScanner simulation
-  const [edgePoints, setEdgePoints] = useState({
-    p1: { x: 22, y: 18 },
-    p2: { x: 78, y: 16 },
-    p3: { x: 76, y: 84 },
-    p4: { x: 24, y: 82 }
+  // SVG Edge coordinates driven by real detection
+  const [edgePoints, setEdgePoints] = useState<QuadPoints>({
+    p1: { x: 15, y: 10 },
+    p2: { x: 85, y: 10 },
+    p3: { x: 83, y: 90 },
+    p4: { x: 17, y: 90 }
   });
   
-  // Beautify filter choice
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
   
   // OCR processing states
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrStatus, setOcrStatus] = useState('Iniciando motor de reconocimiento OCR...');
+  const [ocrStatus, setOcrStatus] = useState('Iniciando OCR...');
 
   // Extracted Metadata Form - editable by user after OCR
   const [workerName, setWorkerName] = useState('Juan Pablo Martínez Díaz');
@@ -67,45 +72,45 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Attach stream to video element whenever stream changes
-  // This fixes the chicken-and-egg: videoRef.current wasn't available when startCamera ran
-  useEffect(() => {
-    if (cameraStream && videoRef.current) {
-      videoRef.current.srcObject = cameraStream;
-    }
-  }, [cameraStream]);
+  // ============================================================
+  // REAL-TIME DOCUMENT DETECTION via useDocumentDetection hook
+  // ============================================================
+  const handleDetection = useCallback((quad: QuadPoints, confidence: number) => {
+    setEdgePoints(quad);
+    setDetectionConfidence(confidence);
 
-  // CamScanner-style edge detection animation (only in simulator mode or as overlay hint)
-  useEffect(() => {
-    if (step !== 'capture') return;
+    const detected = confidence > 0.5;
+    setSheetDetected(detected);
 
-    let frame = 0;
-    const interval = setInterval(() => {
-      frame++;
-      if (frame > 10) {
-        setSheetDetected(true);
-        setScannerMsg('Listo — presiona el botón para capturar');
-        setEdgePoints({
-          p1: { x: 25, y: 15 },
-          p2: { x: 75, y: 15 },
-          p3: { x: 73, y: 85 },
-          p4: { x: 27, y: 85 }
-        });
+    if (detected) {
+      autoCapCountRef.current += 1;
+      if (autoCapCountRef.current >= 18) { // ~3 seconds of stable detection at 60fps
+        setScannerMsg('✓ Documento detectado — manteniendo encuadre...');
+      } else if (autoCapCountRef.current >= 8) {
+        setScannerMsg('✔ Encuadre óptimo — capturando automáticamente...');
       } else {
-        setSheetDetected(false);
-        setScannerMsg('Apunta la cámara al documento...');
-        const drift = () => Math.random() * 2 - 1;
-        setEdgePoints({
-          p1: { x: 22 + drift(), y: 18 + drift() },
-          p2: { x: 78 + drift(), y: 16 + drift() },
-          p3: { x: 76 + drift(), y: 84 + drift() },
-          p4: { x: 24 + drift(), y: 82 + drift() }
-        });
+        setScannerMsg('Detectando documento...');
       }
-    }, 180);
+      // Auto-capture after 1.5s of stable high-confidence detection
+      if (autoCapCountRef.current === 30 && !autoCapturing) {
+        setAutoCapturing(true);
+        capturePhoto();
+      }
+    } else {
+      autoCapCountRef.current = 0;
+      setScannerMsg('Apunta la cámara al documento...');
+    }
+  }, [autoCapturing]);
 
-    return () => clearInterval(interval);
-  }, [step]);
+  useDocumentDetection({
+    videoRef,
+    active: step === 'capture' && hasCamera && !forceSimulator,
+    onDetection: handleDetection,
+  });
+
+  // ============================================================
+  // CAMERA START / STOP
+  // ============================================================
 
   const startCamera = async () => {
     try {
@@ -113,7 +118,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
-      // Store the stream; the useEffect above will attach it to videoRef
       setCameraStream(stream);
       setHasCamera(true);
       setForceSimulator(false);
@@ -123,6 +127,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       setForceSimulator(true);
     }
   };
+
+  // Attach stream to video element whenever cameraStream changes (fixes chicken-and-egg)
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraStream]);
 
   const stopCamera = () => {
     if (cameraStream) {
@@ -312,31 +323,75 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setStep('beautify');
   };
 
-  // OCR Processing Simulation
-  const startOcrProcessing = () => {
+  // ============================================================
+  // REAL OCR WITH TESSERACT.JS
+  // ============================================================
+  const runRealOcr = async (imageSrc: string) => {
     setStep('ocr-processing');
-    setOcrProgress(0);
-    setOcrStatus('Iniciando lectura lingüística de caracteres OCR...');
+    setOcrProgress(5);
+    setOcrStatus('Cargando motor de reconocimiento de texto...');
 
-    const statuses = [
-      { p: 15, msg: 'Segmentando bloques de texto optimizados...' },
-      { p: 40, msg: 'Detectando demandante (Juan Pablo Martínez Díaz)...' },
-      { p: 70, msg: 'Buscando cuantía del reclamo ($18,500,000 CLP)...' },
-      { p: 90, msg: 'Identificando tribunal (1° Juzgado de Letras de Santiago)...' },
-      { p: 100, msg: 'Reconocimiento completado e indexado.' }
-    ];
-
-    statuses.forEach((s) => {
-      setTimeout(() => {
-        setOcrProgress(s.p);
-        setOcrStatus(s.msg);
-        if (s.p === 100) {
-          setTimeout(() => {
-            setStep('ocr-confirm');
-          }, 800);
+    try {
+      const result = await Tesseract.recognize(imageSrc, 'spa', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            const pct = Math.round(10 + m.progress * 85);
+            setOcrProgress(pct);
+            setOcrStatus(
+              pct < 30 ? 'Segmentando bloques de texto...' :
+              pct < 60 ? 'Reconociendo caracteres (OCR en progreso)...' :
+              pct < 90 ? 'Analizando estructura del documento...' :
+              'Finalizando extracción de texto...'
+            );
+          }
         }
-      }, s.p * 25);
-    });
+      });
+
+      const rawText = result.data.text;
+      setOcrProgress(100);
+      setOcrStatus('Texto extraído correctamente.');
+
+      // Try to parse metadata from OCR text
+      // Common patterns in Chilean legal documents
+      const nameMatch = rawText.match(/(?:demandante|trabajador)[:\s]+([\w\s,\.]+?)(?:\n|,|domiciliad)/i);
+      const amountMatch = rawText.match(/\$([\d.,]+(?:\s*CLP)?)/i);
+      const courtMatch = rawText.match(/(?:juzgado|tribunal)[^\n]{0,60}/i);
+      const judgeMatch = rawText.match(/(?:juez|magistrad|dra?\.|lic\.)[^\n]{0,50}/i);
+
+      if (nameMatch?.[1]?.trim()) setWorkerName(nameMatch[1].trim());
+      if (amountMatch?.[0]) setClaimAmount(amountMatch[0].trim());
+      if (courtMatch?.[0]) setCourt(courtMatch[0].trim());
+      if (judgeMatch?.[0]) setJudge(judgeMatch[0].trim());
+
+      // Set description to first meaningful paragraph
+      const firstParagraph = rawText
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 40)
+        .slice(0, 3)
+        .join(' ');
+      if (firstParagraph) setDescription(firstParagraph.slice(0, 300));
+
+      setTimeout(() => setStep('ocr-confirm'), 500);
+    } catch (err) {
+      console.error('Tesseract OCR error:', err);
+      setOcrStatus('Error en OCR. Puedes editar los campos manualmente.');
+      setTimeout(() => setStep('ocr-confirm'), 1200);
+    }
+  };
+
+  const startOcrProcessing = async () => {
+    if (!capturedImage) return;
+    try {
+      setStep('ocr-processing');
+      setOcrProgress(2);
+      setOcrStatus('Recortando y preparando imagen...');
+      const croppedImageResult = await cropImage(capturedImage, cropBox, getFilterStyle(activeFilter), 0.88);
+      await runRealOcr(croppedImageResult.dataUrl);
+    } catch (err) {
+      console.error('Error cropping image:', err);
+      await runRealOcr(capturedImage);
+    }
   };
 
   const handleFinalSubmit = async () => {
@@ -348,7 +403,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       'Tribunal asignado: ' + court,
       'Juez a cargo: ' + judge,
       'Resumen: ' + description,
-      'Documento procesado por OCR y realce CamScanner en Legium.'
+      'Documento procesado con OCR real (Tesseract.js) en Legium.'
     ].join('\n');
 
     try {
@@ -358,9 +413,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
       const docId = 'doc-' + Date.now();
       const uploadDate = new Date().toISOString().split('T')[0];
+      const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
 
-      // ✅ FIX: Persist PDF to localStorage so it survives modal close/reopen
+      // 1. Persist PDF locally (localStorage)
       await savePdfBlob(docId, pdfBlob);
+
+      // 2. Upload to Supabase Storage (if configured)
+      const pdfUrl = await uploadPdfToSupabase(docId, pdfBlob, caseId);
 
       const newDoc: DocumentItem = {
         id: docId,
@@ -371,38 +430,53 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         storageKey: getPdfStorageKey(docId)
       };
 
-      const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
       const newCase: Case = {
         id: caseId,
         title: (workerName.trim() ? workerName : 'Trabajador') + ' vs. Constructora Alfa',
         clientId: currentUser.clientId || 'cli-01',
         clientName: 'Constructora Alfa S.A.',
         opposingParty: workerName,
-        opposingLawyer: 'Estudio Patrocinante Gomez & Asociados',
+        opposingLawyer: 'Estudio Patrocinante Gómez & Asociados',
         practiceArea: 'Laboral',
         status: 'Activo',
         court: court,
         judge: judge,
         assignedLawyerId: 'usr-03',
-        assignedLawyerName: 'Lic. Mateo Rios',
+        assignedLawyerName: 'Lic. Mateo Ríos',
         startDate: uploadDate,
         description: description,
-        timeline: [
-          {
-            date: uploadDate,
-            title: 'Ingreso por Portal Cliente (OCR)',
-            desc: 'Cargado y embellecido via modulo CamScanner. Pre-lectura de metadatos automatica.',
-            completed: true
-          }
-        ],
-        tasks: [
-          { id: 'tsk-' + Date.now().toString().slice(-4), title: 'Revisar y contestar demanda laboral en tribunal', dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], assignedTo: 'usr-03', completed: false }
-        ],
-        notes: [
-          { id: 'nt-' + Date.now(), date: uploadDate + ' ' + new Date().toTimeString().slice(0, 5), author: 'OCR Extraccion Inteligente', text: 'Metadatos extraidos de la demanda. Cuantia economica: ' + claimAmount + '. Tribunal: ' + court + '.' }
-        ],
+        timeline: [{
+          date: uploadDate,
+          title: 'Ingreso por Portal Cliente (OCR Real)',
+          desc: 'Escaneado con cámara real. OCR con Tesseract.js. PDF guardado ' + (pdfUrl ? 'en Supabase Storage' : 'localmente') + '.',
+          completed: true
+        }],
+        tasks: [{
+          id: 'tsk-' + Date.now().toString().slice(-4),
+          title: 'Revisar y contestar demanda laboral',
+          dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          assignedTo: 'usr-03',
+          completed: false
+        }],
+        notes: [{
+          id: 'nt-' + Date.now(),
+          date: uploadDate + ' ' + new Date().toTimeString().slice(0, 5),
+          author: 'OCR Real (Tesseract.js)',
+          text: 'Texto extraído automáticamente del documento. Cuantía: ' + claimAmount + '. Tribunal: ' + court + '.'
+        }],
         documents: [newDoc]
       };
+
+      // 3. Save document record to Supabase DB (if configured)
+      await saveDocumentRecord({
+        id: docId,
+        caseId,
+        name: newDoc.name,
+        sizeKb: parseFloat(sizeKB),
+        uploadDate,
+        ocrText,
+        pdfUrl,
+      });
 
       onOcrComplete(newCase, newDoc, pdfBlob);
     } catch (err) {

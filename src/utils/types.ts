@@ -1,4 +1,4 @@
-﻿export type UserRole = 'TI Administrador' | 'Socio Principal' | 'Abogado Senior' | 'Abogado Junior' | 'Cliente';
+export type UserRole = 'TI Administrador' | 'Socio Principal' | 'Abogado Senior' | 'Abogado Junior' | 'Cliente';
 
 export interface User {
   id: string;
@@ -103,4 +103,14 @@ export interface Financials {
   summary: FinancialSummary;
   monthlyRevenue: MonthlyRevenue[];
 }
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+  caseId?: string;
+}
+
 

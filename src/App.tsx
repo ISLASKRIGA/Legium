@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/shared/Navbar';
 import { Topbar } from './components/shared/Topbar';
+import { LoginView } from './components/shared/LoginView';
 import { ToastContainer, ToastMessage } from './components/shared/Toast';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { ClientDashboard } from './components/dashboard/ClientDashboard';
@@ -8,12 +9,12 @@ import { CasesView } from './components/cases/CasesView';
 import { ClientsView } from './components/clients/ClientsView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AdminView } from './components/admin/AdminView';
-import { User, UserRole, Case, Client, AuditLog, Financials } from './utils/types';
+import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
 
 export const App: React.FC = () => {
   // State Variables (Initialize DB synchronously first)
-  const [currentUser, setCurrentUser] = useState<User>(() => {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
     LegiumDB.initialize();
     return LegiumDB.getCurrentUser();
   });
@@ -22,6 +23,7 @@ export const App: React.FC = () => {
   const [clients, setClients] = useState<Client[]>(() => LegiumDB.get<Client[]>('clients', DEFAULT_CLIENTS));
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => LegiumDB.get<AuditLog[]>('logs', DEFAULT_AUDIT_LOGS));
   const [financials, setFinancials] = useState<Financials>(() => LegiumDB.get<Financials>('financials', DEFAULT_FINANCIALS));
+  const [notifications, setNotifications] = useState<Notification[]>(() => LegiumDB.getNotifications());
 
   const [activeTab, setActiveTab] = useState<string>(() => {
     const hash = window.location.hash.replace('#', '');
@@ -52,7 +54,7 @@ export const App: React.FC = () => {
   // Synchronize URL hash when state activeTab changes
   const handleTabChange = (tab: string) => {
     // Role checks before navigating
-    if ((currentUser.role === 'Abogado Senior' || currentUser.role === 'Abogado Junior') && (tab === 'reports' || tab === 'it-admin')) {
+    if (currentUser && (currentUser.role === 'Abogado Senior' || currentUser.role === 'Abogado Junior') && (tab === 'reports' || tab === 'it-admin')) {
       showToast('Acceso Denegado', 'No tienes permisos para visualizar esta sección.', 'danger');
       return;
     }
@@ -83,7 +85,9 @@ export const App: React.FC = () => {
 
   // Audit Logger Helper
   const addLogEntry = (action: string, status: 'Success' | 'Warning' | 'Denied' = 'Success') => {
-    LegiumDB.addLog(currentUser.id, action, status);
+    if (currentUser) {
+      LegiumDB.addLog(currentUser.id, action, status);
+    }
     // Reload logs from localstorage to update UI
     setAuditLogs(LegiumDB.get<AuditLog[]>('logs', DEFAULT_AUDIT_LOGS));
   };
@@ -107,6 +111,26 @@ export const App: React.FC = () => {
     setAuditLogs(LegiumDB.get<AuditLog[]>('logs', DEFAULT_AUDIT_LOGS));
   };
 
+  const handleLogout = () => {
+    LegiumDB.setCurrentUser(null);
+    setCurrentUser(null);
+    showToast('Sesión Cerrada', 'Has cerrado tu sesión de forma segura.', 'info');
+  };
+
+  const handleNotificationClick = (caseId: string, notificationId: string) => {
+    LegiumDB.markNotificationAsRead(notificationId);
+    setNotifications(LegiumDB.getNotifications());
+    if (caseId && currentUser && currentUser.role !== 'Cliente') {
+      handleViewCaseFromDashboard(caseId);
+    }
+  };
+
+  const handleMarkAllNotificationsAsRead = () => {
+    LegiumDB.markAllNotificationsAsRead();
+    setNotifications(LegiumDB.getNotifications());
+    showToast('Notificaciones Leídas', 'Todas las notificaciones han sido marcadas como leídas.', 'success');
+  };
+
   // --- CRUD ACTIONS ---
 
   // Update single case
@@ -121,6 +145,16 @@ export const App: React.FC = () => {
     const updatedCases = [...cases, newCase];
     LegiumDB.set('cases', updatedCases);
     setCases(updatedCases);
+
+    if (currentUser?.role === 'Cliente') {
+      LegiumDB.addNotification(
+        'Nueva Demanda Recibida',
+        `El cliente ${currentUser.name} ha subido una nueva demanda: ${newCase.title}. Extracción OCR y PDF realizados.`,
+        newCase.id
+      );
+      setNotifications(LegiumDB.getNotifications());
+      showToast('Demanda Notificada', 'Se ha enviado una notificación a todos los abogados.', 'info');
+    }
   };
 
   // Create new client
@@ -173,7 +207,7 @@ export const App: React.FC = () => {
     );
 
     // If changing current simulated user, sync state
-    if (userId === currentUser.id) {
+    if (currentUser && userId === currentUser.id) {
       const updatedSelf = { ...currentUser, role: newRole };
       LegiumDB.setCurrentUser(updatedSelf);
       setCurrentUser(updatedSelf);
@@ -234,7 +268,7 @@ export const App: React.FC = () => {
     const c = cases.find(item => item.id === caseId);
     if (!c) return;
 
-    if (currentUser.role === 'Abogado Junior' && c.assignedLawyerId !== currentUser.id) {
+    if (currentUser?.role === 'Abogado Junior' && c.assignedLawyerId !== currentUser.id) {
       addLogEntry(`Intento no autorizado de visualización de expediente ${caseId}`, 'Denied');
       showToast('Acceso Denegado', 'No tienes permisos para visualizar este expediente.', 'danger');
       return;
@@ -243,6 +277,20 @@ export const App: React.FC = () => {
     setActiveCaseId(caseId);
     handleTabChange('cases');
   };
+
+  if (!currentUser) {
+    return (
+      <LoginView 
+        users={users} 
+        onLogin={(user) => {
+          LegiumDB.setCurrentUser(user);
+          setCurrentUser(user);
+          setNotifications(LegiumDB.getNotifications());
+          showToast('Sesión Iniciada', `Bienvenido al sistema, ${user.name}.`, 'success');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="app-container">
@@ -261,9 +309,11 @@ export const App: React.FC = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           currentUser={currentUser}
-          onUserChange={handleUserChange}
+          onLogout={handleLogout}
           onMobileToggle={() => setMobileOpen(!mobileOpen)}
-          users={users}
+          notifications={notifications}
+          onNotificationClick={handleNotificationClick}
+          onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
         />
 
         {/* Page Container */}

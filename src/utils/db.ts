@@ -1,4 +1,4 @@
-import { User, Client, Case, AuditLog, Financials } from './types';
+import { User, Client, Case, AuditLog, Financials, Notification } from './types';
 
 export const DEFAULT_USERS: User[] = [
   { id: "usr-01", name: "Dr. Carlos Mendoza", email: "carlos.mendoza@legium.law", role: "Socio Principal", active: true, avatar: "CM" },
@@ -379,10 +379,6 @@ export const LegiumDB = {
 
     this.get<AuditLog[]>("logs", DEFAULT_AUDIT_LOGS);
     this.get<Financials>("financials", DEFAULT_FINANCIALS);
-    
-    if (!localStorage.getItem("legium_current_user")) {
-      localStorage.setItem("legium_current_user", JSON.stringify(DEFAULT_USERS[3])); // Ing. Alejandro Torres (TI Admin)
-    }
   },
 
   reset: function(): void {
@@ -392,17 +388,22 @@ export const LegiumDB = {
     localStorage.removeItem("legium_logs");
     localStorage.removeItem("legium_financials");
     localStorage.removeItem("legium_current_user");
+    localStorage.removeItem("legium_notifications");
     this.initialize();
   },
 
-  getCurrentUser: function(): User {
+  getCurrentUser: function(): User | null {
     const data = localStorage.getItem("legium_current_user");
-    return data ? JSON.parse(data) as User : DEFAULT_USERS[3];
+    return data ? JSON.parse(data) as User : null;
   },
 
-  setCurrentUser: function(user: User): void {
-    localStorage.setItem("legium_current_user", JSON.stringify(user));
-    this.addLog(user.id, `Simulación de cambio de usuario a ${user.name} (${user.role})`, "Success");
+  setCurrentUser: function(user: User | null): void {
+    if (user) {
+      localStorage.setItem("legium_current_user", JSON.stringify(user));
+      this.addLog(user.id, `Simulación de cambio de usuario a ${user.name} (${user.role})`, "Success");
+    } else {
+      localStorage.removeItem("legium_current_user");
+    }
   },
 
   addLog: function(userId: string, action: string, status: 'Success' | 'Warning' | 'Denied' = "Success"): void {
@@ -426,5 +427,47 @@ export const LegiumDB = {
     if (logs.length > 50) logs.pop();
     
     this.set("logs", logs);
+  },
+
+  getNotifications: function(): Notification[] {
+    const data = localStorage.getItem("legium_notifications");
+    if (data) {
+      try {
+        return JSON.parse(data) as Notification[];
+      } catch (e) {
+        console.error("Error parsing notifications", e);
+        return [];
+      }
+    }
+    return [];
+  },
+
+  addNotification: function(title: string, message: string, caseId?: string): void {
+    const notifications = this.getNotifications();
+    const newNoti: Notification = {
+      id: 'noti-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      title,
+      message,
+      date: new Date().toISOString(),
+      read: false,
+      caseId
+    };
+    notifications.unshift(newNoti);
+    if (notifications.length > 20) {
+      notifications.pop();
+    }
+    localStorage.setItem("legium_notifications", JSON.stringify(notifications));
+  },
+
+  markNotificationAsRead: function(id: string): void {
+    const notifications = this.getNotifications();
+    const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
+    localStorage.setItem("legium_notifications", JSON.stringify(updated));
+  },
+
+  markAllNotificationsAsRead: function(): void {
+    const notifications = this.getNotifications();
+    const updated = notifications.map(n => ({ ...n, read: true }));
+    localStorage.setItem("legium_notifications", JSON.stringify(updated));
   }
 };
