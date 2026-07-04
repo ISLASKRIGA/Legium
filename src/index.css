@@ -1662,4 +1662,35 @@ textarea.form-control {
   display: block;
 }
 
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 12px;
+}
+
+.table-responsive .custom-table {
+  min-width: 550px; /* Prevent columns from shrinking too much on narrow viewports */
+}
+
+/* Collapsing Grids for Medium and Small viewports */
+@media (max-width: 991px) {
+  .ti-layout-client {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .ti-layout, .reports-layout, .ti-layout-client {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  
+  /* Prevent horizontal grid item stretching */
+  .ti-layout > div, .ti-layout-client > div, .reports-layout > div {
+    min-width: 0 !important;
+  }
+}
+
 
