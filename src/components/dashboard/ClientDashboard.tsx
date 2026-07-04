@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert } from 'lucide-react';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
@@ -22,7 +22,24 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
   onShowToast
 }) => {
   const [activeModal, setActiveModal] = useState<'none' | 'scanner' | 'pdf'>('none');
+  const [scannerSheetOpen, setScannerSheetOpen] = useState(false); // controls slide-up animation
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  // Animate scanner sheet in/out
+  useEffect(() => {
+    if (activeModal === 'scanner') {
+      // Small delay so the DOM element renders before we trigger the slide-up
+      requestAnimationFrame(() => setScannerSheetOpen(true));
+    } else {
+      setScannerSheetOpen(false);
+    }
+  }, [activeModal]);
+
+  const closeScanner = () => {
+    setScannerSheetOpen(false);
+    // Wait for the slide-down animation to finish before removing from DOM
+    setTimeout(() => setActiveModal('none'), 380);
+  };
 
   // PDF Viewer states
   const [activeDocName, setActiveDocName] = useState('');
@@ -332,21 +349,60 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
       {/* ==================== MODALS ==================== */}
 
-      {/* 1. OCR SCANNER MODAL */}
+      {/* 1. OCR SCANNER MODAL — Bottom Sheet that slides up from below */}
       {activeModal === 'scanner' && (
-        <div className="modal active" style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-content" style={{ maxWidth: '100vw', width: '100vw', height: '100vh', maxHeight: '100vh', borderRadius: 0, margin: 0, display: 'flex', flexDirection: 'column' }}>
-            <div className="modal-header" style={{ border: 'none', background: '#1c1c1e', color: '#fff', padding: '14px 20px' }}>
-              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', justifyContent: 'center' }}>
-                <Camera size={18} style={{ color: 'var(--primary-gold)' }} /> Escaneo de Documentos Judiciales (CamScanner)
-              </h3>
-              <button className="modal-close" onClick={() => setActiveModal('none')} style={{ color: 'var(--primary-blue)' }}>Cerrar</button>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            background: scannerSheetOpen ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0)',
+            backdropFilter: scannerSheetOpen ? 'blur(8px)' : 'none',
+            transition: 'background 0.38s ease, backdrop-filter 0.38s ease',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeScanner(); }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '100vw',
+              height: '96vh',
+              background: '#1c1c1e',
+              borderRadius: '20px 20px 0 0',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxShadow: '0 -12px 40px rgba(0,0,0,0.5)',
+              transform: scannerSheetOpen ? 'translateY(0)' : 'translateY(100%)',
+              transition: 'transform 0.38s cubic-bezier(0.32, 0.72, 0, 1)',
+            }}
+          >
+            {/* Sheet drag handle */}
+            <div style={{ padding: '10px 0 0', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: '36px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.2)' }} />
             </div>
-            <div className="modal-body" style={{ flexGrow: 1, padding: 0, display: 'flex', flexDirection: 'column', background: '#1c1c1e', overflow: 'hidden', maxHeight: '100%' }}>
-              <OcrScanner 
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px 8px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Camera size={18} style={{ color: 'var(--primary-gold)' }} />
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: '15px' }}>Escanear Documento</span>
+              </div>
+              <button
+                onClick={closeScanner}
+                style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600 }}
+              >
+                ✕
+              </button>
+            </div>
+            {/* Scanner body */}
+            <div style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <OcrScanner
                 currentUser={currentUser}
                 onOcrComplete={handleOcrComplete}
-                onClose={() => setActiveModal('none')}
+                onClose={closeScanner}
               />
             </div>
           </div>

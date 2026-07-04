@@ -77,7 +77,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       // Simulating paper edges locking on after 2 seconds
       if (frame > 10) {
         setSheetDetected(true);
-        setScannerMsg('CamScanner: Â¡Hoja Detectada! (Encuadre Ã“ptimo)');
+        setScannerMsg('CamScanner: ¡Hoja Detectada! (Encuadre Óptimo)');
         setEdgePoints({
           p1: { x: 25, y: 15 },
           p2: { x: 75, y: 15 },
@@ -166,35 +166,35 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       ctx.fillStyle = '#222';
       ctx.font = 'bold 22px Times New Roman, serif';
       ctx.fillText('EN LO PRINCIPAL: DEMANDA DE TUTELA LABORAL Y DESPIDO INJUSTIFICADO', 70, 100);
-      ctx.fillText('OTROSÃ: ACOMPAÃ‘A DOCUMENTOS E INSTRUMENTALES', 70, 130);
+      ctx.fillText('OTROSÍ: ACOMPAÑA DOCUMENTOS E INSTRUMENTALES', 70, 130);
 
       ctx.font = 'bold 18px Times New Roman, serif';
-      ctx.fillText('S.J.L. DEL TRABAJO DE SANTIAGO (1Â°)', 70, 190);
+      ctx.fillText('S.J.L. DEL TRABAJO DE SANTIAGO (1°)', 70, 190);
 
       ctx.font = '16px Times New Roman, serif';
-      ctx.fillText('JUAN PABLO MARTÃNEZ DÃAZ, tÃ©cnico en construcciÃ³n, domiciliado en Av. VicuÃ±a Mackenna 450,', 70, 250);
+      ctx.fillText('JUAN PABLO MARTÍNEZ DÍAZ, técnico en construcción, domiciliado en Av. Vicuña Mackenna 450,', 70, 250);
       ctx.fillText('a S.S. con respeto digo: Que interpongo demanda en contra de mi ex empleadora,', 70, 280);
       ctx.fillStyle = '#007aff';
       ctx.fillText('CONSTRUCTORA ALFA S.A., representada por don Luis Fuentes, ambos domiciliados en Colina,', 70, 310);
       ctx.fillStyle = '#222';
-      ctx.fillText('fundado en los hechos de vulneraciÃ³n de integridad fÃ­sica que paso a exponer:', 70, 340);
+      ctx.fillText('fundado en los hechos de vulneración de integridad física que paso a exponer:', 70, 340);
 
       // Paragraph body
       ctx.font = '15px Times New Roman, serif';
       let y = 390;
       const lines = [
-        'I. RELACIÃ“N LABORAL Y FUNCIONES:',
-        'IngresÃ© a prestar servicios el dÃ­a 15 de marzo de 2018 como Supervisor de Obra.',
-        'Mi remuneraciÃ³n promedio de los Ãºltimos meses ascendÃ­a a la suma de $1,850,000 CLP.',
+        'I. RELACIÓN LABORAL Y FUNCIONES:',
+        'Ingresé a prestar servicios el día 15 de marzo de 2018 como Supervisor de Obra.',
+        'Mi remuneración promedio de los últimos meses ascendía a la suma de $1,850,000 CLP.',
         '',
         'II. DESPIDO INDIRECTO O AUTODESPIDO:',
-        'Con fecha 3 de junio de 2026, me vi en la obligaciÃ³n de poner tÃ©rmino al contrato',
+        'Con fecha 3 de junio de 2026, me vi en la obligación de poner término al contrato',
         'de trabajo por graves incumplimientos del empleador en medidas de seguridad e higiene,',
-        'tras sufrir un accidente en faena sin recibir los implementos de protecciÃ³n.',
+        'tras sufrir un accidente en faena sin recibir los implementos de protección.',
         '',
         'POR TANTO, ruego a S.S. acoger esta demanda, decretar el pago de las indemnizaciones',
-        'por aÃ±os de servicio con recargo del 50%, y compensaciÃ³n por daÃ±o moral por la suma de',
-        '$18,500,000 CLP mÃ¡s costas procesales.'
+        'por años de servicio con recargo del 50%, y compensación por daño moral por la suma de',
+        '$18,500,000 CLP más costas procesales.'
       ];
 
       lines.forEach((l) => {
@@ -204,12 +204,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
       // Signatures
       ctx.font = 'italic 18px Times New Roman';
-      ctx.fillText('Juan P. MartÃ­nez D.', 100, y + 40);
+      ctx.fillText('Juan P. Martínez D.', 100, y + 40);
       ctx.font = '13px Times New Roman';
       ctx.fillText('Trabajador Demandante', 100, y + 60);
 
       ctx.font = 'italic 18px Times New Roman';
-      ctx.fillText('Esteban GÃ³mez V.', 480, y + 40);
+      ctx.fillText('Esteban Gómez V.', 480, y + 40);
       ctx.font = '13px Times New Roman';
       ctx.fillText('Abogado Patrocinante (Reg. 908)', 480, y + 60);
 
@@ -312,13 +312,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const startOcrProcessing = () => {
     setStep('ocr-processing');
     setOcrProgress(0);
-    setOcrStatus('Iniciando lectura lingÃ¼Ã­stica de caracteres OCR...');
+    setOcrStatus('Iniciando lectura lingüística de caracteres OCR...');
 
     const statuses = [
       { p: 15, msg: 'Segmentando bloques de texto optimizados...' },
-      { p: 40, msg: 'Detectando demandante (Juan Pablo MartÃ­nez DÃ­az)...' },
-      { p: 70, msg: 'Buscando cuantÃ­a del reclamo ($18,500,000 CLP)...' },
-      { p: 90, msg: 'Identificando tribunal (1Â° Juzgado de Letras de Santiago)...' },
+      { p: 40, msg: 'Detectando demandante (Juan Pablo Martínez Díaz)...' },
+      { p: 70, msg: 'Buscando cuantía del reclamo ($18,500,000 CLP)...' },
+      { p: 90, msg: 'Identificando tribunal (1° Juzgado de Letras de Santiago)...' },
       { p: 100, msg: 'Reconocimiento completado e indexado.' }
     ];
 
@@ -572,7 +572,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   backdropFilter: 'blur(8px)'
                 }}
               >
-                {forceSimulator ? 'ðŸ”Œ Activar CÃ¡mara FÃ­sica' : 'ðŸ¤– Usar Simulador Inteligente'}
+                {forceSimulator ? '📷 Activar Cámara Física' : '🤖 Usar Simulador Inteligente'}
               </button>
             </div>
             
@@ -732,7 +732,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 gap: '4px'
               }}
             >
-              <Wand2 size={10} /> Realce AutomÃ¡tico Activo
+              <Wand2 size={10} /> Realce Automático Activo
             </div>
           </div>
 
@@ -779,7 +779,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               }}
             >
               <Sparkles size={14} style={{ color: activeFilter === 'magic' ? '#fff' : 'var(--primary-gold)' }} />
-              Realce MÃ¡gico
+              Realce Mágico
             </button>
 
             <button
@@ -813,7 +813,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               }}
               style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
-              AtrÃ¡s
+              Atrás
             </button>
             
             <button 
@@ -857,7 +857,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           />
 
           <Cpu className="pulsing" size={44} style={{ color: 'var(--primary-gold)', marginBottom: '16px' }} />
-          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Procesando AnÃ¡lisis OCR</h4>
+          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Procesando Análisis OCR</h4>
           
           <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: '3px', overflow: 'hidden', margin: '10px 0 16px' }}>
             <div style={{ width: `${ocrProgress}%`, height: '100%', backgroundColor: 'var(--primary-gold)', transition: 'width 0.2s ease-in-out' }} />
@@ -892,7 +892,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           >
             <Sparkles size={18} style={{ color: 'var(--success)' }} />
             <span style={{ fontSize: '12.5px', color: 'var(--success)', fontWeight: 600 }}>
-              CamScanner OCR: Metadatos extraÃ­dos con Ã©xito:
+              CamScanner OCR: Metadatos extraídos con éxito:
             </span>
           </div>
 
@@ -911,7 +911,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
             <div className="form-row">
               <div className="form-group">
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>CuantÃ­a Estimada</label>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Cuantía Estimada</label>
                 <input 
                   type="text" 
                   className="form-control" 
@@ -922,7 +922,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 />
               </div>
               <div className="form-group">
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Ãrea de Especialidad</label>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Área de Especialidad</label>
                 <input 
                   type="text" 
                   className="form-control" 
@@ -977,7 +977,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               }}
               style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
-              AtrÃ¡s
+              Atrás
             </button>
             
             <button 
