@@ -59,25 +59,32 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [dragHandle, setDragHandle] = useState<string | null>(null);
 
   useEffect(() => {
-    // Always try real camera on mount; fall back to simulator on error (handled in startCamera)
+    // Start real camera on mount
     startCamera();
     return () => {
       stopCamera();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Simulating CamScanner real-time edge detection drift
+  // Attach stream to video element whenever stream changes
+  // This fixes the chicken-and-egg: videoRef.current wasn't available when startCamera ran
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraStream]);
+
+  // CamScanner-style edge detection animation (only in simulator mode or as overlay hint)
   useEffect(() => {
     if (step !== 'capture') return;
 
     let frame = 0;
     const interval = setInterval(() => {
       frame++;
-      
-      // Simulating paper edges locking on after 2 seconds
       if (frame > 10) {
         setSheetDetected(true);
-        setScannerMsg('CamScanner: ¡Hoja Detectada! (Encuadre Óptimo)');
+        setScannerMsg('Listo — presiona el botón para capturar');
         setEdgePoints({
           p1: { x: 25, y: 15 },
           p2: { x: 75, y: 15 },
@@ -86,8 +93,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         });
       } else {
         setSheetDetected(false);
-        setScannerMsg('CamScanner: Buscando bordes de hoja...');
-        // Add minor random drift to show it is "calculating" edges
+        setScannerMsg('Apunta la cámara al documento...');
         const drift = () => Math.random() * 2 - 1;
         setEdgePoints({
           p1: { x: 22 + drift(), y: 18 + drift() },
@@ -105,16 +111,14 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     try {
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
+      // Store the stream; the useEffect above will attach it to videoRef
       setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
       setHasCamera(true);
       setForceSimulator(false);
     } catch (err) {
-      console.warn('Webcam not available for CamScanner simulation, using template.', err);
+      console.warn('Camera unavailable, using document simulator.', err);
       setHasCamera(false);
       setForceSimulator(true);
     }
@@ -418,193 +422,140 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       {step === 'capture' && (
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', height: '100%', justifyContent: 'space-between' }}>
           
-          {/* Full Screen Camera View Frame */}
-          <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 160px)', width: '100%', position: 'relative', borderRadius: 0 }}>
-            
-            {/* Beautiful, styled simulated paper sheet in background */}
-            <div 
+          {/* Full Screen Camera Viewport */}
+          <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 160px)', width: '100%', position: 'relative', borderRadius: 0, overflow: 'hidden', background: '#000' }}>
+
+            {/* ALWAYS-RENDERED video element — stream attaches via useEffect */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
               style={{
                 position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                background: '#121214', // dark desk surface
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1
+                top: 0, left: 0,
+                width: '100%', height: '100%',
+                objectFit: 'cover',
+                zIndex: 2,
+                display: hasCamera ? 'block' : 'none'
               }}
-            >
-              {/* The mock sheet itself */}
-              <div 
+            />
+
+            {/* Fallback: simulator document (shown only if camera is unavailable) */}
+            {forceSimulator && (
+              <div
                 style={{
-                  width: '210px',
-                  height: '280px',
-                  backgroundColor: '#fbfbf9',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-                  borderRadius: '2px',
-                  padding: '12px',
-                  transform: 'rotate(1.5deg)',
-                  fontSize: '3px',
-                  color: '#333',
-                  lineHeight: '5px',
-                  border: '1px solid rgba(0,0,0,0.08)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px'
+                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                  background: '#121214',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  zIndex: 1
                 }}
               >
-                <div style={{ height: '6px', width: '90%', borderBottom: '1px solid #aaa', marginBottom: '8px', fontWeight: 'bold' }}>EN LO PRINCIPAL: DEMANDA LABORAL</div>
-                <div>S.J.L. DEL TRABAJO DE SANTIAGO</div>
-                <div>JUAN PABLO MARTINEZ DIAZ, tecnico en construccion, domicilado...</div>
-                <div style={{ color: 'var(--primary-blue)', fontWeight: 'bold' }}>CONSTRUCTORA ALFA S.A., representada por don Luis Fuentes...</div>
-                <div>I. RELACION LABORAL Y HECHOS:</div>
-                <div>El trabajador sufrio un accidente en faena por falta de medidas de proteccion...</div>
-                <div>Se solicita indemnizacion por la suma de $18,500,000 CLP...</div>
-                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between' }}>
-                  <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Trabajador</div>
-                  <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Abogado</div>
+                <div
+                  style={{
+                    width: '210px', height: '280px', backgroundColor: '#fbfbf9',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)', borderRadius: '2px',
+                    padding: '12px', transform: 'rotate(1.5deg)', fontSize: '3px',
+                    color: '#333', lineHeight: '5px', border: '1px solid rgba(0,0,0,0.08)',
+                    display: 'flex', flexDirection: 'column', gap: '4px'
+                  }}
+                >
+                  <div style={{ height: '6px', width: '90%', borderBottom: '1px solid #aaa', marginBottom: '8px', fontWeight: 'bold' }}>EN LO PRINCIPAL: DEMANDA LABORAL</div>
+                  <div>S.J.L. DEL TRABAJO DE SANTIAGO</div>
+                  <div>JUAN PABLO MARTINEZ DIAZ, técnico en construcción...</div>
+                  <div style={{ color: 'var(--primary-blue)', fontWeight: 'bold' }}>CONSTRUCTORA ALFA S.A...</div>
+                  <div>I. RELACIÓN LABORAL Y HECHOS:</div>
+                  <div>El trabajador sufrió un accidente en faena...</div>
+                  <div>Se solicita indemnización: $18,500,000 CLP</div>
+                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Trabajador</div>
+                    <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Abogado</div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Webcam Video stream overlaid on top */}
-            {!forceSimulator && hasCamera && (
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                className="camera-video" 
-                style={{ 
-                  position: 'absolute', 
-                  top: 0, 
-                  left: 0, 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'cover',
-                  opacity: 0.85, 
-                  zIndex: 2 
-                }} 
-              />
             )}
 
-            {/* Glowing Edge Detection SVG Overlays */}
-            <svg 
-              style={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
-                width: '100%', 
-                height: '100%', 
-                pointerEvents: 'none',
-                zIndex: 4 
+            {/* Camera loading state */}
+            {!hasCamera && !forceSimulator && (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <span style={{ color: '#ccc', fontSize: '13px' }}>Iniciando cámara...</span>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            )}
+
+            {/* SVG Edge Detection Overlay */}
+            <svg
+              style={{
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                pointerEvents: 'none', zIndex: 4
               }}
             >
-              <polygon 
+              <polygon
                 points={`
-                  ${edgePoints.p1.x}%,${edgePoints.p1.y}% 
-                  ${edgePoints.p2.x}%,${edgePoints.p2.y}% 
-                  ${edgePoints.p3.x}%,${edgePoints.p3.y}% 
+                  ${edgePoints.p1.x}%,${edgePoints.p1.y}%
+                  ${edgePoints.p2.x}%,${edgePoints.p2.y}%
+                  ${edgePoints.p3.x}%,${edgePoints.p3.y}%
                   ${edgePoints.p4.x}%,${edgePoints.p4.y}%
                 `}
-                style={{ 
-                  fill: 'rgba(0, 122, 255, 0.12)', 
-                  stroke: sheetDetected ? 'var(--success)' : 'var(--primary-blue)', 
+                style={{
+                  fill: 'rgba(0, 122, 255, 0.1)',
+                  stroke: sheetDetected ? '#34c759' : '#007aff',
                   strokeWidth: '2.5',
-                  transition: 'all 0.25s ease' 
-                }} 
+                  transition: 'all 0.25s ease'
+                }}
               />
-              
-              {/* Corner handle dots */}
-              <circle cx={`${edgePoints.p1.x}%`} cy={`${edgePoints.p1.y}%`} r="6" fill={sheetDetected ? 'var(--success)' : 'var(--primary-blue)'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
-              <circle cx={`${edgePoints.p2.x}%`} cy={`${edgePoints.p2.y}%`} r="6" fill={sheetDetected ? 'var(--success)' : 'var(--primary-blue)'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
-              <circle cx={`${edgePoints.p3.x}%`} cy={`${edgePoints.p3.y}%`} r="6" fill={sheetDetected ? 'var(--success)' : 'var(--primary-blue)'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
-              <circle cx={`${edgePoints.p4.x}%`} cy={`${edgePoints.p4.y}%`} r="6" fill={sheetDetected ? 'var(--success)' : 'var(--primary-blue)'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
+              <circle cx={`${edgePoints.p1.x}%`} cy={`${edgePoints.p1.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
+              <circle cx={`${edgePoints.p2.x}%`} cy={`${edgePoints.p2.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
+              <circle cx={`${edgePoints.p3.x}%`} cy={`${edgePoints.p3.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
+              <circle cx={`${edgePoints.p4.x}%`} cy={`${edgePoints.p4.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
             </svg>
 
-            {/* Glowing bottom badge for CamScanner state */}
-            <div 
-              style={{ 
-                position: 'absolute', 
-                bottom: '16px', 
-                left: '50%', 
-                transform: 'translateX(-50%)', 
-                background: sheetDetected ? 'rgba(52,199,89,0.95)' : 'rgba(0,122,255,0.95)', 
-                color: '#fff', 
-                fontSize: '11px', 
-                padding: '5px 14px', 
-                borderRadius: '99px',
-                fontWeight: 600,
-                backdropFilter: 'blur(10px)',
-                zIndex: 5,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-                transition: 'all 0.3s ease'
+            {/* Status badge */}
+            <div
+              style={{
+                position: 'absolute', bottom: '16px', left: '50%',
+                transform: 'translateX(-50%)',
+                background: sheetDetected ? 'rgba(52,199,89,0.95)' : 'rgba(0,122,255,0.95)',
+                color: '#fff', fontSize: '12px', padding: '6px 16px',
+                borderRadius: '99px', fontWeight: 600,
+                backdropFilter: 'blur(10px)', zIndex: 5,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                transition: 'all 0.3s ease', whiteSpace: 'nowrap'
               }}
             >
-              {scannerMsg}
+              {forceSimulator ? '🧩 Simulador (cámara no disponible)' : scannerMsg}
             </div>
 
-            {/* Topbar inside scanner view to switch modes */}
-            <div 
-              style={{
-                position: 'absolute',
-                top: '12px',
-                left: '12px',
-                right: '12px',
-                zIndex: 5,
-                display: 'flex',
-                justifyContent: 'space-between',
-                pointerEvents: 'auto'
-              }}
-            >
-              <button 
-                onClick={() => setForceSimulator(!forceSimulator)}
-                style={{ 
-                  background: 'rgba(255,255,255,0.12)', 
-                  border: '1px solid rgba(255,255,255,0.2)', 
-                  color: '#fff', 
-                  padding: '5px 12px', 
-                  borderRadius: '20px', 
-                  fontSize: '10px', 
-                  fontWeight: 600, 
-                  cursor: 'pointer',
-                  backdropFilter: 'blur(8px)'
-                }}
-              >
-                {forceSimulator ? '📷 Activar Cámara Física' : '🤖 Usar Simulador Inteligente'}
-              </button>
-            </div>
-            
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
-          {/* Dark control bottom bar */}
+          {/* Bottom controls */}
           <div className="scanner-controls" style={{ background: '#1c1c1e', padding: '16px 24px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <input 
-              type="file" 
-              accept="image/*" 
-              ref={fileInputRef} 
-              style={{ display: 'none' }} 
-              onChange={handleFileUpload} 
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
             />
-            
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               onClick={() => fileInputRef.current?.click()}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               <Upload size={16} /> Subir Imagen
             </button>
 
-            <button 
-              className="shutter-button" 
-              onClick={capturePhoto} 
-              style={{ border: sheetDetected ? '4px solid var(--success)' : '4px solid var(--primary-gold)' }}
+            <button
+              className="shutter-button"
+              onClick={capturePhoto}
+              style={{ border: sheetDetected ? '4px solid #34c759' : '4px solid var(--primary-gold)' }}
             />
 
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               onClick={onClose}
               style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
