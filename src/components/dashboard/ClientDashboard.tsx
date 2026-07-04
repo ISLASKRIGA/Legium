@@ -103,7 +103,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
             onClick={() => setActiveModal('scanner')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
-            <Camera size={16} /> Escanear Nueva Demanda
+            <Camera size={16} /> Escanear Nuevo Documento
           </button>
         </div>
       </div>
@@ -337,7 +337,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
             <div className="ios-grabber" />
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Camera size={18} style={{ color: 'var(--primary-gold)' }} /> Escaneo de Demandas Laborales
+                <Camera size={18} style={{ color: 'var(--primary-gold)' }} /> Escaneo de Documentos Judiciales
               </h3>
               <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
             </div>
