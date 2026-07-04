@@ -1,8 +1,6 @@
-/**
- * data.js - Legium Database Initializer & LocalStorage Helper
- */
+import { User, Client, Case, AuditLog, Financials } from './types';
 
-const DEFAULT_USERS = [
+export const DEFAULT_USERS: User[] = [
   { id: "usr-01", name: "Dr. Carlos Mendoza", email: "carlos.mendoza@legium.law", role: "Socio Principal", active: true, avatar: "CM" },
   { id: "usr-02", name: "Dra. Sofía Valenzuela", email: "sofia.valenzuela@legium.law", role: "Abogado Senior", active: true, avatar: "SV" },
   { id: "usr-03", name: "Lic. Mateo Ríos", email: "mateo.rios@legium.law", role: "Abogado Junior", active: true, avatar: "MR" },
@@ -10,7 +8,7 @@ const DEFAULT_USERS = [
   { id: "usr-05", name: "Dra. Valentina Paz", email: "valentina.paz@legium.law", role: "Abogado Senior", active: false, avatar: "VP" }
 ];
 
-const DEFAULT_CLIENTS = [
+export const DEFAULT_CLIENTS: Client[] = [
   { id: "cli-01", name: "Constructora Alfa S.A.", email: "legal@constructoraalfa.com", phone: "+56 9 8765 4321", type: "Corporativo", rfc: "CALF900812-A10", contactPerson: "Ing. Luis Fuentes" },
   { id: "cli-02", name: "Inversiones del Norte S.A.S.", email: "contacto@inversionesnorte.cl", phone: "+56 9 1234 5678", type: "Corporativo", rfc: "INOR150320-TX9", contactPerson: "Sra. Clara Belmar" },
   { id: "cli-03", name: "BioTecno Labs S.A.", email: "patentes@biotecnolabs.com", phone: "+56 2 2456 7890", type: "Corporativo", rfc: "BLAB201105-3R8", contactPerson: "Dr. Hugo Valencia" },
@@ -19,7 +17,7 @@ const DEFAULT_CLIENTS = [
   { id: "cli-06", name: "Andrés Larraín", email: "andres.larrain@yahoo.com", phone: "+56 9 4433 2211", type: "Individual", rfc: "LARA880402-K99", contactPerson: "Andrés Larraín" }
 ];
 
-const DEFAULT_CASES = [
+export const DEFAULT_CASES: Case[] = [
   {
     id: "LEG-2026-001",
     title: "Demanda de Reivindicación Alfa vs. Beta",
@@ -51,9 +49,7 @@ const DEFAULT_CASES = [
       { id: "nt-001", date: "2026-02-05 10:30", author: "Dr. Carlos Mendoza", text: "El cliente insiste en que no aceptará un acuerdo inferior al 80% del terreno en disputa." },
       { id: "nt-002", date: "2026-03-02 16:15", author: "Dra. Sofía Valenzuela", text: "La contestación de la contraparte es débil en cuanto a la inscripción de dominio de 1994. Tenemos ventaja documental." }
     ],
-    documents: [
-      { id: "doc-mock-001", name: "Demanda_Reivindicacion_Alfa.pdf", size: "1.2 KB", uploadDate: "2026-01-15" }
-    ]
+    documents: []
   },
   {
     id: "LEG-2026-002",
@@ -82,9 +78,7 @@ const DEFAULT_CASES = [
     notes: [
       { id: "nt-003", date: "2026-03-11 09:00", author: "Dra. Sofía Valenzuela", text: "El fiscal se mostró abierto a una salida alternativa si se repara el 50% del perjuicio estimado. El cliente está evaluando créditos." }
     ],
-    documents: [
-      { id: "doc-mock-002", name: "Querella_Tributaria_SII.pdf", size: "1.1 KB", uploadDate: "2026-03-10" }
-    ]
+    documents: []
   },
   {
     id: "LEG-2026-003",
@@ -115,9 +109,7 @@ const DEFAULT_CASES = [
     notes: [
       { id: "nt-004", date: "2026-05-11 11:00", author: "Dr. Carlos Mendoza", text: "Fusión aprobada unánimemente. Los socios quedaron muy conformes con el control de pasivos laborales que recomendamos." }
     ],
-    documents: [
-      { id: "doc-mock-003", name: "Contrato_Fusion_Inversiones_Norte.pdf", size: "1.3 KB", uploadDate: "2026-02-01" }
-    ]
+    documents: []
   },
   {
     id: "LEG-2026-004",
@@ -146,7 +138,8 @@ const DEFAULT_CASES = [
     ],
     notes: [
       { id: "nt-005", date: "2026-04-23 15:40", author: "Lic. Mateo Ríos", text: "María Elena aportó pantallazos de WhatsApp claves que demuestran el acoso laboral (mobbing). Eso sustenta fuertemente la tutela de derechos." }
-    ]
+    ],
+    documents: []
   },
   {
     id: "LEG-2026-005",
@@ -175,7 +168,8 @@ const DEFAULT_CASES = [
     ],
     notes: [
       { id: "nt-006", date: "2025-11-22 17:00", author: "Dr. Carlos Mendoza", text: "La sentencia del TTA tiene una contradicción grave sobre la justificación del gasto en la pág 14. Ese será nuestro foco principal en la Corte de Apelaciones." }
-    ]
+    ],
+    documents: []
   },
   {
     id: "LEG-2026-006",
@@ -204,7 +198,8 @@ const DEFAULT_CASES = [
     ],
     notes: [
       { id: "nt-007", date: "2026-01-22 12:00", author: "Dra. Sofía Valenzuela", text: "El perito de INAPI no entendió el proceso de catalización a temperatura ambiente. Preparamos un anexo gráfico con el equipo de I+D de BioTecno Labs." }
-    ]
+    ],
+    documents: []
   },
   {
     id: "LEG-2026-007",
@@ -233,7 +228,8 @@ const DEFAULT_CASES = [
     ],
     notes: [
       { id: "nt-008", date: "2026-04-10 13:00", author: "Lic. Mateo Ríos", text: "El acuerdo fue homologado sin reparos por el juez de familia. Caso cerrado eficientemente." }
-    ]
+    ],
+    documents: []
   },
   {
     id: "LEG-2026-008",
@@ -261,11 +257,12 @@ const DEFAULT_CASES = [
     ],
     notes: [
       { id: "nt-009", date: "2026-03-12 10:00", author: "Dr. Carlos Mendoza", text: "El plazo de suspensión vence en junio. Nos reuniremos el 23 con los directores de Alfa para ver si aceptamos su oferta de indemnización." }
-    ]
+    ],
+    documents: []
   }
 ];
 
-const DEFAULT_AUDIT_LOGS = [
+export const DEFAULT_AUDIT_LOGS: AuditLog[] = [
   { timestamp: "2026-06-21 14:32:15", userId: "usr-04", userName: "Ing. Alejandro Torres", userRole: "TI Administrador", action: "Inicio de sesión exitoso en consola de administración", status: "Success" },
   { timestamp: "2026-06-21 13:10:44", userId: "usr-01", userName: "Dr. Carlos Mendoza", userRole: "Socio Principal", action: "Descarga de informe financiero de facturación Q2", status: "Success" },
   { timestamp: "2026-06-21 11:25:02", userId: "usr-03", userName: "Lic. Mateo Ríos", userRole: "Abogado Junior", action: "Creación de tarea 'Preparar perito' en expediente LEG-2026-001", status: "Success" },
@@ -275,7 +272,7 @@ const DEFAULT_AUDIT_LOGS = [
   { timestamp: "2026-06-20 15:30:12", userId: "usr-04", userName: "Ing. Alejandro Torres", userRole: "TI Administrador", action: "Copia de seguridad del sistema ejecutada con éxito (Backup Auto-2106)", status: "Success" }
 ];
 
-const DEFAULT_FINANCIALS = {
+export const DEFAULT_FINANCIALS: Financials = {
   summary: {
     totalRevenue: 24500000,
     pendingPayments: 12800000,
@@ -293,12 +290,12 @@ const DEFAULT_FINANCIALS = {
 };
 
 // Database Initialization Helper
-const LegiumDB = {
-  get: function(key, defaultValue) {
+export const LegiumDB = {
+  get: function<T>(key: string, defaultValue: T): T {
     const data = localStorage.getItem(`legium_${key}`);
     if (data) {
       try {
-        return JSON.parse(data);
+        return JSON.parse(data) as T;
       } catch (e) {
         console.error("Error parsing localStorage key " + key, e);
         return defaultValue;
@@ -308,19 +305,18 @@ const LegiumDB = {
     return defaultValue;
   },
 
-  set: function(key, value) {
+  set: function<T>(key: string, value: T): void {
     localStorage.setItem(`legium_${key}`, JSON.stringify(value));
   },
 
-  initialize: function() {
-    this.get("users", DEFAULT_USERS);
-    this.get("clients", DEFAULT_CLIENTS);
+  initialize: function(): void {
+    this.get<User[]>("users", DEFAULT_USERS);
+    this.get<Client[]>("clients", DEFAULT_CLIENTS);
     
     // Load cases and ensure each has a documents array and demo files populated
-    const cases = this.get("cases", DEFAULT_CASES);
+    const cases = this.get<Case[]>("cases", DEFAULT_CASES);
     let updated = false;
     cases.forEach(c => {
-      // Clear old mock documents to replace them with the new rich documents
       if (c.documents) {
         c.documents = c.documents.filter(d => !d.id.startsWith("doc-mock-"));
       } else {
@@ -357,16 +353,15 @@ const LegiumDB = {
       this.set("cases", cases);
     }
 
-    this.get("logs", DEFAULT_AUDIT_LOGS);
-    this.get("financials", DEFAULT_FINANCIALS);
+    this.get<AuditLog[]>("logs", DEFAULT_AUDIT_LOGS);
+    this.get<Financials>("financials", DEFAULT_FINANCIALS);
     
-    // Set active user role simulation (Default: TI Administrador to show everything, but easily swappable)
     if (!localStorage.getItem("legium_current_user")) {
       localStorage.setItem("legium_current_user", JSON.stringify(DEFAULT_USERS[3])); // Ing. Alejandro Torres (TI Admin)
     }
   },
 
-  reset: function() {
+  reset: function(): void {
     localStorage.removeItem("legium_users");
     localStorage.removeItem("legium_clients");
     localStorage.removeItem("legium_cases");
@@ -376,23 +371,23 @@ const LegiumDB = {
     this.initialize();
   },
 
-  getCurrentUser: function() {
-    return JSON.parse(localStorage.getItem("legium_current_user")) || DEFAULT_USERS[3];
+  getCurrentUser: function(): User {
+    const data = localStorage.getItem("legium_current_user");
+    return data ? JSON.parse(data) as User : DEFAULT_USERS[3];
   },
 
-  setCurrentUser: function(user) {
+  setCurrentUser: function(user: User): void {
     localStorage.setItem("legium_current_user", JSON.stringify(user));
-    // Log role switch action
     this.addLog(user.id, `Simulación de cambio de usuario a ${user.name} (${user.role})`, "Success");
   },
 
-  addLog: function(userId, action, status = "Success") {
-    const logs = this.get("logs", DEFAULT_AUDIT_LOGS);
-    const users = this.get("users", DEFAULT_USERS);
-    const user = users.find(u => u.id === userId) || { name: "Sistema", role: "Automatización" };
+  addLog: function(userId: string, action: string, status: 'Success' | 'Warning' | 'Denied' = "Success"): void {
+    const logs = this.get<AuditLog[]>("logs", DEFAULT_AUDIT_LOGS);
+    const users = this.get<User[]>("users", DEFAULT_USERS);
+    const user = users.find(u => u.id === userId) || { name: "Sistema", role: "Automatización" as any };
     
     const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
+    const pad = (n: number) => String(n).padStart(2, '0');
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     
     logs.unshift({
@@ -404,14 +399,8 @@ const LegiumDB = {
       status
     });
     
-    // Limit to 50 logs for performance
     if (logs.length > 50) logs.pop();
     
     this.set("logs", logs);
   }
 };
-
-// Auto initialize when script runs
-LegiumDB.initialize();
-window.LegiumDB = LegiumDB;
-console.log("Legium Database Initialized Successfully.");
