@@ -5,7 +5,8 @@ export const DEFAULT_USERS: User[] = [
   { id: "usr-02", name: "Dra. Sofía Valenzuela", email: "sofia.valenzuela@legium.law", role: "Abogado Senior", active: true, avatar: "SV" },
   { id: "usr-03", name: "Lic. Mateo Ríos", email: "mateo.rios@legium.law", role: "Abogado Junior", active: true, avatar: "MR" },
   { id: "usr-04", name: "Ing. Alejandro Torres", email: "alejandro.torres@legium.law", role: "TI Administrador", active: true, avatar: "AT" },
-  { id: "usr-05", name: "Dra. Valentina Paz", email: "valentina.paz@legium.law", role: "Abogado Senior", active: false, avatar: "VP" }
+  { id: "usr-05", name: "Dra. Valentina Paz", email: "valentina.paz@legium.law", role: "Abogado Senior", active: false, avatar: "VP" },
+  { id: "usr-06", name: "Ing. Luis Fuentes", email: "lfuentes@constructoraalfa.com", role: "Cliente", active: true, avatar: "LF", clientId: "cli-01" }
 ];
 
 export const DEFAULT_CLIENTS: Client[] = [
@@ -310,7 +311,19 @@ export const LegiumDB = {
   },
 
   initialize: function(): void {
-    this.get<User[]>("users", DEFAULT_USERS);
+    const users = this.get<User[]>("users", DEFAULT_USERS);
+    // Sync default users if any are missing from pre-existing localStorage
+    let usersUpdated = false;
+    DEFAULT_USERS.forEach((defaultUser) => {
+      if (!users.some((u) => u.id === defaultUser.id)) {
+        users.push(defaultUser);
+        usersUpdated = true;
+      }
+    });
+    if (usersUpdated) {
+      this.set("users", users);
+    }
+    
     this.get<Client[]>("clients", DEFAULT_CLIENTS);
     
     // Load cases and ensure each has a documents array and demo files populated

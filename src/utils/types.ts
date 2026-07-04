@@ -1,4 +1,4 @@
-export type UserRole = 'TI Administrador' | 'Socio Principal' | 'Abogado Senior' | 'Abogado Junior';
+export type UserRole = 'TI Administrador' | 'Socio Principal' | 'Abogado Senior' | 'Abogado Junior' | 'Cliente';
 
 export interface User {
   id: string;
@@ -7,6 +7,7 @@ export interface User {
   role: UserRole;
   active: boolean;
   avatar: string;
+  clientId?: string;
 }
 
 export type ClientType = 'Corporativo' | 'Individual';

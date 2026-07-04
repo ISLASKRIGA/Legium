@@ -10,10 +10,13 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentUser }) => {
   const isTabVisible = (tab: string) => {
+    if (currentUser.role === 'Cliente') {
+      return tab === 'dashboard';
+    }
     if (tab === 'it-admin') {
       return currentUser.role === 'TI Administrador';
     }
-    return true; // All other tabs are theoretically in the sidebar list (though blocked inside App if senior/junior try to access reports)
+    return true;
   };
 
   const menuItems = [

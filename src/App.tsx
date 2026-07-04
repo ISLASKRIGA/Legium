@@ -3,6 +3,7 @@ import { Navbar } from './components/shared/Navbar';
 import { Topbar } from './components/shared/Topbar';
 import { ToastContainer, ToastMessage } from './components/shared/Toast';
 import { DashboardView } from './components/dashboard/DashboardView';
+import { ClientDashboard } from './components/dashboard/ClientDashboard';
 import { CasesView } from './components/cases/CasesView';
 import { ClientsView } from './components/clients/ClientsView';
 import { ReportsView } from './components/reports/ReportsView';
@@ -11,13 +12,11 @@ import { User, UserRole, Case, Client, AuditLog, Financials } from './utils/type
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
 
 export const App: React.FC = () => {
-  // Database Initializer
-  useEffect(() => {
+  // State Variables (Initialize DB synchronously first)
+  const [currentUser, setCurrentUser] = useState<User>(() => {
     LegiumDB.initialize();
-  }, []);
-
-  // State Variables
-  const [currentUser, setCurrentUser] = useState<User>(() => LegiumDB.getCurrentUser());
+    return LegiumDB.getCurrentUser();
+  });
   const [users, setUsers] = useState<User[]>(() => LegiumDB.get<User[]>('users', DEFAULT_USERS));
   const [cases, setCases] = useState<Case[]>(() => LegiumDB.get<Case[]>('cases', DEFAULT_CASES));
   const [clients, setClients] = useState<Client[]>(() => LegiumDB.get<Client[]>('clients', DEFAULT_CLIENTS));
@@ -270,14 +269,25 @@ export const App: React.FC = () => {
         {/* Page Container */}
         <div className="page-container" style={{ flexGrow: 1, overflowY: 'auto', padding: '24px' }}>
           {activeTab === 'dashboard' && (
-            <DashboardView
-              currentUser={currentUser}
-              cases={cases}
-              auditLogs={auditLogs}
-              financials={financials}
-              onViewCase={handleViewCaseFromDashboard}
-              onToggleTask={handleToggleDashboardTask}
-            />
+            currentUser.role === 'Cliente' ? (
+              <ClientDashboard
+                currentUser={currentUser}
+                cases={cases}
+                searchQuery={searchQuery}
+                onAddCase={handleAddCase}
+                onAddLog={addLogEntry}
+                onShowToast={showToast}
+              />
+            ) : (
+              <DashboardView
+                currentUser={currentUser}
+                cases={cases}
+                auditLogs={auditLogs}
+                financials={financials}
+                onViewCase={handleViewCaseFromDashboard}
+                onToggleTask={handleToggleDashboardTask}
+              />
+            )
           )}
 
           {activeTab === 'cases' && (
