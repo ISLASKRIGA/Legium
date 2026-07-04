@@ -106,19 +106,23 @@ a:hover {
   overflow: hidden;
 }
 
-/* Sidebar - iPadOS translucent sidebar style */
+/* Sidebar - Premium Flying Capsule (Pastilla Flotante) */
 .sidebar {
   width: 250px;
-  background-color: var(--bg-sidebar);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-right: 1px solid var(--border-color);
+  background-color: #0b132b; /* Premium dark navy/blue capsule background */
   display: flex;
   flex-direction: column;
-  height: 100%;
   flex-shrink: 0;
   z-index: 100;
   transition: var(--transition-normal);
+  
+  /* Flying capsule styles (desktop) */
+  margin: 16px 0 16px 16px;
+  height: calc(100vh - 32px);
+  border-radius: 28px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
 }
 
 .sidebar-brand {
@@ -131,12 +135,12 @@ a:hover {
 .logo-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 10px;
   background: linear-gradient(135deg, var(--primary-gold), #b38600);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(184, 134, 11, 0.2);
+  box-shadow: 0 2px 8px rgba(184, 134, 11, 0.3);
 }
 
 .logo-icon svg {
@@ -148,7 +152,7 @@ a:hover {
 .brand-name {
   font-size: 20px;
   font-weight: 800;
-  color: var(--text-primary);
+  color: #ffffff; /* White text for dark sidebar */
   letter-spacing: -0.5px;
 }
 
@@ -161,7 +165,7 @@ a:hover {
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   flex-grow: 1;
   overflow-y: auto;
 }
@@ -170,43 +174,45 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  color: var(--text-primary);
+  padding: 12px 16px;
+  border-radius: 14px;
+  color: #a0aec0; /* Soft contrast text */
   font-weight: 500;
-  font-size: 14.5px;
-  transition: var(--transition-fast);
+  font-size: 14px;
+  transition: all var(--transition-fast);
   border: none;
 }
 
 .menu-item a svg {
   width: 20px;
   height: 20px;
-  stroke: var(--text-secondary);
+  stroke: #a0aec0;
   stroke-width: 2.2;
   fill: none;
-  transition: var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .menu-item a:hover {
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
 }
 
 .menu-item.active a {
-  color: var(--primary-blue);
-  background-color: rgba(0, 122, 255, 0.08);
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary-blue), #0056b3);
+  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.35);
   font-weight: 600;
 }
 
 .menu-item.active a svg {
-  stroke: var(--primary-blue);
+  stroke: #ffffff;
 }
 
 /* Sidebar Footer User Badge */
 .sidebar-footer {
   padding: 16px 20px;
-  border-top: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .user-badge {
@@ -219,14 +225,14 @@ a:hover {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   border: 1.5px solid var(--primary-blue);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 13px;
-  color: var(--primary-blue);
+  color: #ffffff;
 }
 
 .user-info {
@@ -237,7 +243,7 @@ a:hover {
 .user-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #ffffff;
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -246,7 +252,7 @@ a:hover {
 
 .user-role {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: #a0aec0;
   font-weight: 400;
 }
 
@@ -1290,29 +1296,89 @@ textarea.form-control {
 }
 
 /* Responsive mobile design */
+/* Responsive mobile design */
 .mobile-toggle {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  font-size: 20px;
-  cursor: pointer;
+  display: none !important; /* Hide hamburger menu icon as we use a floating bottom dock */
 }
 
 @media (max-width: 768px) {
   .sidebar {
-    position: absolute;
-    left: -250px;
-    background-color: #fff;
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    width: calc(100% - 40px) !important;
+    height: 72px !important;
+    margin: 0 !important;
+    background-color: #0b132b !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+    border-radius: 99px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 12px;
   }
   
-  .sidebar.mobile-open {
-    left: 0;
-    box-shadow: 10px 0 30px rgba(0,0,0,0.1);
+  .sidebar-brand, .sidebar-footer {
+    display: none !important;
   }
   
-  .mobile-toggle {
-    display: block;
+  .sidebar-menu {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+    height: 100% !important;
+    align-items: center;
+    justify-content: space-around !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    overflow-y: hidden !important;
+  }
+  
+  .menu-item {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+  }
+  
+  .menu-item a {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    padding: 8px 12px !important;
+    border-radius: 20px !important;
+    color: #a0aec0 !important;
+    font-size: 9px !important;
+    font-weight: 500;
+    text-align: center;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  
+  .menu-item a svg {
+    width: 18px !important;
+    height: 18px !important;
+    stroke: #a0aec0 !important;
+  }
+  
+  .menu-item.active a {
+    color: #ffffff !important;
+    background: linear-gradient(135deg, var(--primary-blue), #0056b3) !important;
+    box-shadow: 0 4px 10px rgba(0, 122, 255, 0.3) !important;
+  }
+  
+  .menu-item.active a svg {
+    stroke: #ffffff !important;
+  }
+  
+  .page-container {
+    padding-bottom: 100px !important;
   }
   
   .dashboard-layout {
