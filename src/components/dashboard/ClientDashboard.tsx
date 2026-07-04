@@ -332,16 +332,15 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
 
       {/* 1. OCR SCANNER MODAL */}
       {activeModal === 'scanner' && (
-        <div className="modal active">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
-            <div className="ios-grabber" />
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Camera size={18} style={{ color: 'var(--primary-gold)' }} /> Escaneo de Documentos Judiciales
+        <div className="modal active" style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-content" style={{ maxWidth: '100vw', width: '100vw', height: '100vh', maxHeight: '100vh', borderRadius: 0, margin: 0, display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header" style={{ border: 'none', background: '#1c1c1e', color: '#fff', padding: '14px 20px' }}>
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', justifyContent: 'center' }}>
+                <Camera size={18} style={{ color: 'var(--primary-gold)' }} /> Escaneo de Documentos Judiciales (CamScanner)
               </h3>
-              <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
+              <button className="modal-close" onClick={() => setActiveModal('none')} style={{ color: 'var(--primary-blue)' }}>Cerrar</button>
             </div>
-            <div className="modal-body" style={{ padding: '16px' }}>
+            <div className="modal-body" style={{ flexGrow: 1, padding: 0, display: 'flex', flexDirection: 'column', background: '#1c1c1e', overflow: 'hidden', maxHeight: '100%' }}>
               <OcrScanner 
                 currentUser={currentUser}
                 onOcrComplete={handleOcrComplete}

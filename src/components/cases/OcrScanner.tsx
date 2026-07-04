@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, FileText, X, RotateCcw, Upload, Check, Image as ImageIcon, Sparkles, Cpu, ChevronRight, Wand2 } from 'lucide-react';
+import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
 
@@ -19,13 +19,14 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [flashActive, setFlashActive] = useState(false);
   const [scannerMsg, setScannerMsg] = useState('CamScanner: Buscando bordes de hoja...');
   const [sheetDetected, setSheetDetected] = useState(false);
+  const [forceSimulator, setForceSimulator] = useState(true); // Default to simulator to avoid black camera streams
 
   // SVG Edge coordinates for real-time CamScanner simulation
   const [edgePoints, setEdgePoints] = useState({
-    p1: { x: 15, y: 20 },
-    p2: { x: 85, y: 18 },
-    p3: { x: 82, y: 85 },
-    p4: { x: 18, y: 82 }
+    p1: { x: 22, y: 18 },
+    p2: { x: 78, y: 16 },
+    p3: { x: 76, y: 84 },
+    p4: { x: 24, y: 82 }
   });
   
   // Beautify filter choice
@@ -51,17 +52,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const cropContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Crop Coordinates (percentages)
-  const [cropBox, setCropBox] = useState({ top: 10, left: 10, width: 80, height: 80 });
+  const [cropBox, setCropBox] = useState({ top: 12, left: 12, width: 76, height: 74 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragHandle, setDragHandle] = useState<string | null>(null);
 
   useEffect(() => {
-    startCamera();
+    if (!forceSimulator) {
+      startCamera();
+    }
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [forceSimulator]);
 
   // Simulating CamScanner real-time edge detection drift
   useEffect(() => {
@@ -72,25 +75,25 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       frame++;
       
       // Simulating paper edges locking on after 2 seconds
-      if (frame > 12) {
+      if (frame > 10) {
         setSheetDetected(true);
         setScannerMsg('CamScanner: ¡Hoja Detectada! (Encuadre Óptimo)');
         setEdgePoints({
-          p1: { x: 18, y: 15 },
-          p2: { x: 82, y: 15 },
-          p3: { x: 80, y: 85 },
-          p4: { x: 20, y: 85 }
+          p1: { x: 25, y: 15 },
+          p2: { x: 75, y: 15 },
+          p3: { x: 73, y: 85 },
+          p4: { x: 27, y: 85 }
         });
       } else {
         setSheetDetected(false);
         setScannerMsg('CamScanner: Buscando bordes de hoja...');
         // Add minor random drift to show it is "calculating" edges
-        const drift = () => Math.random() * 3 - 1.5;
+        const drift = () => Math.random() * 2 - 1;
         setEdgePoints({
-          p1: { x: 15 + drift(), y: 20 + drift() },
-          p2: { x: 85 + drift(), y: 18 + drift() },
-          p3: { x: 82 + drift(), y: 85 + drift() },
-          p4: { x: 18 + drift(), y: 82 + drift() }
+          p1: { x: 22 + drift(), y: 18 + drift() },
+          p2: { x: 78 + drift(), y: 16 + drift() },
+          p3: { x: 76 + drift(), y: 84 + drift() },
+          p4: { x: 24 + drift(), y: 82 + drift() }
         });
       }
     }, 180);
@@ -109,9 +112,11 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         videoRef.current.srcObject = stream;
       }
       setHasCamera(true);
+      setForceSimulator(false);
     } catch (err) {
       console.warn('Webcam not available for CamScanner simulation, using template.', err);
       setHasCamera(false);
+      setForceSimulator(true);
     }
   };
 
@@ -127,7 +132,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 200);
 
-    if (hasCamera && videoRef.current) {
+    if (!forceSimulator && hasCamera && videoRef.current) {
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth || 640;
       canvas.height = videoRef.current.videoHeight || 480;
@@ -208,23 +213,23 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       ctx.font = '13px Times New Roman';
       ctx.fillText('Abogado Patrocinante (Reg. 908)', 480, y + 60);
 
-      // Distort slightly on desktop to simulate photography scanner
+      // Place document on desk
       const deskCanvas = document.createElement('canvas');
       deskCanvas.width = 1000;
       deskCanvas.height = 1300;
       const dCtx = deskCanvas.getContext('2d');
       if (dCtx) {
-        dCtx.fillStyle = '#1c1c1e'; // desk background
+        dCtx.fillStyle = '#121214'; // dark desk surface
         dCtx.fillRect(0, 0, deskCanvas.width, deskCanvas.height);
         
         // draw shadow and tilt
         dCtx.save();
         dCtx.translate(deskCanvas.width / 2, deskCanvas.height / 2);
         dCtx.rotate((1.5 * Math.PI) / 180); // tilt
-        dCtx.shadowColor = 'rgba(0,0,0,0.4)';
-        dCtx.shadowBlur = 24;
-        dCtx.shadowOffsetX = 6;
-        dCtx.shadowOffsetY = 10;
+        dCtx.shadowColor = 'rgba(0,0,0,0.5)';
+        dCtx.shadowBlur = 30;
+        dCtx.shadowOffsetX = 8;
+        dCtx.shadowOffsetY = 12;
         dCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
         dCtx.restore();
 
@@ -433,36 +438,80 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   };
 
   return (
-    <div className="scanner-container" style={{ minHeight: '380px' }}>
+    <div className="scanner-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1c1c1e', padding: 0 }}>
       
       {step === 'capture' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative' }}>
-          {/* Full height/width camera block to look like CamScanner */}
-          <div className="camera-preview-wrapper" style={{ height: '360px', width: '100%', position: 'relative' }}>
-            {hasCamera ? (
-              <video ref={videoRef} autoPlay playsInline className="camera-video" />
-            ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', height: '100%', justifyContent: 'space-between' }}>
+          
+          {/* Full Screen Camera View Frame */}
+          <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 160px)', width: '100%', position: 'relative', borderRadius: 0 }}>
+            
+            {/* Beautiful, styled simulated paper sheet in background */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: '#121214', // dark desk surface
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1
+              }}
+            >
+              {/* The mock sheet itself */}
               <div 
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  background: 'linear-gradient(135deg, #1c1c1e, #2c2c2e)', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  padding: '24px',
-                  color: '#fff'
+                style={{
+                  width: '210px',
+                  height: '280px',
+                  backgroundColor: '#fbfbf9',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                  borderRadius: '2px',
+                  padding: '12px',
+                  transform: 'rotate(1.5deg)',
+                  fontSize: '3px',
+                  color: '#333',
+                  lineHeight: '5px',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
                 }}
               >
-                <Sparkles size={40} style={{ color: 'var(--primary-gold)', marginBottom: '10px' }} className="pulsing" />
-                <p style={{ fontSize: '13px', fontWeight: '700', letterSpacing: '-0.3px' }}>
-                  CamScanner: Inteligencia de Bordes
-                </p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', textAlign: 'center', maxWidth: '290px', marginTop: '4px' }}>
-                  Simulando detección inteligente de escritos. Presione capturar para recortar y procesar.
-                </p>
+                <div style={{ height: '6px', width: '90%', borderBottom: '1px solid #aaa', marginBottom: '8px', fontWeight: 'bold' }}>EN LO PRINCIPAL: DEMANDA LABORAL</div>
+                <div>S.J.L. DEL TRABAJO DE SANTIAGO</div>
+                <div>JUAN PABLO MARTINEZ DIAZ, tecnico en construccion, domicilado...</div>
+                <div style={{ color: 'var(--primary-blue)', fontWeight: 'bold' }}>CONSTRUCTORA ALFA S.A., representada por don Luis Fuentes...</div>
+                <div>I. RELACION LABORAL Y HECHOS:</div>
+                <div>El trabajador sufrio un accidente en faena por falta de medidas de proteccion...</div>
+                <div>Se solicita indemnizacion por la suma de $18,500,000 CLP...</div>
+                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Trabajador</div>
+                  <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Abogado</div>
+                </div>
               </div>
+            </div>
+
+            {/* Webcam Video stream overlaid on top */}
+            {!forceSimulator && hasCamera && (
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                className="camera-video" 
+                style={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  opacity: 0.85, 
+                  zIndex: 2 
+                }} 
+              />
             )}
 
             {/* Glowing Edge Detection SVG Overlays */}
@@ -503,28 +552,60 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <div 
               style={{ 
                 position: 'absolute', 
-                bottom: '12px', 
+                bottom: '16px', 
                 left: '50%', 
                 transform: 'translateX(-50%)', 
-                background: sheetDetected ? 'rgba(52,199,89,0.9)' : 'rgba(0,122,255,0.9)', 
+                background: sheetDetected ? 'rgba(52,199,89,0.95)' : 'rgba(0,122,255,0.95)', 
                 color: '#fff', 
                 fontSize: '11px', 
-                padding: '4px 12px', 
+                padding: '5px 14px', 
                 borderRadius: '99px',
                 fontWeight: 600,
                 backdropFilter: 'blur(10px)',
                 zIndex: 5,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
                 transition: 'all 0.3s ease'
               }}
             >
               {scannerMsg}
             </div>
+
+            {/* Topbar inside scanner view to switch modes */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: '12px',
+                left: '12px',
+                right: '12px',
+                zIndex: 5,
+                display: 'flex',
+                justifyContent: 'space-between',
+                pointerEvents: 'auto'
+              }}
+            >
+              <button 
+                onClick={() => setForceSimulator(!forceSimulator)}
+                style={{ 
+                  background: 'rgba(255,255,255,0.12)', 
+                  border: '1px solid rgba(255,255,255,0.2)', 
+                  color: '#fff', 
+                  padding: '5px 12px', 
+                  borderRadius: '20px', 
+                  fontSize: '10px', 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(8px)'
+                }}
+              >
+                {forceSimulator ? '🔌 Activar Cámara Física' : '🤖 Usar Simulador Inteligente'}
+              </button>
+            </div>
             
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
-          <div className="scanner-controls">
+          {/* Dark control bottom bar */}
+          <div className="scanner-controls" style={{ background: '#1c1c1e', padding: '16px 24px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <input 
               type="file" 
               accept="image/*" 
@@ -536,7 +617,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <button 
               className="btn btn-secondary" 
               onClick={() => fileInputRef.current?.click()}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               <Upload size={16} /> Subir Imagen
             </button>
@@ -550,6 +631,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <button 
               className="btn btn-secondary" 
               onClick={onClose}
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               Cancelar
             </button>
@@ -558,8 +640,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'crop' && capturedImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <span className="health-label" style={{ textAlign: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#1c1c1e', padding: '16px' }}>
+          <span className="health-label" style={{ textAlign: 'center', color: '#fff' }}>
             Ajustar recorte del escrito judicial
           </span>
 
@@ -567,7 +649,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             className="crop-editor-container"
             onMouseMove={handleMouseMove}
             onMouseUp={() => setIsDragging(false)}
-            style={{ height: '320px' }}
+            style={{ flexGrow: 1, height: 'calc(100vh - 200px)', background: '#121214' }}
           >
             <div className="crop-canvas-wrapper" ref={cropContainerRef}>
               <img src={capturedImage} className="crop-image" alt="Captured Document" draggable={false} />
@@ -591,14 +673,14 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             </div>
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px' }}>
+          <div className="scanner-controls" style={{ gap: '12px', background: 'transparent' }}>
             <button 
               className="btn btn-secondary" 
               onClick={() => {
                 setStep('capture');
                 setCapturedImage(null);
-                startCamera();
               }}
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               <RotateCcw size={16} /> Reintentar
             </button>
@@ -615,17 +697,18 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'beautify' && capturedImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <span className="health-label" style={{ textAlign: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#1c1c1e', padding: '16px' }}>
+          <span className="health-label" style={{ textAlign: 'center', color: '#fff' }}>
             Embellecer Escrito - Filtros de Realce CamScanner
           </span>
 
           {/* Enhanced Preview Frame */}
           <div 
             style={{ 
-              height: '240px', 
+              flexGrow: 1,
+              height: 'calc(100vh - 280px)', 
               width: '100%', 
-              background: '#2c2c2e', 
+              background: '#121214', 
               borderRadius: '12px', 
               overflow: 'hidden', 
               display: 'flex', 
@@ -679,21 +762,22 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           </div>
 
           {/* CamScanner Filter select list */}
-          <div style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(0,0,0,0.02)', padding: '10px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
             <button
               onClick={() => setActiveFilter('original')}
               style={{ 
                 background: activeFilter === 'original' ? '#fff' : 'transparent',
                 border: 'none',
-                padding: '6px 12px',
+                padding: '8px 16px',
                 borderRadius: '8px',
-                boxShadow: activeFilter === 'original' ? '0 4px 10px rgba(0,0,0,0.06)' : 'none',
+                boxShadow: activeFilter === 'original' ? '0 4px 10px rgba(0,0,0,0.2)' : 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '11px',
+                color: activeFilter === 'original' ? '#111' : '#ccc',
                 fontWeight: activeFilter === 'original' ? 600 : 400
               }}
             >
@@ -704,22 +788,22 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <button
               onClick={() => setActiveFilter('magic')}
               style={{ 
-                background: activeFilter === 'magic' ? '#fff' : 'transparent',
+                background: activeFilter === 'magic' ? 'var(--primary-blue)' : 'transparent',
                 border: 'none',
-                padding: '6px 12px',
+                padding: '8px 16px',
                 borderRadius: '8px',
-                boxShadow: activeFilter === 'magic' ? '0 4px 10px rgba(0,0,0,0.06)' : 'none',
+                boxShadow: activeFilter === 'magic' ? '0 4px 10px rgba(0,122,255,0.3)' : 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '11px',
-                fontWeight: activeFilter === 'magic' ? 600 : 400,
-                color: activeFilter === 'magic' ? 'var(--primary-blue)' : 'inherit'
+                color: '#fff',
+                fontWeight: activeFilter === 'magic' ? 600 : 400
               }}
             >
-              <Sparkles size={14} style={{ color: 'var(--primary-gold)' }} />
+              <Sparkles size={14} style={{ color: activeFilter === 'magic' ? '#fff' : 'var(--primary-gold)' }} />
               Realce Mágico
             </button>
 
@@ -728,15 +812,16 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               style={{ 
                 background: activeFilter === 'bw' ? '#fff' : 'transparent',
                 border: 'none',
-                padding: '6px 12px',
+                padding: '8px 16px',
                 borderRadius: '8px',
-                boxShadow: activeFilter === 'bw' ? '0 4px 10px rgba(0,0,0,0.06)' : 'none',
+                boxShadow: activeFilter === 'bw' ? '0 4px 10px rgba(0,0,0,0.2)' : 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '11px',
+                color: activeFilter === 'bw' ? '#111' : '#ccc',
                 fontWeight: activeFilter === 'bw' ? 600 : 400
               }}
             >
@@ -745,12 +830,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             </button>
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px' }}>
+          <div className="scanner-controls" style={{ gap: '12px', background: 'transparent' }}>
             <button 
               className="btn btn-secondary" 
               onClick={() => {
                 setStep('crop');
               }}
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               Atrás
             </button>
@@ -796,13 +882,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           />
 
           <Cpu className="pulsing" size={44} style={{ color: 'var(--primary-gold)', marginBottom: '16px' }} />
-          <h4 style={{ fontWeight: '700', marginBottom: '8px' }}>Procesando Análisis OCR</h4>
+          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Procesando Análisis OCR</h4>
           
-          <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden', margin: '10px 0 16px' }}>
+          <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: '3px', overflow: 'hidden', margin: '10px 0 16px' }}>
             <div style={{ width: `${ocrProgress}%`, height: '100%', backgroundColor: 'var(--primary-gold)', transition: 'width 0.2s ease-in-out' }} />
           </div>
 
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', minHeight: '38px' }}>
+          <p style={{ fontSize: '13px', color: '#ccc', textAlign: 'center', minHeight: '38px' }}>
             {ocrStatus}
           </p>
 
@@ -817,11 +903,11 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'ocr-confirm' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#1c1c1e', padding: '20px', height: '100%', overflowY: 'auto' }}>
           <div 
             style={{ 
-              background: 'rgba(52, 199, 89, 0.06)', 
-              border: '1px solid rgba(52, 199, 89, 0.2)', 
+              background: 'rgba(52, 199, 89, 0.1)', 
+              border: '1px solid rgba(52, 199, 89, 0.3)', 
               borderRadius: '8px', 
               padding: '10px 14px', 
               display: 'flex', 
@@ -835,81 +921,86 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700' }}>Trabajador Demandante (Contraparte)</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Trabajador Demandante (Contraparte)</label>
               <input 
                 type="text" 
                 className="form-control" 
                 value={workerName} 
                 onChange={(e) => setWorkerName(e.target.value)} 
                 required 
+                style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
               />
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label style={{ fontSize: '11px', fontWeight: '700' }}>Cuantía Estimada</label>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Cuantía Estimada</label>
                 <input 
                   type="text" 
                   className="form-control" 
                   value={claimAmount} 
                   onChange={(e) => setClaimAmount(e.target.value)} 
                   required 
+                  style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                 />
               </div>
               <div className="form-group">
-                <label style={{ fontSize: '11px', fontWeight: '700' }}>Área de Especialidad</label>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Área de Especialidad</label>
                 <input 
                   type="text" 
                   className="form-control" 
                   value="Laboral (Especialidad)" 
                   disabled 
-                  style={{ background: 'rgba(0,0,0,0.02)' }}
+                  style={{ background: 'rgba(255,255,255,0.05)', color: '#aaa', border: '1px solid rgba(255,255,255,0.05)' }}
                 />
               </div>
             </div>
 
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700' }}>Tribunal Asignado</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Tribunal Asignado</label>
               <input 
                 type="text" 
                 className="form-control" 
                 value={court} 
                 onChange={(e) => setCourt(e.target.value)} 
                 required 
+                style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
               />
             </div>
 
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700' }}>Nombre del Documento PDF</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Nombre del Documento PDF</label>
               <input 
                 type="text" 
                 className="form-control" 
                 value={fileName} 
                 onChange={(e) => setFileName(e.target.value)} 
                 required 
+                style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
               />
             </div>
 
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700' }}>Resumen de las Pretensiones</label>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Resumen de las Pretensiones</label>
               <textarea 
                 className="form-control" 
                 value={description} 
                 onChange={(e) => setDescription(e.target.value)} 
                 required 
-                style={{ minHeight: '60px', fontSize: '12.5px' }}
+                style={{ minHeight: '60px', fontSize: '12.5px', background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
               />
             </div>
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px' }}>
+          <div className="scanner-controls" style={{ gap: '12px', marginTop: '10px' }}>
             <button 
               className="btn btn-secondary" 
               onClick={() => {
                 setStep('beautify');
               }}
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               Atrás
             </button>
