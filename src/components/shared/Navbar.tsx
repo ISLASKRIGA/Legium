@@ -6,9 +6,10 @@ interface NavbarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   currentUser: User;
+  mobileOpen: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentUser }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentUser, mobileOpen }) => {
   const isTabVisible = (tab: string) => {
     if (currentUser.role === 'Cliente') {
       return tab === 'dashboard';
@@ -28,7 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentU
   ];
 
   return (
-    <aside className="sidebar" id="sidebar">
+    <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`} id="sidebar">
       <div className="sidebar-brand">
         <div className="logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Scale size={18} color="#fff" />

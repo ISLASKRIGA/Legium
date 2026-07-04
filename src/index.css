@@ -1580,6 +1580,12 @@ textarea.form-control {
   pointer-events: auto !important;
 }
 
+@media (min-width: 992px) {
+  .ti-layout-client {
+    grid-template-columns: 1.4fr 1fr !important;
+  }
+}
+
 .view-panel {
   display: none;
 }

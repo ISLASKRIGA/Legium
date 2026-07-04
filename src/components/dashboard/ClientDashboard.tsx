@@ -156,7 +156,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
       </div>
 
       {/* Main Grid */}
-      <div className="ti-layout" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '20px' }}>
+      <div className="ti-layout ti-layout-client">
         
         {/* Left Side: Cases List / Detail */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

@@ -246,11 +246,11 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      {/* Sidebar Navigation */}
       <Navbar 
         activeTab={activeTab} 
         onTabChange={handleTabChange} 
         currentUser={currentUser} 
+        mobileOpen={mobileOpen}
       />
 
       {/* Main Content Area */}
