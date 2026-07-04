@@ -109,7 +109,9 @@ a:hover {
 /* Sidebar - Premium Flying Capsule (Pastilla Flotante) */
 .sidebar {
   width: 250px;
-  background-color: #0b132b; /* Premium dark navy/blue capsule background */
+  background-color: var(--bg-sidebar); /* Original light glass background */
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -120,8 +122,8 @@ a:hover {
   margin: 16px 0 16px 16px;
   height: calc(100vh - 32px);
   border-radius: 28px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06); /* Lighter shadow for light glass */
+  border: 1px solid var(--border-color);
   overflow: hidden;
 }
 
@@ -140,7 +142,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(184, 134, 11, 0.3);
+  box-shadow: 0 2px 8px rgba(184, 134, 11, 0.2);
 }
 
 .logo-icon svg {
@@ -152,7 +154,7 @@ a:hover {
 .brand-name {
   font-size: 20px;
   font-weight: 800;
-  color: #ffffff; /* White text for dark sidebar */
+  color: var(--text-primary); /* Original text primary label */
   letter-spacing: -0.5px;
 }
 
@@ -176,9 +178,9 @@ a:hover {
   gap: 12px;
   padding: 12px 16px;
   border-radius: 14px;
-  color: #a0aec0; /* Soft contrast text */
+  color: var(--text-primary); /* Original color */
   font-weight: 500;
-  font-size: 14px;
+  font-size: 14.5px;
   transition: all var(--transition-fast);
   border: none;
 }
@@ -186,33 +188,31 @@ a:hover {
 .menu-item a svg {
   width: 20px;
   height: 20px;
-  stroke: #a0aec0;
+  stroke: var(--text-secondary);
   stroke-width: 2.2;
   fill: none;
   transition: all var(--transition-fast);
 }
 
 .menu-item a:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background-color: rgba(0, 0, 0, 0.04);
 }
 
 .menu-item.active a {
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--primary-blue), #0056b3);
-  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.35);
+  color: var(--primary-blue); /* Original active theme */
+  background-color: rgba(0, 122, 255, 0.08);
   font-weight: 600;
 }
 
 .menu-item.active a svg {
-  stroke: #ffffff;
+  stroke: var(--primary-blue);
 }
 
 /* Sidebar Footer User Badge */
 .sidebar-footer {
   padding: 16px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .user-badge {
@@ -225,14 +225,14 @@ a:hover {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.05);
   border: 1.5px solid var(--primary-blue);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 13px;
-  color: #ffffff;
+  color: var(--primary-blue);
 }
 
 .user-info {
@@ -243,7 +243,7 @@ a:hover {
 .user-name {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -252,7 +252,7 @@ a:hover {
 
 .user-role {
   font-size: 11px;
-  color: #a0aec0;
+  color: var(--text-secondary);
   font-weight: 400;
 }
 
@@ -1310,10 +1310,12 @@ textarea.form-control {
     width: calc(100% - 40px) !important;
     height: 72px !important;
     margin: 0 !important;
-    background-color: #0b132b !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+    background-color: rgba(255, 255, 255, 0.85) !important; /* Original light glass background */
+    backdrop-filter: var(--glass-blur) !important;
+    -webkit-backdrop-filter: var(--glass-blur) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08) !important;
     border-radius: 99px !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
     z-index: 1000 !important;
     display: flex !important;
     flex-direction: row !important;
@@ -1353,7 +1355,7 @@ textarea.form-control {
     gap: 4px !important;
     padding: 8px 12px !important;
     border-radius: 20px !important;
-    color: #a0aec0 !important;
+    color: var(--text-secondary) !important;
     font-size: 9px !important;
     font-weight: 500;
     text-align: center;
@@ -1364,17 +1366,17 @@ textarea.form-control {
   .menu-item a svg {
     width: 18px !important;
     height: 18px !important;
-    stroke: #a0aec0 !important;
+    stroke: var(--text-secondary) !important;
   }
   
   .menu-item.active a {
-    color: #ffffff !important;
-    background: linear-gradient(135deg, var(--primary-blue), #0056b3) !important;
-    box-shadow: 0 4px 10px rgba(0, 122, 255, 0.3) !important;
+    color: var(--primary-blue) !important;
+    background-color: rgba(0, 122, 255, 0.08) !important;
+    box-shadow: none !important;
   }
   
   .menu-item.active a svg {
-    stroke: #ffffff !important;
+    stroke: var(--primary-blue) !important;
   }
   
   .page-container {
