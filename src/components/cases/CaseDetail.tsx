@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, Calendar, CheckSquare, MessageSquare, FileText, Trash2
 import { Case, User, DocumentItem, TimelineItem, TaskItem } from '../../utils/types';
 import { DocumentScanner } from './DocumentScanner';
 import { deletePdfBlob, getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
+import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
 
 interface CaseDetailProps {
   c: Case;
@@ -165,6 +166,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
   };
 
   const uploadPDFBlob = async (name: string, fileBlob: Blob, scannedDoc?: DocumentItem) => {
+    // If it's not a PDF and does not end in .pdf, show error
     if (fileBlob.type !== 'application/pdf' && !name.toLowerCase().endsWith('.pdf')) {
       onShowToast('Formato Inválido', 'Solo se admiten archivos en formato PDF.', 'danger');
       return;
@@ -177,7 +179,32 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
     const docId = scannedDoc?.id || 'doc-' + Date.now();
     const uploadDate = scannedDoc?.uploadDate || new Date().toISOString().split('T')[0];
     const sizeStr = (fileBlob.size / 1024).toFixed(1) + ' KB';
+    
+    // 1. Save locally to localStorage (fallback/offline view)
     const storageKey = await savePdfBlob(docId, fileBlob);
+
+    // 2. Upload to Supabase Storage and DB (if configured)
+    let pdfUrl: string | null = null;
+    try {
+      // Upsert the case record to avoid foreign key failures
+      await saveCaseRecord(c);
+      
+      // Upload the PDF blob
+      pdfUrl = await uploadPdfToSupabase(docId, fileBlob, c.id);
+      
+      // Save document record
+      await saveDocumentRecord({
+        id: docId,
+        caseId: c.id,
+        name: name.endsWith('.pdf') ? name : name + '.pdf',
+        sizeKb: parseFloat((fileBlob.size / 1024).toFixed(1)),
+        uploadDate,
+        ocrText: scannedDoc?.ocrText || '',
+        pdfUrl
+      });
+    } catch (err) {
+      console.error('[Supabase Upload] Failed syncing case or uploading document:', err);
+    }
 
     const newDoc: DocumentItem = {
       ...scannedDoc,
@@ -185,13 +212,14 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
       name: name.endsWith('.pdf') ? name : name + '.pdf',
       size: sizeStr,
       uploadDate,
-      storageKey
+      storageKey,
+      pdfUrl
     };
 
     const updated = { ...c, documents: [...c.documents, newDoc] };
     onUpdateCase(updated);
     onAddLog('Cargado documento PDF OCR ' + name + ' en caso ' + c.id, 'Success');
-    onShowToast('Documento Cargado', 'El PDF OCR ' + name + ' se ha cargado y almacenado con exito.', 'success');
+    onShowToast('Documento Cargado', 'El PDF OCR ' + name + ' se ha cargado y almacenado con éxito.', 'success');
   };
 
   // Delete PDF
@@ -216,8 +244,15 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
   const handleViewPDF = (docId: string, docName: string) => {
     setActiveDocId(docId);
     setActiveDocName(docName);
-    const url = getPdfObjectUrl(docId);
-    setActiveDocUrl(url || '');
+    
+    // Check if the document has a Supabase public URL
+    const doc = c.documents.find((d) => d.id === docId);
+    if (doc?.pdfUrl) {
+      setActiveDocUrl(doc.pdfUrl);
+    } else {
+      const url = getPdfObjectUrl(docId);
+      setActiveDocUrl(url || '');
+    }
     setActiveModal('pdf');
   };
 

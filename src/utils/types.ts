@@ -51,6 +51,7 @@ export interface DocumentItem {
   uploadDate: string;
   ocrText?: string;
   storageKey?: string;
+  pdfUrl?: string | null;
 }
 
 export type CaseStatus = 'Activo' | 'En Apelación' | 'Cerrado' | 'Suspendido';

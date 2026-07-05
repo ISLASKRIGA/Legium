@@ -5,7 +5,7 @@ import { cropImage, createSearchablePdf } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
 import { useDocumentDetection, QuadPoints } from '../../hooks/useDocumentDetection';
-import { uploadPdfToSupabase, saveDocumentRecord } from '../../utils/supabaseClient';
+import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
 
 interface OcrScannerProps {
   currentUser: User;
@@ -503,7 +503,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         documents: [newDoc]
       };
 
-      // 3. Save document record to Supabase DB (if configured)
+      // 3. Save case & document record to Supabase DB (if configured)
+      await saveCaseRecord(newCase);
       await saveDocumentRecord({
         id: docId,
         caseId,

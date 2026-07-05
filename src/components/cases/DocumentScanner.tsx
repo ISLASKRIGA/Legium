@@ -1,5 +1,6 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
-import { Camera, FileText, X, RotateCcw, Upload, Check, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, FileText, X, RotateCcw, Upload, Check, Image as ImageIcon, ChevronRight, Sparkles, Wand2 } from 'lucide-react';
+import Tesseract from 'tesseract.js';
 import { cropImage, createSearchablePdf, DEFAULT_SCANNED_OCR_TEXT } from '../../utils/scannerPdf';
 import { getPdfStorageKey } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
@@ -10,14 +11,18 @@ interface DocumentScannerProps {
 }
 
 export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'crop' | 'saving'>('capture');
+  const [step, setStep] = useState<'capture' | 'crop' | 'beautify' | 'ocr' | 'saving'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
   const [scannerMsg, setScannerMsg] = useState('Coloque el documento en el recuadro');
   const [fileName, setFileName] = useState(`Documento_Escaneado_${Date.now().toString().slice(-4)}.pdf`);
-  const [ocrText, setOcrText] = useState(DEFAULT_SCANNED_OCR_TEXT);
+  
+  // OCR states
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrStatus, setOcrStatus] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'original' | 'magic' | 'bw'>('magic');
 
   // Video Ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -49,11 +54,11 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         videoRef.current.srcObject = stream;
       }
       setHasCamera(true);
-      setScannerMsg('EscÃ¡ner de CÃ¡mara Activo');
+      setScannerMsg('Escáner de Cámara Activo');
     } catch (err) {
       console.warn('No webcam access or no camera found, using simulator.', err);
       setHasCamera(false);
-      setScannerMsg('Modo SimulaciÃ³n: CÃ¡mara no detectada');
+      setScannerMsg('Modo Simulación: Cámara no detectada');
     }
   };
 
@@ -130,15 +135,15 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         'En Santiago de Chile, a 4 de julio de 2026, las partes comparecientes',
         'acuerdan y ratifican los hitos pactados en el marco del procedimiento.',
         '',
-        'SECCIÃ“N PRIMERA - DE LAS OBLIGACIONES:',
-        'El demandante conviene en acompaÃ±ar todos los documentos requeridos,',
+        'SECCIÓN PRIMERA - DE LAS OBLIGACIONES:',
+        'El demandante conviene en acompañar todos los documentos requeridos,',
         'incluyendo comprobantes de transferencia y copias de deslindes.',
         '',
-        'SECCIÃ“N SEGUNDA - DE LOS PLAZOS:',
+        'SECCIÓN SEGUNDA - DE LOS PLAZOS:',
         'Los plazos fatales acordados para responder traslados se fijan en',
-        'un tÃ©rmino mÃ¡ximo de 5 dÃ­as hÃ¡biles a contar de esta notificaciÃ³n.',
+        'un término máximo de 5 días hábiles a contar de esta notificación.',
         '',
-        'Firma y Constancia Legal de AceptaciÃ³n Digital:',
+        'Firma y Constancia Legal de Aceptación Digital:',
         '____________________________________________'
       ];
 
@@ -270,14 +275,47 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     };
   }, [isDragging]);
 
-  // Convert to searchable OCR PDF
-  const convertAndSave = async () => {
+  const getFilterStyle = (f: 'original' | 'magic' | 'bw'): string => {
+    if (f === 'magic') return 'contrast(1.4) brightness(1.08) saturate(1.1)';
+    if (f === 'bw') return 'contrast(1.7) brightness(1.05) grayscale(1)';
+    return 'none';
+  };
+
+  // Convert and process OCR
+  const handleOcrAndSave = async () => {
     if (!capturedImage) return;
-    setStep('saving');
+    setStep('ocr');
+    setOcrProgress(5);
+    setOcrStatus('Recortando y aplicando filtros...');
 
     try {
-      const croppedImage = await cropImage(capturedImage, cropBox, 'contrast(1.18) brightness(1.04)', 0.88);
-      const pdfBlob = createSearchablePdf(croppedImage, ocrText);
+      // 1. Recortar la imagen con el filtro seleccionado
+      const croppedImage = await cropImage(capturedImage, cropBox, getFilterStyle(activeFilter), 0.88);
+      
+      // 2. Ejecutar OCR real con Tesseract.js
+      setOcrStatus('Iniciando motor de OCR...');
+      const result = await Tesseract.recognize(croppedImage.dataUrl, 'spa', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            const pct = Math.round(10 + m.progress * 85);
+            setOcrProgress(pct);
+            setOcrStatus(
+              pct < 30 ? 'Segmentando bloques de texto...' :
+              pct < 60 ? 'Reconociendo caracteres (OCR en progreso)...' :
+              pct < 90 ? 'Analizando estructura del documento...' :
+              'Finalizando extracción de texto...'
+            );
+          }
+        }
+      });
+
+      const extractedText = result.data.text || DEFAULT_SCANNED_OCR_TEXT;
+      setOcrProgress(100);
+      setOcrStatus('Texto extraído correctamente.');
+
+      // 3. Generar PDF y completar
+      setStep('saving');
+      const pdfBlob = createSearchablePdf(croppedImage, extractedText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
       const docId = 'doc-' + Date.now();
 
@@ -286,14 +324,14 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         name: fileName.endsWith('.pdf') ? fileName : fileName + '.pdf',
         size: sizeKB + ' KB',
         uploadDate: new Date().toISOString().split('T')[0],
-        ocrText,
+        ocrText: extractedText,
         storageKey: getPdfStorageKey(docId)
       };
 
       onScanComplete(newDoc, pdfBlob);
     } catch (err) {
-      console.error('Error converting scan to OCR PDF', err);
-      setStep('crop');
+      console.error('Error during OCR or PDF generation:', err);
+      setStep('beautify');
     }
   };
 
@@ -320,10 +358,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               >
                 <ImageIcon size={44} style={{ color: 'var(--primary-gold)', marginBottom: '12px' }} />
                 <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
-                  Simulador de EscÃ¡ner Activado
+                  Simulador de Escáner Activado
                 </p>
                 <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
-                  La cÃ¡mara no estÃ¡ disponible. Al hacer clic en "Capturar" se generarÃ¡ un documento formal de demostraciÃ³n procesal.
+                  La cámara no está disponible. Al hacer clic en "Capturar" se generará un documento formal de demostración procesal.
                 </p>
               </div>
             )}
@@ -376,7 +414,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       {step === 'crop' && capturedImage && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <span className="health-label" style={{ textAlign: 'center' }}>
-            Ajusta los bordes azules para recortar y enderezar el documento
+            Ajusta los bordes azules para recortar y encuadrar el documento
           </span>
 
           <div 
@@ -415,17 +453,6 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
             </div>
           </div>
 
-          <div className="form-group" style={{ margin: '0 4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '700' }}>Nombre del Documento PDF</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              value={fileName} 
-              onChange={(e) => setFileName(e.target.value)} 
-              placeholder="Ej. Poder_Firmado.pdf"
-            />
-          </div>
-
           <div className="scanner-controls" style={{ gap: '12px' }}>
             <button 
               className="btn btn-secondary" 
@@ -441,12 +468,221 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
             
             <button 
               className="btn btn-primary" 
-              onClick={convertAndSave}
+              onClick={() => setStep('beautify')}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
             >
-              <Check size={16} /> Convertir a PDF
+              Siguiente <ChevronRight size={16} />
             </button>
           </div>
+        </div>
+      )}
+
+      {step === 'beautify' && capturedImage && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <span className="health-label" style={{ textAlign: 'center' }}>
+            Filtros de Realce Digital (CamScanner) y Nombre del Archivo
+          </span>
+
+          {/* Enhanced Preview Frame */}
+          <div 
+            style={{ 
+              height: '240px', 
+              width: '100%', 
+              background: '#121214', 
+              borderRadius: '12px', 
+              overflow: 'hidden', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.5)',
+              position: 'relative'
+            }}
+          >
+            <div 
+              style={{ 
+                position: 'relative', 
+                maxWidth: '90%', 
+                maxHeight: '90%', 
+                overflow: 'hidden',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+                borderRadius: '4px' 
+              }}
+            >
+              <img 
+                src={capturedImage} 
+                alt="Enhanced Preview" 
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '100%', 
+                  display: 'block',
+                  filter: getFilterStyle(activeFilter),
+                  transition: 'all 0.3s ease'
+                }} 
+              />
+            </div>
+            
+            <div 
+              style={{ 
+                position: 'absolute', 
+                top: '10px', 
+                right: '10px', 
+                background: 'rgba(0,122,255,0.85)', 
+                color: '#fff', 
+                fontSize: '10px', 
+                fontWeight: 700, 
+                padding: '3px 8px', 
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Wand2 size={10} /> Realce Automático Activo
+            </div>
+          </div>
+
+          {/* CamScanner Filter select list */}
+          <div style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(0,0,0,0.05)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.08)' }}>
+            <button
+              onClick={() => setActiveFilter('original')}
+              style={{ 
+                background: activeFilter === 'original' ? '#fff' : 'transparent',
+                border: activeFilter === 'original' ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                color: activeFilter === 'original' ? '#111' : 'var(--text-secondary)',
+                fontWeight: activeFilter === 'original' ? 600 : 400
+              }}
+            >
+              <span style={{ fontSize: '14px' }}>📷</span>
+              Original
+            </button>
+
+            <button
+              onClick={() => setActiveFilter('magic')}
+              style={{ 
+                background: activeFilter === 'magic' ? 'var(--primary-blue)' : 'transparent',
+                border: 'none',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                color: activeFilter === 'magic' ? '#fff' : 'var(--text-secondary)',
+                fontWeight: activeFilter === 'magic' ? 600 : 400
+              }}
+            >
+              <Sparkles size={12} style={{ color: activeFilter === 'magic' ? '#fff' : 'var(--primary-gold)' }} />
+              Realce Mágico
+            </button>
+
+            <button
+              onClick={() => setActiveFilter('bw')}
+              style={{ 
+                background: activeFilter === 'bw' ? '#fff' : 'transparent',
+                border: activeFilter === 'bw' ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                color: activeFilter === 'bw' ? '#111' : 'var(--text-secondary)',
+                fontWeight: activeFilter === 'bw' ? 600 : 400
+              }}
+            >
+              <span style={{ fontSize: '14px' }}>🏁</span>
+              B y N
+            </button>
+          </div>
+
+          <div className="form-group" style={{ margin: '0 4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '700' }}>Nombre del Documento PDF</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={fileName} 
+              onChange={(e) => setFileName(e.target.value)} 
+              placeholder="Ej. Poder_Firmado.pdf"
+            />
+          </div>
+
+          <div className="scanner-controls" style={{ gap: '12px' }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setStep('crop')}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <RotateCcw size={16} /> Recortar
+            </button>
+            
+            <button 
+              className="btn btn-primary" 
+              onClick={handleOcrAndSave}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
+            >
+              <Check size={16} /> Procesar OCR y Guardar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'ocr' && (
+        <div 
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            padding: '40px',
+            minHeight: '260px'
+          }}
+        >
+          <div style={{ position: 'relative', width: '50px', height: '50px', marginBottom: '16px' }}>
+            <div 
+              className="health-indicator pulsing" 
+              style={{ 
+                width: '40px', 
+                height: '40px', 
+                backgroundColor: 'var(--primary-gold)', 
+                margin: '5px',
+                borderRadius: '50%'
+              }} 
+            />
+            <FileText size={24} style={{ position: 'absolute', top: '13px', left: '13px', color: '#fff' }} />
+          </div>
+          
+          <h4 style={{ fontWeight: '700', marginBottom: '8px' }}>Ejecutando OCR Real (Tesseract.js)</h4>
+          
+          <div style={{ width: '100%', maxWidth: '280px', height: '6px', backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
+            <div 
+              style={{ 
+                width: `${ocrProgress}%`, 
+                height: '100%', 
+                backgroundColor: 'var(--primary-blue)', 
+                borderRadius: '10px', 
+                transition: 'width 0.2s ease-out' 
+              }} 
+            />
+          </div>
+          
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>
+            {ocrProgress}% completado
+          </span>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '260px' }}>
+            {ocrStatus}
+          </p>
         </div>
       )}
 
@@ -467,17 +703,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           </div>
           <h4 style={{ fontWeight: '700', marginBottom: '6px' }}>Generando Archivo PDF</h4>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '280px' }}>
-            Aplicando filtros de contraste judicial, recortando mÃ¡rgenes y empaquetando en formato vectorial.
+            Aplicando filtros de contraste judicial, recortando márgenes y empaquetando en formato vectorial.
           </p>
         </div>
       )}
     </div>
   );
 };
-
-
-
-
-
-
-

@@ -1703,3 +1703,120 @@ textarea.form-control {
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Glass Button Styles */
+.glass-button-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  border-radius: 9999px;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.04), 
+    inset 0 1.5px 0.5px rgba(255, 255, 255, 0.8),
+    inset 0 -1.5px 1px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+.glass-button-wrap:hover .glass-button {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.06), 
+    inset 0 1.5px 0.5px rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.glass-button-wrap:active .glass-button {
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.04), 
+    inset 0 1px 0px rgba(255, 255, 255, 0.6);
+  transform: translateY(1px);
+}
+
+/* Glow effect / shadow background for premium glass feel */
+.glass-button-shadow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(135deg, rgba(184, 134, 11, 0.1), rgba(0, 122, 255, 0.08));
+  filter: blur(12px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glass-button-wrap:hover .glass-button-shadow {
+  opacity: 1;
+}
+
+/* When inside a primary context or if we want primary colors */
+.glass-button-wrap.btn-primary .glass-button {
+  background: rgba(0, 122, 255, 0.12);
+  border-color: rgba(0, 122, 255, 0.22);
+  color: var(--primary-blue);
+  font-weight: 600;
+}
+.glass-button-wrap.btn-primary:hover .glass-button {
+  background: rgba(0, 122, 255, 0.2);
+  border-color: rgba(0, 122, 255, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 122, 255, 0.15);
+}
+.glass-button-wrap.btn-primary .glass-button-shadow {
+  background: var(--primary-blue);
+  filter: blur(14px);
+  opacity: 0.1;
+}
+.glass-button-wrap.btn-primary:hover .glass-button-shadow {
+  opacity: 0.25;
+}
+
+/* When inside a danger context */
+.glass-button-wrap.btn-danger .glass-button {
+  background: rgba(255, 59, 48, 0.1);
+  border-color: rgba(255, 59, 48, 0.2);
+  color: var(--danger);
+}
+.glass-button-wrap.btn-danger:hover .glass-button {
+  background: rgba(255, 59, 48, 0.18);
+  border-color: rgba(255, 59, 48, 0.3);
+  box-shadow: 0 8px 24px rgba(255, 59, 48, 0.12);
+}
+
+/* When inside a gold / secondary context */
+.glass-button-wrap.btn-secondary .glass-button {
+  background: rgba(184, 134, 11, 0.08);
+  border-color: rgba(184, 134, 11, 0.18);
+  color: var(--primary-gold);
+}
+.glass-button-wrap.btn-secondary:hover .glass-button {
+  background: rgba(184, 134, 11, 0.15);
+  border-color: rgba(184, 134, 11, 0.3);
+  box-shadow: 0 8px 24px rgba(184, 134, 11, 0.12);
+}
+
+/* Make sure the text/content uses standard font and padding */
+.glass-button-text {
+  font-family: var(--font-sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
