@@ -1784,47 +1784,35 @@ textarea.form-control {
 
 /* When inside a primary context or if we want primary colors */
 .glass-button-wrap.btn-primary .glass-button {
-  background: rgba(0, 122, 255, 0.12) !important;
-  border-color: rgba(0, 122, 255, 0.25) !important;
   color: var(--primary-blue) !important;
   font-weight: 600;
+  text-shadow: none;
 }
 .glass-button-wrap.btn-primary:hover .glass-button {
-  background: rgba(0, 122, 255, 0.2) !important;
-  border-color: rgba(0, 122, 255, 0.35) !important;
-  box-shadow: 0 8px 24px rgba(0, 122, 255, 0.15) !important;
-}
-.glass-button-wrap.btn-primary .glass-button-shadow {
-  background: var(--primary-blue) !important;
-  filter: blur(14px);
-  opacity: 0.1 !important;
-}
-.glass-button-wrap.btn-primary:hover .glass-button-shadow {
-  opacity: 0.25 !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
 }
 
 /* When inside a danger context */
 .glass-button-wrap.btn-danger .glass-button {
-  background: rgba(255, 59, 48, 0.1) !important;
-  border-color: rgba(255, 59, 48, 0.2) !important;
   color: var(--danger) !important;
+  font-weight: 600;
+  text-shadow: none;
 }
 .glass-button-wrap.btn-danger:hover .glass-button {
-  background: rgba(255, 59, 48, 0.18) !important;
-  border-color: rgba(255, 59, 48, 0.3) !important;
-  box-shadow: 0 8px 24px rgba(255, 59, 48, 0.12) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
 }
 
 /* When inside a gold / secondary context */
 .glass-button-wrap.btn-secondary .glass-button {
-  background: rgba(184, 134, 11, 0.08) !important;
-  border-color: rgba(184, 134, 11, 0.18) !important;
   color: var(--primary-gold) !important;
+  font-weight: 600;
+  text-shadow: none;
 }
 .glass-button-wrap.btn-secondary:hover .glass-button {
-  background: rgba(184, 134, 11, 0.15) !important;
-  border-color: rgba(184, 134, 11, 0.3) !important;
-  box-shadow: 0 8px 24px rgba(184, 134, 11, 0.12) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
 }
 
 /* Make sure the text/content uses standard font and padding */
