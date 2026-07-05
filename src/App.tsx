@@ -6,6 +6,7 @@ import { ToastContainer, ToastMessage } from './components/shared/Toast';
 
 import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
+import { saveCaseRecord, saveNotificationRecord } from './utils/supabaseClient';
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((module) => ({ default: module.DashboardView })));
 const ClientDashboard = lazy(() => import('./components/dashboard/ClientDashboard').then((module) => ({ default: module.ClientDashboard })));
 const CasesView = lazy(() => import('./components/cases/CasesView').then((module) => ({ default: module.CasesView })));
@@ -146,21 +147,48 @@ export const App: React.FC = () => {
   };
 
   // Create new case
-  const handleAddCase = (newCase: Case) => {
+  const handleAddCase = async (newCase: Case) => {
     const updatedCases = [...cases, newCase];
     LegiumDB.set('cases', updatedCases);
     setCases(updatedCases);
 
+    // Sync case to Supabase
+    try {
+      await saveCaseRecord(newCase);
+    } catch (err) {
+      console.error('[Supabase] Failed to sync new case:', err);
+    }
+
     if (currentUser?.role === 'Cliente') {
-      // Notificar solo a Abogados Senior
+      const notiId = 'noti-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      const notiDate = new Date().toISOString();
+      const notiTitle = 'Nueva Demanda Recibida';
+      const notiMsg = `El cliente ${currentUser.name} ha subido una nueva demanda: ${newCase.title}. Extracción OCR y PDF realizados.`;
+
+      // 1. Add notification locally
       LegiumDB.addNotification(
-        'Nueva Demanda Recibida',
-        `El cliente ${currentUser.name} ha subido una nueva demanda: ${newCase.title}. Extracción OCR y PDF realizados.`,
+        notiTitle,
+        notiMsg,
         newCase.id,
         'Abogado Senior'
       );
       setNotifications(LegiumDB.getNotifications());
       showToast('Demanda Notificada', 'Se ha enviado una notificación al equipo de Abogados Senior.', 'info');
+
+      // 2. Sync notification to Supabase
+      try {
+        await saveNotificationRecord({
+          id: notiId,
+          title: notiTitle,
+          message: notiMsg,
+          date: notiDate,
+          read: false,
+          caseId: newCase.id,
+          targetRole: 'Abogado Senior'
+        });
+      } catch (err) {
+        console.error('[Supabase] Failed to sync notification:', err);
+      }
     }
   };
 

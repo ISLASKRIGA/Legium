@@ -82,3 +82,24 @@ WITH CHECK (bucket_id = 'legal-documents');
 CREATE POLICY "Allow anonymous updates to legal-documents"
 ON storage.objects FOR UPDATE
 USING (bucket_id = 'legal-documents');
+
+
+-- 4. CREACIÓN DE LA TABLA DE NOTIFICACIONES (NOTIFICATIONS)
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    read BOOLEAN DEFAULT false NOT NULL,
+    case_id TEXT REFERENCES public.cases(id) ON DELETE CASCADE,
+    target_role TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Habilitar RLS en notifications
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+-- Crear políticas de acceso libre para prototipo
+CREATE POLICY "Allow public select notifications" ON public.notifications FOR SELECT USING (true);
+CREATE POLICY "Allow public insert notifications" ON public.notifications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update notifications" ON public.notifications FOR UPDATE USING (true);
