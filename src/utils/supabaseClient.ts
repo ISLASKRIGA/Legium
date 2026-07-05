@@ -100,3 +100,28 @@ export const saveDocumentRecord = async (doc: {
   });
   if (error) console.error('[Supabase] Document insert error:', error.message);
 };
+
+/**
+ * Save a notification record to the Supabase notifications table.
+ */
+export const saveNotificationRecord = async (noti: {
+  id: string;
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+  caseId?: string;
+  targetRole?: string;
+}) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('notifications').insert({
+    id: noti.id,
+    title: noti.title,
+    message: noti.message,
+    date: noti.date,
+    read: noti.read,
+    case_id: noti.caseId || null,
+    target_role: noti.targetRole || null,
+  });
+  if (error) console.error('[Supabase] Notification insert error:', error.message);
+};
