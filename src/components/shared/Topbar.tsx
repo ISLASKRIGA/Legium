@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Menu, LogOut, CheckCheck, Inbox, FileText } from 'lucide-react';
 import { User, Notification } from '../../utils/types';
+import { GlassButton } from '../ui/glass-button';
 
 interface TopbarProps {
   searchQuery: string;
@@ -75,28 +76,15 @@ export const Topbar: React.FC<TopbarProps> = ({
       <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
         
         {/* Sign Out Button */}
-        <button 
-          className="btn btn-secondary btn-sm"
+        <GlassButton
           id="btn-logout"
           onClick={onLogout}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px',
-            background: 'rgba(0,0,0,0.03)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '99px',
-            padding: '6px 14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '12.5px',
-            color: 'var(--text-primary)',
-            transition: 'background var(--transition-fast)'
-          }}
+          size="sm"
+          className="btn-secondary"
         >
           <LogOut size={13} style={{ color: 'var(--danger)' }} />
           <span>Cerrar Sesión</span>
-        </button>
+        </GlassButton>
 
         {/* Notification Bell with Dropdown */}
         <div style={{ position: 'relative' }} ref={dropdownRef}>

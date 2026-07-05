@@ -3,6 +3,7 @@ import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as User
 import { Case, User, DocumentItem, Client } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
 import { getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
+import { GlassButton } from '../ui/glass-button';
 
 interface ClientDashboardProps {
   currentUser: User;
@@ -123,13 +124,12 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
         </div>
         
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            className="btn btn-primary" 
+          <GlassButton 
+            className="btn-primary" 
             onClick={() => setActiveModal('scanner')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <Camera size={16} /> Escanear Nuevo Documento
-          </button>
+          </GlassButton>
         </div>
       </div>
 

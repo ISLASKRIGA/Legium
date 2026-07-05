@@ -20,9 +20,14 @@ const ZapIcon = (props: React.SVGProps<SVGSVGElement>) => (
 const DottedBackground = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    height="100%"
-    width="100%"
-    className="pointer-events-none absolute inset-0 z-0"
+    style={{
+      pointerEvents: 'none',
+      position: 'absolute',
+      inset: 0,
+      width: '100%',
+      height: '100%',
+      zIndex: 0,
+    }}
   >
     <defs>
       <pattern
@@ -32,10 +37,10 @@ const DottedBackground = () => (
         id="dottedGrid"
       >
         <circle
-          fill="oklch(from var(--foreground) l c h / 30%)"
-          r="1"
-          cy="2"
-          cx="2"
+          fill="rgba(0, 0, 0, 0.15)"
+          r="1.5"
+          cy="15"
+          cx="15"
         ></circle>
       </pattern>
     </defs>
@@ -45,10 +50,35 @@ const DottedBackground = () => (
 
 const GlassButtonDemo = () => {
   return (
-    <div className="relative flex h-screen w-full flex-col items-center justify-center gap-8 bg-background p-10">
+    <div style={{
+      position: 'relative',
+      display: 'flex',
+      height: '70vh',
+      width: '100%',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '32px',
+      background: '#f4f4f6',
+      borderRadius: '24px',
+      border: '1px solid rgba(0, 0, 0, 0.05)',
+      padding: '40px',
+      overflow: 'hidden',
+      boxShadow: 'inset 0 0 40px rgba(0,0,0,0.02)'
+    }}>
       <DottedBackground />
-      <div className="z-10 text-center">
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-6">
+      <div style={{ zIndex: 10, textAlign: 'center' }}>
+        <h2 style={{ marginBottom: '24px', fontSize: '24px', fontWeight: 700, color: '#1c1c1e', letterSpacing: '-0.5px' }}>
+          Apple Tahoe Glass Buttons
+        </h2>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '24px',
+          marginTop: '16px'
+        }}>
           <GlassButton
             size="sm"
           >
@@ -60,7 +90,7 @@ const GlassButtonDemo = () => {
           >
             <span>Generate</span>
             
-            <ZapIcon className="h-5 w-5" />
+            <ZapIcon className="h-5 w-5" style={{ width: '16px', height: '16px', color: '#b8860b' }} />
           </GlassButton>
           <GlassButton
             size="lg"
@@ -70,7 +100,7 @@ const GlassButtonDemo = () => {
           <GlassButton
             size="icon"
           >
-            <ZapIcon className="h-5 w-5" />
+            <ZapIcon className="h-5 w-5" style={{ width: '18px', height: '18px', color: '#007aff' }} />
           </GlassButton>
         </div>
       </div>

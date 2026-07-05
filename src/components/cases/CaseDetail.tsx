@@ -4,6 +4,7 @@ import { Case, User, DocumentItem, TimelineItem, TaskItem } from '../../utils/ty
 import { DocumentScanner } from './DocumentScanner';
 import { deletePdfBlob, getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
 import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
+import { GlassButton } from '../ui/glass-button';
 
 interface CaseDetailProps {
   c: Case;
@@ -478,13 +479,13 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                 <FileText size={18} style={{ color: 'var(--danger)' }} />
                 Documentos PDF
               </h3>
-              <button 
-                className="btn btn-secondary btn-sm" 
+              <GlassButton 
+                className="btn-secondary" 
+                size="sm"
                 onClick={() => setActiveModal('scanner')}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}
               >
                 <Camera size={13} /> Escanear
-              </button>
+              </GlassButton>
             </div>
 
             <div 
