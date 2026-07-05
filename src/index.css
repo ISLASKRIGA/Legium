@@ -1694,3 +1694,12 @@ textarea.form-control {
 }
 
 
+
+.page-loader {
+  display: grid;
+  min-height: 320px;
+  place-items: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}

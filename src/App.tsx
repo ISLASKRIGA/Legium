@@ -1,16 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { Navbar } from './components/shared/Navbar';
 import { Topbar } from './components/shared/Topbar';
 import { LoginView } from './components/shared/LoginView';
 import { ToastContainer, ToastMessage } from './components/shared/Toast';
-import { DashboardView } from './components/dashboard/DashboardView';
-import { ClientDashboard } from './components/dashboard/ClientDashboard';
-import { CasesView } from './components/cases/CasesView';
-import { ClientsView } from './components/clients/ClientsView';
-import { ReportsView } from './components/reports/ReportsView';
-import { AdminView } from './components/admin/AdminView';
+
 import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((module) => ({ default: module.DashboardView })));
+const ClientDashboard = lazy(() => import('./components/dashboard/ClientDashboard').then((module) => ({ default: module.ClientDashboard })));
+const CasesView = lazy(() => import('./components/cases/CasesView').then((module) => ({ default: module.CasesView })));
+const ClientsView = lazy(() => import('./components/clients/ClientsView').then((module) => ({ default: module.ClientsView })));
+const ReportsView = lazy(() => import('./components/reports/ReportsView').then((module) => ({ default: module.ReportsView })));
+const AdminView = lazy(() => import('./components/admin/AdminView').then((module) => ({ default: module.AdminView })));
+
+const PageLoader = () => (
+  <div className='page-loader' role='status' aria-live='polite'>
+    Cargando módulo...
+  </div>
+);
 
 export const App: React.FC = () => {
   // State Variables (Initialize DB synchronously first)
@@ -321,79 +328,82 @@ export const App: React.FC = () => {
 
         {/* Page Container */}
         <div className="page-container" style={{ flexGrow: 1, overflowY: 'auto', padding: '24px' }}>
-          {activeTab === 'dashboard' && (
-            currentUser.role === 'Cliente' ? (
-              <ClientDashboard
-                currentUser={currentUser}
+          <Suspense fallback={<PageLoader />}>
+            {activeTab === 'dashboard' && (
+              currentUser.role === 'Cliente' ? (
+                <ClientDashboard
+                  currentUser={currentUser}
+                  cases={cases}
+                  clients={clients}
+                  searchQuery={searchQuery}
+                  onAddCase={handleAddCase}
+                  onAddLog={addLogEntry}
+                  onShowToast={showToast}
+                />
+              ) : (
+                <DashboardView
+                  currentUser={currentUser}
+                  cases={cases}
+                  auditLogs={auditLogs}
+                  financials={financials}
+                  onViewCase={handleViewCaseFromDashboard}
+                  onToggleTask={handleToggleDashboardTask}
+                />
+              )
+            )}
+
+            {activeTab === 'cases' && (
+              <CasesView
                 cases={cases}
+                currentUser={currentUser}
+                users={users}
                 clients={clients}
                 searchQuery={searchQuery}
+                onUpdateCase={handleUpdateCase}
                 onAddCase={handleAddCase}
                 onAddLog={addLogEntry}
                 onShowToast={showToast}
+                activeCaseId={activeCaseId}
+                setActiveCaseId={setActiveCaseId}
               />
-            ) : (
-              <DashboardView
+            )}
+
+            {activeTab === 'clients' && (
+              <ClientsView
+                clients={clients}
+                cases={cases}
+                currentUser={currentUser}
+                searchQuery={searchQuery}
+                onAddClient={handleAddClient}
+                onAddLog={addLogEntry}
+                onShowToast={showToast}
+                onViewCase={handleViewCaseFromDashboard}
+              />
+            )}
+
+            {activeTab === 'reports' && (
+              <ReportsView
                 currentUser={currentUser}
                 cases={cases}
-                auditLogs={auditLogs}
                 financials={financials}
-                onViewCase={handleViewCaseFromDashboard}
-                onToggleTask={handleToggleDashboardTask}
               />
-            )
-          )}
+            )}
 
-          {activeTab === 'cases' && (
-            <CasesView
-              cases={cases}
-              currentUser={currentUser}
-              users={users}
-              clients={clients}
-              searchQuery={searchQuery}
-              onUpdateCase={handleUpdateCase}
-              onAddCase={handleAddCase}
-              onAddLog={addLogEntry}
-              onShowToast={showToast}
-              activeCaseId={activeCaseId}
-              setActiveCaseId={setActiveCaseId}
-            />
-          )}
+            {activeTab === 'it-admin' && (
+              <AdminView
+                currentUser={currentUser}
+                users={users}
+                auditLogs={auditLogs}
+                onUpdateUserActive={handleUpdateUserActive}
+                onUpdateUserRole={handleUpdateUserRole}
+                onAddUser={handleAddUser}
+                onAddLog={addLogEntry}
+                onShowToast={showToast}
+                onResetDB={handleResetDB}
+              />
+            )}
+          </Suspense>
 
-          {activeTab === 'clients' && (
-            <ClientsView
-              clients={clients}
-              cases={cases}
-              currentUser={currentUser}
-              searchQuery={searchQuery}
-              onAddClient={handleAddClient}
-              onAddLog={addLogEntry}
-              onShowToast={showToast}
-              onViewCase={handleViewCaseFromDashboard}
-            />
-          )}
-
-          {activeTab === 'reports' && (
-            <ReportsView
-              currentUser={currentUser}
-              cases={cases}
-              financials={financials}
-            />
-          )}
-
-          {activeTab === 'it-admin' && (
-            <AdminView
-              currentUser={currentUser}
-              users={users}
-              auditLogs={auditLogs}
-              onUpdateUserActive={handleUpdateUserActive}
-              onUpdateUserRole={handleUpdateUserRole}
-              onAddUser={handleAddUser}
-              onAddLog={addLogEntry}
-              onShowToast={showToast}
-              onResetDB={handleResetDB}
-            />
-          )}
         </div>
       </main>
 

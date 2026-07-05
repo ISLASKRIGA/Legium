@@ -1,22 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-// Warn in dev if not configured yet
-if (!supabaseUrl || !supabaseAnonKey) {
+const isConfiguredValue = (value: string | undefined) => {
+  if (!value) return false;
+  return !value.includes('REEMPLAZA_CON_TU') && !value.includes('xxxx.supabase.co');
+};
+
+const hasSupabaseConfig = isConfiguredValue(supabaseUrl) && isConfiguredValue(supabaseAnonKey);
+
+if (!hasSupabaseConfig && import.meta.env.DEV) {
   console.warn(
-    '[Legium] Supabase not configured. Create a .env file with:\n' +
+    '[Legium] Supabase no está configurado. Crea un archivo .env con:\n' +
     'VITE_SUPABASE_URL=https://xxxx.supabase.co\n' +
     'VITE_SUPABASE_ANON_KEY=eyJ...'
   );
 }
 
-export const supabase = (supabaseUrl && supabaseAnonKey)
+export const supabase = hasSupabaseConfig
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-export const isSupabaseConfigured = () => !!supabase;
+export const isSupabaseConfigured = () => hasSupabaseConfig;
 
 /**
  * Upload a PDF blob to Supabase Storage.
@@ -28,7 +34,7 @@ export const uploadPdfToSupabase = async (
   caseId: string
 ): Promise<string | null> => {
   if (!supabase) return null;
-  const path = `${caseId}/${docId}.pdf`;
+  const path = caseId + '/' + docId + '.pdf';
   const { error } = await supabase.storage
     .from('legal-documents')
     .upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true });
