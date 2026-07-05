@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Plus, Calendar, CheckSquare, MessageSquare, FileText, Trash2, Camera, Upload } from 'lucide-react';
 import { Case, User, DocumentItem, TimelineItem, TaskItem } from '../../utils/types';
 import { DocumentScanner } from './DocumentScanner';
@@ -93,7 +93,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
     const formattedDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
     const newNote = {
-      id: `nt-${String(c.notes.length + 1).padStart(3, '0')}`,
+      id: `nt-${Date.now().toString().slice(-6)}`,
       date: formattedDate,
       author: currentUser.name,
       text
@@ -101,7 +101,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
 
     const updated = { ...c, notes: [...c.notes, newNote] };
     onUpdateCase(updated);
-    onAddLog(`AÃ±adida nota de abogado en expediente ${c.id}`, 'Success');
+    onAddLog(`Añadida nota de abogado en expediente ${c.id}`, 'Success');
     onShowToast('Nota Guardada', 'La nota interna ha sido registrada de manera confidencial.', 'success');
     setNoteText('');
   };
@@ -121,7 +121,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
     const updated = { ...c, timeline: [...c.timeline, newItem] };
     onUpdateCase(updated);
     onAddLog(`Hito procesal '${milestoneTitle}' registrado en caso ${c.id}`, 'Success');
-    onShowToast('Hito Registrado', 'El hito fue aÃ±adido a la lÃ­nea de tiempo.', 'success');
+    onShowToast('Hito Registrado', 'El hito fue añadido a la línea de tiempo.', 'success');
     
     // Reset form & close
     setMilestoneTitle('');
@@ -146,7 +146,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
 
     const updated = { ...c, tasks: [...c.tasks, newTask] };
     onUpdateCase(updated);
-    onAddLog(`Nueva tarea '${taskTitle}' aÃ±adida en caso ${c.id}`, 'Success');
+    onAddLog(`Nueva tarea '${taskTitle}' añadida en caso ${c.id}`, 'Success');
     onShowToast('Tarea Creada', 'La tarea fue asignada correctamente.', 'success');
 
     // Reset & close
@@ -166,11 +166,11 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
 
   const uploadPDFBlob = async (name: string, fileBlob: Blob, scannedDoc?: DocumentItem) => {
     if (fileBlob.type !== 'application/pdf' && !name.toLowerCase().endsWith('.pdf')) {
-      onShowToast('Formato InvÃ¡lido', 'Solo se admiten archivos en formato PDF.', 'danger');
+      onShowToast('Formato Inválido', 'Solo se admiten archivos en formato PDF.', 'danger');
       return;
     }
     if (fileBlob.size > 10 * 1024 * 1024) {
-      onShowToast('Archivo muy grande', 'El tamaÃ±o mÃ¡ximo permitido es 10MB.', 'danger');
+      onShowToast('Archivo muy grande', 'El tamaño máximo permitido es 10MB.', 'danger');
       return;
     }
 
@@ -252,7 +252,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
           <span className={`badge ${
             c.status === 'Cerrado' 
               ? 'badge-closed' 
-              : c.status === 'En ApelaciÃ³n' 
+              : c.status === 'En Apelación' 
               ? 'badge-appealing' 
               : c.status === 'Suspendido' 
               ? 'badge-suspended' 
@@ -288,7 +288,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                 <p style={{ fontWeight: 600, marginTop: '2px', fontSize: '13.5px' }}>{c.opposingLawyer || 'No registrado'}</p>
               </div>
               <div>
-                <span className="health-label">Ãrea de PrÃ¡ctica</span>
+                <span className="health-label">Área de Práctica</span>
                 <p style={{ fontWeight: 600, marginTop: '2px', fontSize: '13.5px' }}>{c.practiceArea}</p>
               </div>
               <div>
@@ -310,7 +310,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
             </div>
 
             <div>
-              <span className="health-label">DescripciÃ³n de la Causa</span>
+              <span className="health-label">Descripción de la Causa</span>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.5', marginTop: '4px' }}>
                 {c.description}
               </p>
@@ -322,7 +322,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
             <div className="section-header">
               <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Calendar size={18} style={{ color: 'var(--primary-gold)' }} />
-                LÃ­nea de Tiempo Procesal
+                Línea de Tiempo Procesal
               </h3>
               <button className="btn btn-secondary btn-sm" onClick={() => setActiveModal('milestone')}>
                 Registrar Hito
@@ -427,7 +427,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                 className="form-control" 
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
-                placeholder="AÃ±adir una nota interna confidencial..." 
+                placeholder="Añadir una nota interna confidencial..." 
                 style={{ fontSize: '13px', minHeight: '70px' }}
               />
               <button className="btn btn-primary btn-sm" onClick={handleSaveNote} style={{ marginTop: '8px', width: '100%', justifyContent: 'center' }}>
@@ -461,8 +461,8 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
               style={{ border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.01)', transition: 'all 0.2s' }}
             >
               <Upload size={24} style={{ color: 'var(--primary-blue)', margin: '0 auto 6px', display: 'block' }} />
-              <p style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>Arrastra un PDF aquÃ­ o haz clic</p>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Soporta PDF (MÃ¡x. 10MB)</span>
+              <p style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>Arrastra un PDF aquí o haz clic</p>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Soporta PDF (Máx. 10MB)</span>
               <input 
                 type="file" 
                 id="case-pdf-file-input" 
@@ -485,7 +485,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                     </div>
                     <div className="doc-info">
                       <div className="doc-name" title={doc.name}>{doc.name}</div>
-                      <div className="doc-meta">{doc.size} â€¢ {doc.uploadDate}</div>
+                      <div className="doc-meta">{doc.size} • {doc.uploadDate}</div>
                     </div>
                     <div className="doc-actions">
                       <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name)}>
@@ -541,14 +541,14 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>TÃ­tulo del Evento Procesal</label>
+                  <label>Título del Evento Procesal</label>
                   <input 
                     type="text" 
                     className="form-control" 
                     value={milestoneTitle} 
                     onChange={(e) => setMilestoneTitle(e.target.value)} 
                     required 
-                    placeholder="Ej. Comparendo de conciliaciÃ³n"
+                    placeholder="Ej. Comparendo de conciliación"
                   />
                 </div>
                 <div className="form-group">
@@ -584,7 +584,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
             <form onSubmit={handleCreateTaskSubmit}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label>DescripciÃ³n de la Tarea</label>
+                  <label>Descripción de la Tarea</label>
                   <input 
                     type="text" 
                     className="form-control" 
@@ -612,7 +612,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Fecha LÃ­mite</label>
+                    <label>Fecha Límite</label>
                     <input 
                       type="date" 
                       className="form-control" 
@@ -640,7 +640,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
             <div className="ios-grabber" />
             <div className="modal-header">
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Camera size={18} style={{ color: 'var(--primary-blue)' }} /> EscÃ¡ner de Documentos Judiciales
+                <Camera size={18} style={{ color: 'var(--primary-blue)' }} /> Escáner de Documentos Judiciales
               </h3>
               <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
             </div>
@@ -675,7 +675,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                     <FileText size={48} style={{ color: 'var(--primary-gold)', margin: '0 auto 12px', display: 'block' }} />
                     <h4 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>Vista Previa de Metadatos</h4>
                     <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '340px', margin: '0 auto 16px' }}>
-                      El archivo PDF fÃ­sico ya no estÃ¡ cargado en la sesiÃ³n del navegador. Los metadatos siguen guardados de forma segura en LocalStorage.
+                      El archivo PDF físico ya no está cargado en la sesión del navegador. Los metadatos siguen guardados de forma segura en LocalStorage.
                     </p>
                     <button 
                       className="btn btn-primary btn-sm"
@@ -691,14 +691,14 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                                 setActiveDocUrl(getPdfObjectUrl(activeDocId) || '');
                               });
                             }
-                            onAddLog(`Recargado archivo fÃ­sico para PDF '${activeDocName}' en caso ${c.id}`, 'Success');
-                            onShowToast('Archivo Cargado', `El archivo fÃ­sico '${file.name}' ha sido recargado para la visualizaciÃ³n.`, 'success');
+                            onAddLog(`Recargado archivo físico para PDF '${activeDocName}' en caso ${c.id}`, 'Success');
+                            onShowToast('Archivo Cargado', `El archivo físico '${file.name}' ha sido recargado para la visualización.`, 'success');
                           }
                         });
                         fileInputTemp.click();
                       }}
                     >
-                      Cargar Archivo FÃ­sico
+                      Cargar Archivo Físico
                     </button>
                   </div>
                 )}

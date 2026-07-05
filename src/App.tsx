@@ -102,10 +102,8 @@ export const App: React.FC = () => {
       'success'
     );
     
-    // Check permissions and redirect if in restricted tabs
-    if ((user.role === 'Abogado Senior' || user.role === 'Abogado Junior') && (activeTab === 'reports' || activeTab === 'it-admin')) {
-      handleTabChange('dashboard');
-    }
+    // Siempre redirigir al dashboard para mostrar el correcto según el rol
+    handleTabChange('dashboard');
     
     // Reload logs
     setAuditLogs(LegiumDB.get<AuditLog[]>('logs', DEFAULT_AUDIT_LOGS));
@@ -147,13 +145,15 @@ export const App: React.FC = () => {
     setCases(updatedCases);
 
     if (currentUser?.role === 'Cliente') {
+      // Notificar solo a Abogados Senior
       LegiumDB.addNotification(
         'Nueva Demanda Recibida',
         `El cliente ${currentUser.name} ha subido una nueva demanda: ${newCase.title}. Extracción OCR y PDF realizados.`,
-        newCase.id
+        newCase.id,
+        'Abogado Senior'
       );
       setNotifications(LegiumDB.getNotifications());
-      showToast('Demanda Notificada', 'Se ha enviado una notificación a todos los abogados.', 'info');
+      showToast('Demanda Notificada', 'Se ha enviado una notificación al equipo de Abogados Senior.', 'info');
     }
   };
 
@@ -286,6 +286,9 @@ export const App: React.FC = () => {
           LegiumDB.setCurrentUser(user);
           setCurrentUser(user);
           setNotifications(LegiumDB.getNotifications());
+          // Siempre arrancar en dashboard para mostrar el correcto según el rol
+          window.location.hash = 'dashboard';
+          setActiveTab('dashboard');
           showToast('Sesión Iniciada', `Bienvenido al sistema, ${user.name}.`, 'success');
         }}
       />
@@ -311,7 +314,7 @@ export const App: React.FC = () => {
           currentUser={currentUser}
           onLogout={handleLogout}
           onMobileToggle={() => setMobileOpen(!mobileOpen)}
-          notifications={notifications}
+          notifications={notifications.filter(n => !n.targetRole || n.targetRole === currentUser.role)}
           onNotificationClick={handleNotificationClick}
           onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
         />
@@ -323,6 +326,7 @@ export const App: React.FC = () => {
               <ClientDashboard
                 currentUser={currentUser}
                 cases={cases}
+                clients={clients}
                 searchQuery={searchQuery}
                 onAddCase={handleAddCase}
                 onAddLog={addLogEntry}

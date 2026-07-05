@@ -11,12 +11,21 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentUser, mobileOpen }) => {
   const isTabVisible = (tab: string) => {
-    if (currentUser.role === 'Cliente') {
-      return tab === 'dashboard';
-    }
-    if (tab === 'it-admin') {
-      return currentUser.role === 'TI Administrador';
-    }
+    const role = currentUser.role;
+
+    // Cliente solo ve su dashboard
+    if (role === 'Cliente') return tab === 'dashboard';
+
+    // TI Admin solo ve dashboard e it-admin (no gestiona expedientes ni reportes)
+    if (role === 'TI Administrador') return tab === 'dashboard' || tab === 'it-admin';
+
+    // it-admin es exclusivo de TI Administrador
+    if (tab === 'it-admin') return false;
+
+    // Reportes solo para Socio Principal
+    if (tab === 'reports') return role === 'Socio Principal';
+
+    // El resto (dashboard, cases, clients) visible para Socio Principal, Abogado Senior y Junior
     return true;
   };
 

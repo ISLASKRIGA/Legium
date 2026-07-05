@@ -72,8 +72,9 @@ export const CasesView: React.FC<CasesViewProps> = ({
     const selectedClient = clients.find((cl) => cl.id === caseClient);
     const selectedLawyer = users.find((u) => u.id === caseLawyer);
 
-    const count = cases.length + 1;
-    const newId = `LEG-2026-${String(count).padStart(3, '0')}`;
+    const year = new Date().getFullYear();
+    const uniqueNum = String(Date.now()).slice(-4) + String(Math.floor(Math.random() * 9) + 1);
+    const newId = `LEG-${year}-${uniqueNum}`;
 
     const newCase: Case = {
       id: newId,

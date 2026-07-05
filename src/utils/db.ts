@@ -442,7 +442,7 @@ export const LegiumDB = {
     return [];
   },
 
-  addNotification: function(title: string, message: string, caseId?: string): void {
+  addNotification: function(title: string, message: string, caseId?: string, targetRole?: string): void {
     const notifications = this.getNotifications();
     const newNoti: Notification = {
       id: 'noti-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
@@ -450,7 +450,8 @@ export const LegiumDB = {
       message,
       date: new Date().toISOString(),
       read: false,
-      caseId
+      caseId,
+      ...(targetRole ? { targetRole: targetRole as any } : {})
     };
     notifications.unshift(newNoti);
     if (notifications.length > 20) {

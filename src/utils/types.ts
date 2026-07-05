@@ -53,7 +53,7 @@ export interface DocumentItem {
   storageKey?: string;
 }
 
-export type CaseStatus = 'Activo' | 'En ApelaciÃ³n' | 'Cerrado' | 'Suspendido';
+export type CaseStatus = 'Activo' | 'En Apelación' | 'Cerrado' | 'Suspendido';
 export type PracticeArea = 'Civil' | 'Penal' | 'Laboral' | 'Tributario' | 'Corporativo';
 
 export interface Case {
@@ -111,6 +111,7 @@ export interface Notification {
   date: string;
   read: boolean;
   caseId?: string;
+  targetRole?: UserRole; // Si está definido, solo ese rol verá la notificación
 }
 
 
