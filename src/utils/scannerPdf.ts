@@ -265,6 +265,42 @@ export const warpPerspective = (
   });
 };
 
+function refineCorner(brightness: number[], W: number, H: number, estimated: Point): Point {
+  let bestX = estimated.x;
+  let bestY = estimated.y;
+  let maxGrad = -1;
+
+  // Search window of size 10x10 around the estimated point
+  const radius = 5;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const cx = estimated.x + dx;
+      const cy = estimated.y + dy;
+
+      // Ensure we are inside bounds safely
+      if (cx > 1 && cx < W - 2 && cy > 1 && cy < H - 2) {
+        // Sobel-like gradients in horizontal and vertical directions
+        const gx = 
+          (brightness[(cy - 1) * W + (cx + 1)] + 2 * brightness[cy * W + (cx + 1)] + brightness[(cy + 1) * W + (cx + 1)]) -
+          (brightness[(cy - 1) * W + (cx - 1)] + 2 * brightness[cy * W + (cx - 1)] + brightness[(cy + 1) * W + (cx - 1)]);
+
+        const gy = 
+          (brightness[(cy + 1) * W + (cx - 1)] + 2 * brightness[(cy + 1) * W + cx] + brightness[(cy + 1) * W + (cx + 1)]) -
+          (brightness[(cy - 1) * W + (cx - 1)] + 2 * brightness[(cy - 1) * W + cx] + brightness[(cy - 1) * W + (cx + 1)]);
+
+        const mag = gx * gx + gy * gy;
+        if (mag > maxGrad) {
+          maxGrad = mag;
+          bestX = cx;
+          bestY = cy;
+        }
+      }
+    }
+  }
+
+  return { x: bestX, y: bestY };
+}
+
 export function detectDocumentEdges(img: HTMLImageElement): QuadPoints {
   const W = 80;
   const H = 120;
@@ -274,10 +310,10 @@ export function detectDocumentEdges(img: HTMLImageElement): QuadPoints {
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     return {
-      p1: { x: 15, y: 10 },
-      p2: { x: 85, y: 10 },
-      p3: { x: 83, y: 90 },
-      p4: { x: 17, y: 90 }
+      p1: { x: 12, y: 12 },
+      p2: { x: 88, y: 12 },
+      p3: { x: 86, y: 88 },
+      p4: { x: 14, y: 88 }
     };
   }
   ctx.drawImage(img, 0, 0, W, H);
@@ -293,20 +329,46 @@ export function detectDocumentEdges(img: HTMLImageElement): QuadPoints {
     brightness[i] = 0.299 * r + 0.587 * g + 0.114 * b;
   }
 
-  const avg = brightness.reduce((a, b) => a + b, 0) / brightness.length;
-  const threshold = Math.min(avg * 1.18, 215);
+  // Noise Reduction: Apply 5x5 box blur to completely filter out text lines, shadows, and keyboard keycaps
+  const blurred: number[] = new Array(W * H);
+  let minB = 255;
+  let maxB = 0;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let sum = 0;
+      let count = 0;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const ny = y + dy;
+          const nx = x + dx;
+          if (ny >= 0 && ny < H && nx >= 0 && nx < W) {
+            sum += brightness[ny * W + nx];
+            count++;
+          }
+        }
+      }
+      const val = sum / count;
+      blurred[y * W + x] = val;
+      if (val < minB) minB = val;
+      if (val > maxB) maxB = val;
+    }
+  }
 
+  // Dynamic Threshold: position at 56% between min and max brightness
+  const threshold = minB + (maxB - minB) * 0.56;
+
+  // Extreme points for tilted quad
   let minSum = W + H, maxSum = 0;
   let minDiff = W + H, maxDiff = -W - H;
-  let p1 = { x: 15, y: 10 };
-  let p2 = { x: 85, y: 10 };
-  let p3 = { x: 85, y: 90 };
-  let p4 = { x: 15, y: 90 };
+  let p1 = { x: 12, y: 12 };
+  let p2 = { x: 68, y: 12 };
+  let p3 = { x: 68, y: 108 };
+  let p4 = { x: 12, y: 108 };
   let brightCount = 0;
 
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      if (brightness[y * W + x] > threshold) {
+      if (blurred[y * W + x] > threshold) {
         const sum = x + y;
         const diff = x - y;
 
@@ -331,6 +393,12 @@ export function detectDocumentEdges(img: HTMLImageElement): QuadPoints {
     }
   }
 
+  // Corner Refinement using Sobel edge gradients
+  p1 = refineCorner(brightness, W, H, p1);
+  p2 = refineCorner(brightness, W, H, p2);
+  p3 = refineCorner(brightness, W, H, p3);
+  p4 = refineCorner(brightness, W, H, p4);
+
   const minX = Math.min(p1.x, p4.x);
   const maxX = Math.max(p2.x, p3.x);
   const minY = Math.min(p1.y, p2.y);
@@ -350,16 +418,14 @@ export function detectDocumentEdges(img: HTMLImageElement): QuadPoints {
       p1: { x: ((p1.x + padX) / W) * 100, y: ((p1.y + padY) / H) * 100 },
       p2: { x: ((p2.x - padX) / W) * 100, y: ((p2.y + padY) / H) * 100 },
       p3: { x: ((p3.x - padX) / W) * 100, y: ((p3.y - padY) / H) * 100 },
-      p4: { x: ((p4.x + padX) / W) * 100, y: ((p4.y - padY) / H) * 100 }
+      p4: { x: ((p4.x + padX) / W) * 100, y: ((p4.y - padY) / H) * 100 },
     };
   }
 
   return {
-    p1: { x: 12, y: 12 },
-    p2: { x: 88, y: 12 },
-    p3: { x: 86, y: 88 },
-    p4: { x: 14, y: 88 }
+    p1: { x: 12, y: 10 },
+    p2: { x: 88, y: 10 },
+    p3: { x: 86, y: 90 },
+    p4: { x: 14, y: 90 },
   };
 }
-
-

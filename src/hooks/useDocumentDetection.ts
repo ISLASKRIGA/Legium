@@ -7,6 +7,46 @@ export interface QuadPoints {
   p4: { x: number; y: number };
 }
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+function refineCorner(brightness: number[], W: number, H: number, estimated: Point): Point {
+  let bestX = estimated.x;
+  let bestY = estimated.y;
+  let maxGrad = -1;
+
+  // Search window of size 10x10 around the estimated point
+  const radius = 5;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const cx = estimated.x + dx;
+      const cy = estimated.y + dy;
+
+      if (cx > 1 && cx < W - 2 && cy > 1 && cy < H - 2) {
+        // Sobel-like gradients in horizontal and vertical directions
+        const gx = 
+          (brightness[(cy - 1) * W + (cx + 1)] + 2 * brightness[cy * W + (cx + 1)] + brightness[(cy + 1) * W + (cx + 1)]) -
+          (brightness[(cy - 1) * W + (cx - 1)] + 2 * brightness[cy * W + (cx - 1)] + brightness[(cy + 1) * W + (cx - 1)]);
+
+        const gy = 
+          (brightness[(cy + 1) * W + (cx - 1)] + 2 * brightness[(cy + 1) * W + cx] + brightness[(cy + 1) * W + (cx + 1)]) -
+          (brightness[(cy - 1) * W + (cx - 1)] + 2 * brightness[(cy - 1) * W + cx] + brightness[(cy - 1) * W + (cx + 1)]);
+
+        const mag = gx * gx + gy * gy;
+        if (mag > maxGrad) {
+          maxGrad = mag;
+          bestX = cx;
+          bestY = cy;
+        }
+      }
+    }
+  }
+
+  return { x: bestX, y: bestY };
+}
+
 interface UseDocumentDetectionOptions {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   active: boolean;
@@ -134,6 +174,12 @@ export function useDocumentDetection({
         }
       }
     }
+
+    // Corner Refinement using Sobel edge gradients
+    p1 = refineCorner(brightness, W, H, p1);
+    p2 = refineCorner(brightness, W, H, p2);
+    p3 = refineCorner(brightness, W, H, p3);
+    p4 = refineCorner(brightness, W, H, p4);
 
     const minX = Math.min(p1.x, p4.x);
     const maxX = Math.max(p2.x, p3.x);
