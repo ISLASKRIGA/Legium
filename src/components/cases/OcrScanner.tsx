@@ -106,7 +106,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       setSheetDetected(detected);
 
       if (detected) {
-        setScannerMsg('✓ Documento enfocado');
+        setScannerMsg('✓ Listo para capturar');
       } else {
         setScannerMsg('Apunta la cámara al escrito judicial...');
       }
@@ -176,6 +176,39 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // Rotate image 90 degrees Left or Right
+  const rotateImage = (direction: 'left' | 'right') => {
+    if (!originalImage) return;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.height;
+      canvas.height = img.width;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        if (direction === 'left') {
+          ctx.translate(0, img.width);
+          ctx.rotate(-Math.PI / 2);
+        } else {
+          ctx.translate(img.height, 0);
+          ctx.rotate(Math.PI / 2);
+        }
+        ctx.drawImage(img, 0, 0);
+        const rotatedUrl = canvas.toDataURL('image/jpeg');
+        setOriginalImage(rotatedUrl);
+
+        // Run edge detection on rotated image
+        const tempImg = new Image();
+        tempImg.onload = () => {
+          const detectedQuad = detectDocumentEdges(tempImg);
+          setEdgePoints(detectedQuad);
+        };
+        tempImg.src = rotatedUrl;
+      }
+    };
+    img.src = originalImage;
   };
 
   // Drag Corners event handlers
@@ -447,17 +480,38 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     }
   };
 
-  const getFilterStyle = (f: FilterType): string => {
-    if (f === 'magic') return 'contrast(1.4) brightness(1.08) saturate(1.1)';
-    if (f === 'bw') return 'contrast(1.7) brightness(1.05) grayscale(1)';
-    return 'none';
+  const p1 = edgePoints.p1;
+  const p2 = edgePoints.p2;
+  const p3 = edgePoints.p3;
+  const p4 = edgePoints.p4;
+
+  const getMidpointProps = (pt1: typeof p1, pt2: typeof p1) => {
+    const mx = (pt1.x + pt2.x) / 2;
+    const my = (pt1.y + pt2.y) / 2;
+    const angle = Math.atan2(pt2.y - pt1.y, pt2.x - pt1.x) * (180 / Math.PI);
+    return { mx, my, angle };
   };
+
+  const mid1 = getMidpointProps(p1, p2);
+  const mid2 = getMidpointProps(p2, p3);
+  const mid3 = getMidpointProps(p3, p4);
+  const mid4 = getMidpointProps(p4, p1);
 
   return (
     <div className="scanner-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1c1c1e', padding: 0 }}>
+      
+      {/* Top Bar for camera */}
+      {step === 'capture' && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', color: '#fff', alignItems: 'center', background: '#000', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <span style={{ fontSize: '16px', opacity: 0.85, cursor: 'pointer' }}>🔆</span>
+          <span style={{ border: '1.2px solid rgba(255,255,255,0.6)', borderRadius: '4px', padding: '2px 8px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>HD</span>
+          <span style={{ fontSize: '16px', opacity: 0.85, cursor: 'pointer' }}>⚙️</span>
+        </div>
+      )}
+
       {step === 'capture' && (
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', height: '100%', justifyContent: 'space-between' }}>
-          <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 160px)', width: '100%', position: 'relative', borderRadius: 0, overflow: 'hidden', background: '#000' }}>
+          <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 200px)', width: '100%', position: 'relative', borderRadius: 0, overflow: 'hidden', background: '#000' }}>
             {hasCamera ? (
               <video
                 ref={videoRef}
@@ -487,12 +541,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   zIndex: 2
                 }}
               >
-                <Upload size={48} style={{ color: 'var(--primary-gold)', marginBottom: '12px' }} />
+                <Upload size={48} style={{ color: '#00ff80', marginBottom: '12px' }} />
                 <p style={{ fontSize: '14px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
                   Escáner de Escritos Judiciales
                 </p>
                 <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
-                  La cámara no está disponible. Sube un archivo de imagen para detectar automáticamente sus bordes y alinearlo.
+                  Cámara no disponible. Sube una foto de tu documento para ajustar sus esquinas y recortarlo.
                 </p>
               </div>
             )}
@@ -508,16 +562,11 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 preserveAspectRatio="none"
               >
                 <polygon
-                  points={`
-                    ${edgePoints.p1.x},${edgePoints.p1.y}
-                    ${edgePoints.p2.x},${edgePoints.p2.y}
-                    ${edgePoints.p3.x},${edgePoints.p3.y}
-                    ${edgePoints.p4.x},${edgePoints.p4.y}
-                  `}
+                  points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
                   style={{
-                    fill: 'rgba(0, 255, 128, 0.12)',
+                    fill: 'rgba(0, 255, 128, 0.08)',
                     stroke: '#00ff80',
-                    strokeWidth: '1.5',
+                    strokeWidth: '1.2',
                     transition: 'all 0.08s ease-out',
                     filter: 'drop-shadow(0 0 3px #00ff80)'
                   }}
@@ -530,11 +579,11 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               style={{
                 position: 'absolute', bottom: '16px', left: '50%',
                 transform: 'translateX(-50%)',
-                background: sheetDetected ? 'rgba(52,199,89,0.95)' : 'rgba(0,122,255,0.95)',
-                color: '#fff', fontSize: '12px', padding: '6px 16px',
+                background: sheetDetected ? 'rgba(0, 255, 128, 0.9)' : 'rgba(255, 255, 255, 0.25)',
+                color: '#fff', fontSize: '11px', padding: '6px 14px',
                 borderRadius: '99px', fontWeight: 600,
                 backdropFilter: 'blur(10px)', zIndex: 5,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                 transition: 'all 0.3s ease', whiteSpace: 'nowrap'
               }}
             >
@@ -544,7 +593,36 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
-          <div className="scanner-controls" style={{ background: '#1c1c1e', padding: '16px 24px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Camera controls - matches CamScanner example */}
+          <div className="scanner-controls" style={{ background: '#000', padding: '24px 36px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <button
+              className="btn btn-icon"
+              onClick={onClose}
+              style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none' }}
+            >
+              <X size={26} />
+            </button>
+
+            {hasCamera ? (
+              <button
+                className="shutter-button"
+                onClick={capturePhoto}
+                style={{ 
+                  width: '66px', 
+                  height: '66px', 
+                  borderRadius: '50%', 
+                  border: '5px solid #00ff80', 
+                  background: '#fff',
+                  boxShadow: '0 0 16px rgba(0,255,128,0.45)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  outline: 'none'
+                }}
+              />
+            ) : (
+              <div style={{ width: '66px', height: '66px' }} />
+            )}
+
             <input
               type="file"
               accept="image/*"
@@ -552,29 +630,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               style={{ display: 'none' }}
               onChange={handleFileUpload}
             />
-            
             <button
-              className="btn btn-secondary"
+              className="btn btn-icon"
               onClick={() => fileInputRef.current?.click()}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
+              style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none' }}
             >
-              <Upload size={16} /> Subir Imagen
-            </button>
-
-            {hasCamera && (
-              <button
-                className="shutter-button"
-                onClick={capturePhoto}
-                style={{ border: sheetDetected ? '4px solid #34c759' : '4px solid var(--primary-gold)' }}
-              />
-            )}
-
-            <button
-              className="btn btn-secondary"
-              onClick={onClose}
-              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
-            >
-              Cancelar
+              <Upload size={24} />
             </button>
           </div>
         </div>
@@ -582,8 +643,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
       {step === 'preview-full' && originalImage && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between' }}>
-          <span style={{ textAlign: 'center', color: '#fff', fontSize: '12px', fontWeight: 600 }}>
-            Ajusta los 4 puntos para encuadrar los bordes de la hoja
+          <span style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600 }}>
+            Ajusta los puntos en las esquinas para encuadrar la hoja
           </span>
 
           <div 
@@ -594,10 +655,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               position: 'relative', 
               width: '100%', 
               flexGrow: 1,
-              height: 'calc(100vh - 200px)',
+              height: 'calc(100vh - 220px)',
               borderRadius: '12px', 
               overflow: 'hidden', 
-              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
               background: '#121214',
               userSelect: 'none',
               display: 'flex',
@@ -617,7 +678,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               }} 
             />
             
-            {/* Draggable Polygon Overlay */}
+            {/* Draggable Polygon and Edge Bars Overlay */}
             <svg 
               style={{ 
                 position: 'absolute', 
@@ -627,90 +688,89 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 height: '100%', 
                 zIndex: 10
               }}
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
             >
               <polygon
-                points={`
-                  ${edgePoints.p1.x}%,${edgePoints.p1.y}%
-                  ${edgePoints.p2.x}%,${edgePoints.p2.y}%
-                  ${edgePoints.p3.x}%,${edgePoints.p3.y}%
-                  ${edgePoints.p4.x}%,${edgePoints.p4.y}%
-                `}
+                points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
                 style={{
-                  fill: 'rgba(0, 122, 255, 0.15)',
-                  stroke: 'var(--primary-blue)',
-                  strokeWidth: '2'
+                  fill: 'rgba(0, 255, 128, 0.12)',
+                  stroke: '#00ff80',
+                  strokeWidth: '0.8',
+                  filter: 'drop-shadow(0 0 3px rgba(0,255,128,0.2))'
                 }}
               />
               
-              {/* Corner handles */}
-              <circle 
-                cx={`${edgePoints.p1.x}%`} 
-                cy={`${edgePoints.p1.y}%`} 
-                r="11" 
-                fill="#fff" 
-                stroke="var(--primary-blue)" 
-                strokeWidth="3.5" 
-                style={{ cursor: 'move' }}
-                onMouseDown={(e) => handleCornerMouseDown(e, 'p1')}
-                onTouchStart={() => handleCornerTouchStart('p1')}
-              />
-              <circle 
-                cx={`${edgePoints.p2.x}%`} 
-                cy={`${edgePoints.p2.y}%`} 
-                r="11" 
-                fill="#fff" 
-                stroke="var(--primary-blue)" 
-                strokeWidth="3.5" 
-                style={{ cursor: 'move' }}
-                onMouseDown={(e) => handleCornerMouseDown(e, 'p2')}
-                onTouchStart={() => handleCornerTouchStart('p2')}
-              />
-              <circle 
-                cx={`${edgePoints.p3.x}%`} 
-                cy={`${edgePoints.p3.y}%`} 
-                r="11" 
-                fill="#fff" 
-                stroke="var(--primary-blue)" 
-                strokeWidth="3.5" 
-                style={{ cursor: 'move' }}
-                onMouseDown={(e) => handleCornerMouseDown(e, 'p3')}
-                onTouchStart={() => handleCornerTouchStart('p3')}
-              />
-              <circle 
-                cx={`${edgePoints.p4.x}%`} 
-                cy={`${edgePoints.p4.y}%`} 
-                r="11" 
-                fill="#fff" 
-                stroke="var(--primary-blue)" 
-                strokeWidth="3.5" 
-                style={{ cursor: 'move' }}
-                onMouseDown={(e) => handleCornerMouseDown(e, 'p4')}
-                onTouchStart={() => handleCornerTouchStart('p4')}
-              />
+              {/* Corner Circular Handles (White with green border) */}
+              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={() => handleCornerTouchStart('p1')} />
+              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={() => handleCornerTouchStart('p2')} />
+              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={() => handleCornerTouchStart('p3')} />
+              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={() => handleCornerTouchStart('p4')} />
+
+              {/* Edge Pill/Bar handles (White rects rotated along edges) */}
+              <g transform={`translate(${mid1.mx}, ${mid1.my}) rotate(${mid1.angle})`}>
+                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
+              </g>
+              <g transform={`translate(${mid2.mx}, ${mid2.my}) rotate(${mid2.angle})`}>
+                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
+              </g>
+              <g transform={`translate(${mid3.mx}, ${mid3.my}) rotate(${mid3.angle})`}>
+                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
+              </g>
+              <g transform={`translate(${mid4.mx}, ${mid4.my}) rotate(${mid4.angle})`}>
+                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
+              </g>
             </svg>
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px' }}>
+          {/* Bottom toolbar - matches CamScanner example */}
+          <div style={{ background: '#000', padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '12px' }}>
             <button 
-              className="btn btn-secondary" 
-              onClick={() => {
-                setStep('capture');
-                setOriginalImage(null);
-                startCamera();
-              }}
-              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
+              onClick={() => setEdgePoints({ p1: { x: 5, y: 5 }, p2: { x: 95, y: 5 }, p3: { x: 95, y: 95 }, p4: { x: 5, y: 95 } })}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
             >
-              Reintentar
+              <span style={{ fontSize: '18px' }}>🔳</span>
+              All
             </button>
+
             <button 
-              className="btn btn-primary" 
+              onClick={() => rotateImage('left')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
+            >
+              <span style={{ fontSize: '18px' }}>↩️</span>
+              Left
+            </button>
+
+            <button 
+              onClick={() => rotateImage('right')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
+            >
+              <span style={{ fontSize: '18px' }}>↪️</span>
+              Right
+            </button>
+
+            <button 
               onClick={() => {
                 setStep('aligning');
                 processAlignment(originalImage, edgePoints);
               }}
-              style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{ 
+                width: '46px', 
+                height: '46px', 
+                borderRadius: '50%', 
+                background: '#00ff80', 
+                color: '#000', 
+                border: 'none', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,255,128,0.3)',
+                padding: 0,
+                outline: 'none'
+              }}
             >
-              Alinear y Recortar <ChevronRight size={16} />
+              <ChevronRight size={24} style={{ strokeWidth: 3 }} />
             </button>
           </div>
         </div>
@@ -719,7 +779,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       {step === 'aligning' && originalImage && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '320px', gap: '20px', background: '#1c1c1e', flexGrow: 1 }}>
           <h4 style={{ fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <RefreshCw size={18} className="spinning" style={{ color: 'var(--primary-blue)' }} /> Alineando y Rectificando
+            <RefreshCw size={18} className="spinning" style={{ color: '#00ff80' }} /> Alineando y Rectificando
           </h4>
           
           <div 
@@ -758,13 +818,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               preserveAspectRatio="none"
             >
               <polygon
-                points={`${edgePoints.p1.x},${edgePoints.p1.y} ${edgePoints.p2.x},${edgePoints.p2.y} ${edgePoints.p3.x},${edgePoints.p3.y} ${edgePoints.p4.x},${edgePoints.p4.y}`}
-                fill="rgba(0, 122, 255, 0.08)"
-                stroke="var(--primary-blue)"
+                points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+                fill="rgba(0, 255, 128, 0.08)"
+                stroke="#00ff80"
                 strokeWidth="1.5"
                 strokeLinejoin="round"
                 style={{
-                  filter: 'drop-shadow(0 0 4px var(--primary-blue))',
+                  filter: 'drop-shadow(0 0 4px #00ff80)',
                   animation: 'warpPulse 1.2s ease-in-out infinite'
                 }}
               />
