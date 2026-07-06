@@ -13,62 +13,71 @@ interface UseDocumentDetectionOptions {
   onDetection: (quad: QuadPoints, confidence: number) => void;
 }
 
-/**
- * Least-squares linear fit.  Returns {slope, intercept} for  y = slope*x + intercept.
- * Returns null if fewer than 5 points or degenerate.
- */
-function fitLine(pts: { x: number; y: number }[]): { slope: number; intercept: number } | null {
-  const n = pts.length;
-  if (n < 5) return null;
-  let sx = 0, sy = 0, sxy = 0, sxx = 0;
-  for (const p of pts) { sx += p.x; sy += p.y; sxy += p.x * p.y; sxx += p.x * p.x; }
-  const denom = n * sxx - sx * sx;
-  if (Math.abs(denom) < 1e-4) return null;
-  const slope     = (n * sxy - sx * sy) / denom;
-  const intercept = (sy - slope * sx) / n;
-  return { slope, intercept };
-}
-
-/**
- * Intersect:
- *   col = A*row + B   (left/right vertical-ish edge, expressed as col-from-row)
- *   row = C*col + D   (top/bottom horizontal-ish edge, expressed as row-from-col)
- *
- * Substituting:  row = C*(A*row + B) + D  →  row(1 - CA) = CB + D
- * Returns { x: col, y: row }
- */
-function intersectEdges(
-  colFromRow: { slope: number; intercept: number },
-  rowFromCol: { slope: number; intercept: number },
-): { x: number; y: number } | null {
-  const A = colFromRow.slope, B = colFromRow.intercept;
-  const C = rowFromCol.slope, D = rowFromCol.intercept;
-  const denom = 1 - C * A;
-  if (Math.abs(denom) < 0.01) return null;
-  const row = (C * B + D) / denom;
-  const col = A * row + B;
-  return { x: col, y: row };
-}
-
 const DEFAULT_QUAD: QuadPoints = {
   p1: { x: 12, y: 8 }, p2: { x: 88, y: 8 },
   p3: { x: 88, y: 92 }, p4: { x: 12, y: 92 },
 };
 
 /**
+ * Compute Otsu's optimal binarization threshold for a grayscale image.
+ * Maximises inter-class variance → finds the natural break between
+ * "paper" (bright) and "background" (dark), regardless of absolute brightness.
+ * Returns { threshold, separability } where separability ∈ [0, 1].
+ * Separability < 0.01 means no document is visible.
+ */
+function otsuThreshold(blur: Float32Array, n: number): { threshold: number; separability: number } {
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) hist[Math.min(255, blur[i] | 0)]++;
+
+  let totalSum = 0;
+  for (let i = 0; i < 256; i++) totalSum += i * hist[i];
+
+  let sumB = 0, wB = 0;
+  let maxVar = 0;
+  let threshold = 128;
+
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = n - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (totalSum - sumB) / wF;
+    const varBetween = (wB / n) * (wF / n) * (mB - mF) * (mB - mF);
+    if (varBetween > maxVar) { maxVar = varBetween; threshold = t; }
+  }
+
+  // Total variance (σ²_T) for normalisation
+  let mean = totalSum / n, totalVar = 0;
+  for (let i = 0; i < n; i++) totalVar += (blur[i] - mean) ** 2;
+  totalVar /= n;
+  const separability = totalVar > 0 ? maxVar / totalVar : 0;
+
+  return { threshold, separability };
+}
+
+/**
  * Detects document boundaries in real-time from a video stream.
  *
- * Algorithm — edge-gradient scanline approach (works in any lighting):
+ * Algorithm — Otsu + bright-region BFS + diagonal-extreme corners + Sobel refinement:
  * 1. Grayscale + 3×3 Gaussian blur
- * 2. Sobel edge magnitude + directional (gx, gy) components
- * 3. Horizontal scanlines  → find leftmost "dark→paper" (gx > 0) and
- *                            rightmost "paper→dark" (gx < 0) edge per row
- *    Vertical scanlines    → find topmost  "dark→paper" (gy > 0) and
- *                            bottommost "paper→dark" (gy < 0) edge per column
- * 4. Least-squares line fit to each of the 4 edge point sets
- * 5. Intersect the 4 lines → 4 perspective-correct corners
- * 6. Validity checks (area, aspect ratio, coverage)
- * 7. Exponential temporal smoothing to reduce jitter
+ * 2. Otsu binarisation: automatically finds the paper / background split,
+ *    regardless of scene brightness (works on dark tile, gray desk, white desk, …)
+ * 3. BFS flood-fill from every bright seed → find the largest bright connected
+ *    component (= the white paper sheet)
+ * 4. Four perspective corners via diagonal-sum extremes:
+ *      Top-Left  → minimize  x + y
+ *      Top-Right → maximize  x − y
+ *      Bot-Right → maximize  x + y
+ *      Bot-Left  → minimize  x − y
+ * 5. Sub-pixel corner snap with Sobel gradient search (radius 5)
+ * 6. Validity + confidence checks
+ * 7. Exponential temporal smoothing to kill jitter
+ *
+ * Why Otsu instead of a fixed brightness fraction:
+ *   A fixed fraction fails when the background itself is bright (white desk, office).
+ *   Otsu adapts to the actual bimodal histogram, always finding the optimal split.
  */
 export function useDocumentDetection({
   videoRef,
@@ -87,13 +96,14 @@ export function useDocumentDetection({
       return;
     }
 
-    // ~15 fps: process every other frame
+    // ~15 fps: skip every other frame
     if (++frameCountRef.current % 2 !== 0) {
       animFrameRef.current = requestAnimationFrame(detect);
       return;
     }
 
     const W = 160, H = 240;
+    const N = W * H;
 
     if (!canvasRef.current) {
       canvasRef.current = document.createElement('canvas');
@@ -108,168 +118,146 @@ export function useDocumentDetection({
     const { data } = ctx.getImageData(0, 0, W, H);
 
     // ── 1. Grayscale ──────────────────────────────────────────────────────────
-    const gray = new Float32Array(W * H);
-    for (let i = 0; i < W * H; i++) {
+    const gray = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
       gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
     }
 
-    // ── 2. 3×3 Gaussian blur (weights: 1 2 1 / 2 4 2 / 1 2 1 / 16) ──────────
-    const blur = new Float32Array(W * H);
+    // ── 2. 3×3 Gaussian blur (kernel 1 2 1 / 2 4 2 / 1 2 1 / 16) ─────────────
+    const blur = new Float32Array(N);
+    // copy borders as-is
+    for (let i = 0; i < N; i++) blur[i] = gray[i];
     for (let y = 1; y < H - 1; y++) {
       for (let x = 1; x < W - 1; x++) {
         blur[y * W + x] = (
           gray[(y-1)*W+(x-1)] + 2*gray[(y-1)*W+x] + gray[(y-1)*W+(x+1)] +
           2*gray[y*W+(x-1)]   + 4*gray[y*W+x]     + 2*gray[y*W+(x+1)]   +
           gray[(y+1)*W+(x-1)] + 2*gray[(y+1)*W+x] + gray[(y+1)*W+(x+1)]
-        ) / 16;
+        ) >> 4; // divide by 16 via integer shift for speed
       }
     }
 
-    // ── 3. Sobel edge magnitude + directional components ─────────────────────
-    const edgeMag = new Float32Array(W * H);
-    const gxArr   = new Float32Array(W * H);
-    const gyArr   = new Float32Array(W * H);
-    let maxMag = 0;
+    // ── 3. Otsu threshold ─────────────────────────────────────────────────────
+    const { threshold: thresh, separability } = otsuThreshold(blur, N);
 
-    for (let y = 1; y < H - 1; y++) {
-      for (let x = 1; x < W - 1; x++) {
-        const gx =
-          (blur[(y-1)*W+(x+1)] + 2*blur[y*W+(x+1)] + blur[(y+1)*W+(x+1)]) -
-          (blur[(y-1)*W+(x-1)] + 2*blur[y*W+(x-1)] + blur[(y+1)*W+(x-1)]);
-        const gy =
-          (blur[(y+1)*W+(x-1)] + 2*blur[(y+1)*W+x] + blur[(y+1)*W+(x+1)]) -
-          (blur[(y-1)*W+(x-1)] + 2*blur[(y-1)*W+x] + blur[(y-1)*W+(x+1)]);
-        const mag = Math.sqrt(gx * gx + gy * gy);
-        edgeMag[y * W + x] = mag;
-        gxArr[y * W + x]   = gx;
-        gyArr[y * W + x]   = gy;
-        if (mag > maxMag) maxMag = mag;
-      }
-    }
-
-    // No usable contrast → bail out
-    if (maxMag < 15) {
+    // separability < 0.015 → scene too uniform, no paper visible
+    if (separability < 0.015) {
       lastQuadRef.current = null;
       onDetection(DEFAULT_QUAD, 0);
       animFrameRef.current = requestAnimationFrame(detect);
       return;
     }
 
-    const edgeThresh = maxMag * 0.18; // 18% of peak edge magnitude
+    // ── 4. BFS → largest bright connected component ────────────────────────────
+    // Score = area / (1 + distance_from_center * 0.1)
+    // This prefers central, large components (the paper the user is aiming at).
+    const visited = new Uint8Array(N);
+    let bestComp: number[] = [];   // pixel indices
+    let bestScore = -1;
 
-    // ── 4. Directed scanline edge finder ─────────────────────────────────────
-    //
-    //  Horizontal rows → left / right document edges
-    //  A "left edge" at row r is the FIRST column where a strong POSITIVE gx
-    //  (dark background → bright paper) is found scanning left→right.
-    //  A "right edge" is the LAST column with strong NEGATIVE gx found right→left.
-    //
-    //  Vertical columns → top / bottom document edges (same idea with gy).
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        if (blur[idx] <= thresh || visited[idx]) continue;
 
-    const leftPts:   { x: number; y: number }[] = []; // {x: row,  y: leftCol}
-    const rightPts:  { x: number; y: number }[] = []; // {x: row,  y: rightCol}
-    const topPts:    { x: number; y: number }[] = []; // {x: col,  y: topRow}
-    const bottomPts: { x: number; y: number }[] = []; // {x: col,  y: bottomRow}
+        const comp: number[] = [];
+        const queue: number[] = [idx];
+        visited[idx] = 1;
+        let head = 0, sumX = 0, sumY = 0;
 
-    for (let row = 4; row < H - 4; row++) {
-      let lCol = -1, rCol = -1;
+        while (head < queue.length) {
+          const cur = queue[head++];
+          const cx = cur % W, cy = (cur / W) | 0;
+          comp.push(cur);
+          sumX += cx; sumY += cy;
 
-      for (let col = 3; col < W - 3; col++) {
-        if (edgeMag[row * W + col] > edgeThresh && gxArr[row * W + col] > 0) {
-          lCol = col; break;
+          // 4-connected neighbours — use explicit boundary checks to avoid wrap-around
+          if (cx > 0     && blur[cur - 1] > thresh && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
+          if (cx < W - 1 && blur[cur + 1] > thresh && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
+          if (cy > 0     && blur[cur - W] > thresh && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
+          if (cy < H - 1 && blur[cur + W] > thresh && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
         }
-      }
-      for (let col = W - 4; col >= 3; col--) {
-        if (edgeMag[row * W + col] > edgeThresh && gxArr[row * W + col] < 0) {
-          rCol = col; break;
-        }
-      }
 
-      if (lCol >= 0 && rCol > lCol + W * 0.15) {
-        leftPts.push({ x: row, y: lCol });
-        rightPts.push({ x: row, y: rCol });
+        const area = comp.length;
+        if (area < N * 0.04) continue; // too small → skip
+
+        const cxC = sumX / area, cyC = sumY / area;
+        const distToCenter = Math.hypot(cxC - W / 2, cyC - H / 2);
+        const score = area / (1 + distToCenter * 0.10);
+
+        if (score > bestScore) { bestScore = score; bestComp = comp; }
       }
     }
 
-    for (let col = 4; col < W - 4; col++) {
-      let tRow = -1, bRow = -1;
+    const compArea = bestComp.length;
 
-      for (let row = 3; row < H - 3; row++) {
-        if (edgeMag[row * W + col] > edgeThresh && gyArr[row * W + col] > 0) {
-          tRow = row; break;
-        }
-      }
-      for (let row = H - 4; row >= 3; row--) {
-        if (edgeMag[row * W + col] > edgeThresh && gyArr[row * W + col] < 0) {
-          bRow = row; break;
-        }
-      }
-
-      if (tRow >= 0 && bRow > tRow + H * 0.12) {
-        topPts.push({ x: col, y: tRow });
-        bottomPts.push({ x: col, y: bRow });
-      }
-    }
-
-    // ── 5. Minimum coverage check ─────────────────────────────────────────────
-    const MIN_PTS = 20;
-    if (
-      leftPts.length < MIN_PTS || rightPts.length < MIN_PTS ||
-      topPts.length  < MIN_PTS || bottomPts.length < MIN_PTS
-    ) {
+    if (compArea < N * 0.06 || compArea > N * 0.93) {
+      // Component is too small (no document) or too large (entire scene is bright)
       lastQuadRef.current = null;
       onDetection(DEFAULT_QUAD, 0);
       animFrameRef.current = requestAnimationFrame(detect);
       return;
     }
 
-    // ── 6. Least-squares line fit ─────────────────────────────────────────────
-    //  leftLine / rightLine: col = slope*row + intercept
-    //  topLine / bottomLine: row = slope*col + intercept
-    const leftLine   = fitLine(leftPts);
-    const rightLine  = fitLine(rightPts);
-    const topLine    = fitLine(topPts);
-    const bottomLine = fitLine(bottomPts);
+    // ── 5. Four perspective corners via diagonal-sum extremes ──────────────────
+    let minSum = Infinity,  p1 = { x: 0, y: 0 };
+    let maxSum = -Infinity, p3 = { x: 0, y: 0 };
+    let maxDiff = -Infinity, p2 = { x: 0, y: 0 };
+    let minDiff = Infinity,  p4 = { x: 0, y: 0 };
 
-    if (!leftLine || !rightLine || !topLine || !bottomLine) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
-      return;
+    for (const idx of bestComp) {
+      const x = idx % W, y = (idx / W) | 0;
+      const s = x + y, d = x - y;
+      if (s < minSum)  { minSum  = s; p1 = { x, y }; }
+      if (s > maxSum)  { maxSum  = s; p3 = { x, y }; }
+      if (d > maxDiff) { maxDiff = d; p2 = { x, y }; }
+      if (d < minDiff) { minDiff = d; p4 = { x, y }; }
     }
 
-    // ── 7. Four perspective corners from line intersections ───────────────────
-    const c1 = intersectEdges(leftLine,  topLine);     // top-left
-    const c2 = intersectEdges(rightLine, topLine);     // top-right
-    const c3 = intersectEdges(rightLine, bottomLine);  // bottom-right
-    const c4 = intersectEdges(leftLine,  bottomLine);  // bottom-left
+    // ── 6. Sobel corner refinement (radius 5 → snaps to nearest real edge) ────
+    const refine = (pt: { x: number; y: number }, radius = 5) => {
+      let best = pt, maxMag = -1;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const cx = (pt.x + dx) | 0, cy = (pt.y + dy) | 0;
+          if (cx > 1 && cx < W - 2 && cy > 1 && cy < H - 2) {
+            const gx =
+              (gray[(cy-1)*W+(cx+1)] + 2*gray[cy*W+(cx+1)] + gray[(cy+1)*W+(cx+1)]) -
+              (gray[(cy-1)*W+(cx-1)] + 2*gray[cy*W+(cx-1)] + gray[(cy+1)*W+(cx-1)]);
+            const gy =
+              (gray[(cy+1)*W+(cx-1)] + 2*gray[(cy+1)*W+cx] + gray[(cy+1)*W+(cx+1)]) -
+              (gray[(cy-1)*W+(cx-1)] + 2*gray[(cy-1)*W+cx] + gray[(cy-1)*W+(cx+1)]);
+            const mag = gx * gx + gy * gy;
+            if (mag > maxMag) { maxMag = mag; best = { x: cx, y: cy }; }
+          }
+        }
+      }
+      return best;
+    };
 
-    if (!c1 || !c2 || !c3 || !c4) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
-      return;
-    }
+    p1 = refine(p1);
+    p2 = refine(p2);
+    p3 = refine(p3);
+    p4 = refine(p4);
 
-    // ── 8. Validity checks ────────────────────────────────────────────────────
-    const avgW   = ((c2.x - c1.x) + (c3.x - c4.x)) / 2;
-    const avgH   = ((c4.y - c1.y) + (c3.y - c2.y)) / 2;
-    const aspect = avgW / Math.max(1, avgH);
-    const area   = avgW * avgH;
+    // ── 7. Validity + confidence ───────────────────────────────────────────────
+    const bx1 = Math.min(p1.x, p4.x), bx2 = Math.max(p2.x, p3.x);
+    const by1 = Math.min(p1.y, p2.y), by2 = Math.max(p3.y, p4.y);
+    const bw  = bx2 - bx1, bh = by2 - by1;
 
-    // Confidence: fraction of scanlines that found clean document edges
+    // confidence = how well-separated the two classes are × how large the document is
     const confidence = Math.min(1,
-      (leftPts.length / H + rightPts.length / H + topPts.length / W + bottomPts.length / W) / 2
+      separability * 10 * (compArea / N) * (1 / 0.15)
     );
 
     const isValid =
-      area      > W * H * 0.08  &&
-      area      < W * H * 0.97  &&
-      avgW      > W  * 0.15     &&
-      avgH      > H  * 0.12     &&
-      aspect    > 0.30          &&
-      aspect    < 3.50          &&
-      confidence > 0.28;
+      compArea    > N * 0.06     &&
+      compArea    < N * 0.93     &&
+      bw          > W * 0.15     &&
+      bh          > H * 0.12     &&
+      (bw / Math.max(1, bh)) > 0.25 &&
+      (bw / Math.max(1, bh)) < 4.0  &&
+      confidence  > 0.35;
 
     if (!isValid) {
       lastQuadRef.current = null;
@@ -278,18 +266,15 @@ export function useDocumentDetection({
       return;
     }
 
-    // ── 9. Normalize to percentage coordinates ────────────────────────────────
+    // ── 8. Normalise to % and apply exponential smoothing ─────────────────────
     const toP = (pt: { x: number; y: number }) => ({
       x: Math.max(0, Math.min(100, (pt.x / W) * 100)),
       y: Math.max(0, Math.min(100, (pt.y / H) * 100)),
     });
 
-    const raw: QuadPoints = {
-      p1: toP(c1), p2: toP(c2), p3: toP(c3), p4: toP(c4),
-    };
+    const raw: QuadPoints = { p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) };
+    const k = 0.55;
 
-    // ── 10. Exponential temporal smoothing (reduces jitter) ───────────────────
-    const k   = 0.55;
     const out: QuadPoints = lastQuadRef.current
       ? {
           p1: { x: lastQuadRef.current.p1.x * k + raw.p1.x * (1-k), y: lastQuadRef.current.p1.y * k + raw.p1.y * (1-k) },
