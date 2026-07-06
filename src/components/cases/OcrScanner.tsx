@@ -602,41 +602,58 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               </div>
             )}
 
-            {/* SVG Rectangle Detection Overlay */}
-            {hasCamera && sheetDetected && (() => {
-              const rx = p1.x;
-              const ry = p1.y;
-              const rw = p2.x - p1.x;
-              const rh = p4.y - p1.y;
-              const cs = 4; // corner size in viewBox units
-              return (
-                <svg
-                  style={{
-                    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                    pointerEvents: 'none', zIndex: 4
-                  }}
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                >
-                  {/* Shaded rect fill */}
-                  <rect
-                    x={rx} y={ry} width={rw} height={rh}
-                    fill="rgba(0, 255, 128, 0.10)"
-                    stroke="#00ff80"
-                    strokeWidth="0.9"
-                    style={{ transition: 'all 0.10s ease-out', filter: 'drop-shadow(0 0 3px #00ff80)' }}
-                  />
-                  {/* Corner brackets – top-left */}
-                  <polyline points={`${rx},${ry + cs} ${rx},${ry} ${rx + cs},${ry}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
-                  {/* top-right */}
-                  <polyline points={`${rx + rw - cs},${ry} ${rx + rw},${ry} ${rx + rw},${ry + cs}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
-                  {/* bottom-right */}
-                  <polyline points={`${rx + rw},${ry + rh - cs} ${rx + rw},${ry + rh} ${rx + rw - cs},${ry + rh}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
-                  {/* bottom-left */}
-                  <polyline points={`${rx + cs},${ry + rh} ${rx},${ry + rh} ${rx},${ry + rh - cs}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              );
-            })()}
+            {/* ── SVG Perspective Quad Overlay ── */}
+            {hasCamera && sheetDetected && (
+              <svg
+                style={{
+                  position: 'absolute', top: 0, left: 0,
+                  width: '100%', height: '100%',
+                  pointerEvents: 'none', zIndex: 4,
+                  overflow: 'visible',
+                }}
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <defs>
+                  <filter id="ocr-glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="0.7" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
+
+                {/* Translucent fill */}
+                <polygon
+                  points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+                  fill="rgba(0,212,170,0.16)"
+                  stroke="#00d4aa"
+                  strokeWidth="1.1"
+                  strokeLinejoin="round"
+                  filter="url(#ocr-glow)"
+                  style={{ transition: 'all 0.1s ease-out' }}
+                />
+
+                {/* Corner bracket — top-left */}
+                <polyline
+                  points={`${p1.x + 6},${p1.y}  ${p1.x},${p1.y}  ${p1.x},${p1.y + 6}`}
+                  fill="none" stroke="#00d4aa" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                />
+                {/* Corner bracket — top-right */}
+                <polyline
+                  points={`${p2.x - 6},${p2.y}  ${p2.x},${p2.y}  ${p2.x},${p2.y + 6}`}
+                  fill="none" stroke="#00d4aa" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                />
+                {/* Corner bracket — bottom-right */}
+                <polyline
+                  points={`${p3.x},${p3.y - 6}  ${p3.x},${p3.y}  ${p3.x - 6},${p3.y}`}
+                  fill="none" stroke="#00d4aa" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                />
+                {/* Corner bracket — bottom-left */}
+                <polyline
+                  points={`${p4.x},${p4.y - 6}  ${p4.x},${p4.y}  ${p4.x + 6},${p4.y}`}
+                  fill="none" stroke="#00d4aa" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                />
+              </svg>
+            )}
 
             {/* Status badge */}
             <div

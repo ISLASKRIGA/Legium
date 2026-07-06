@@ -1,50 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 export interface QuadPoints {
-  p1: { x: number; y: number };
-  p2: { x: number; y: number };
-  p3: { x: number; y: number };
-  p4: { x: number; y: number };
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-function refineCorner(brightness: number[], W: number, H: number, estimated: Point): Point {
-  let bestX = estimated.x;
-  let bestY = estimated.y;
-  let maxGrad = -1;
-
-  // Search window of size 10x10 around the estimated point
-  const radius = 5;
-  for (let dy = -radius; dy <= radius; dy++) {
-    for (let dx = -radius; dx <= radius; dx++) {
-      const cx = estimated.x + dx;
-      const cy = estimated.y + dy;
-
-      if (cx > 1 && cx < W - 2 && cy > 1 && cy < H - 2) {
-        // Sobel-like gradients in horizontal and vertical directions
-        const gx = 
-          (brightness[(cy - 1) * W + (cx + 1)] + 2 * brightness[cy * W + (cx + 1)] + brightness[(cy + 1) * W + (cx + 1)]) -
-          (brightness[(cy - 1) * W + (cx - 1)] + 2 * brightness[cy * W + (cx - 1)] + brightness[(cy + 1) * W + (cx - 1)]);
-
-        const gy = 
-          (brightness[(cy + 1) * W + (cx - 1)] + 2 * brightness[(cy + 1) * W + cx] + brightness[(cy + 1) * W + (cx + 1)]) -
-          (brightness[(cy - 1) * W + (cx - 1)] + 2 * brightness[(cy - 1) * W + cx] + brightness[(cy - 1) * W + (cx + 1)]);
-
-        const mag = gx * gx + gy * gy;
-        if (mag > maxGrad) {
-          maxGrad = mag;
-          bestX = cx;
-          bestY = cy;
-        }
-      }
-    }
-  }
-
-  return { x: bestX, y: bestY };
+  p1: { x: number; y: number }; // top-left
+  p2: { x: number; y: number }; // top-right
+  p3: { x: number; y: number }; // bottom-right
+  p4: { x: number; y: number }; // bottom-left
 }
 
 interface UseDocumentDetectionOptions {
@@ -54,25 +14,30 @@ interface UseDocumentDetectionOptions {
 }
 
 /**
- * Detects document boundaries in real-time from a video stream using extreme points detection.
- * Algorithm:
- * 1. Draw video frame to an offscreen canvas at low resolution for performance
- * 2. Convert to grayscale and threshold
- * 3. Find extreme points of the bright quadrilateral region:
- *    - Top-Left: minimizes x + y
- *    - Top-Right: maximizes x - y
- *    - Bottom-Right: maximizes x + y
- *    - Bottom-Left: minimizes x - y
- * 4. Apply a temporal low-pass filter to smooth coordinates and prevent jitter
+ * Detects document boundaries in real-time from a video stream.
+ *
+ * Algorithm (runs on a 160×240 offscreen canvas for performance):
+ * 1. Grayscale + 5×5 box blur to kill text noise
+ * 2. Adaptive threshold → binary mask of bright (paper) region
+ * 3. BFS to find the largest bright connected component
+ * 4. Four perspective corners via diagonal extreme-point trick:
+ *    • Top-Left     → minimize  x + y
+ *    • Top-Right    → maximize  x − y
+ *    • Bottom-Right → maximize  x + y
+ *    • Bottom-Left  → minimize  x − y
+ * 5. Sub-pixel corner refinement with Sobel gradient search
+ * 6. Validity checks (area, aspect ratio)
+ * 7. Exponential temporal smoothing to eliminate jitter
  */
 export function useDocumentDetection({
   videoRef,
   active,
   onDetection,
 }: UseDocumentDetectionOptions) {
-  const animFrameRef = useRef<number | null>(null);
-  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const lastQuadRef = useRef<QuadPoints | null>(null);
+  const animFrameRef   = useRef<number | null>(null);
+  const canvasRef      = useRef<HTMLCanvasElement | null>(null);
+  const lastQuadRef    = useRef<QuadPoints | null>(null);
+  const frameCountRef  = useRef(0);
 
   const detect = useCallback(() => {
     const video = videoRef.current;
@@ -81,200 +46,184 @@ export function useDocumentDetection({
       return;
     }
 
-    // Work on a small 80×120 canvas for performance
-    const W = 80;
-    const H = 120;
-
-    if (!offscreenCanvasRef.current) {
-      offscreenCanvasRef.current = document.createElement('canvas');
-      offscreenCanvasRef.current.width = W;
-      offscreenCanvasRef.current.height = H;
-    }
-
-    const canvas = offscreenCanvasRef.current;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) {
+    // Skip every other frame to halve CPU load
+    if (++frameCountRef.current % 2 !== 0) {
       animFrameRef.current = requestAnimationFrame(detect);
       return;
     }
 
-    ctx.drawImage(video, 0, 0, W, H);
-    const imageData = ctx.getImageData(0, 0, W, H);
-    const data = imageData.data;
+    const W = 160, H = 240;
 
-    // Build a brightness map
-    const brightness: number[] = new Array(W * H);
-    for (let i = 0; i < W * H; i++) {
-      const r = data[i * 4];
-      const g = data[i * 4 + 1];
-      const b = data[i * 4 + 2];
-      brightness[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement('canvas');
+      canvasRef.current.width  = W;
+      canvasRef.current.height = H;
     }
 
-    // Noise Reduction: Apply 5x5 box blur to completely filter out text lines, shadows, and keyboard keycaps
-    const blurred: number[] = new Array(W * H);
-    let minB = 255;
-    let maxB = 0;
+    const canvas = canvasRef.current;
+    const ctx    = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) { animFrameRef.current = requestAnimationFrame(detect); return; }
+
+    ctx.drawImage(video, 0, 0, W, H);
+    const { data } = ctx.getImageData(0, 0, W, H);
+
+    // ── 1. Grayscale ──────────────────────────────────────────────────────────
+    const gray = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) {
+      gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+    }
+
+    // ── 2. 5×5 box blur + find global min/max ─────────────────────────────────
+    const blurred = new Float32Array(W * H);
+    let gMin = 255, gMax = 0;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        let sum = 0;
-        let count = 0;
+        let sum = 0, cnt = 0;
         for (let dy = -2; dy <= 2; dy++) {
           for (let dx = -2; dx <= 2; dx++) {
-            const ny = y + dy;
-            const nx = x + dx;
-            if (ny >= 0 && ny < H && nx >= 0 && nx < W) {
-              sum += brightness[ny * W + nx];
-              count++;
-            }
+            const ny = y + dy, nx = x + dx;
+            if (ny >= 0 && ny < H && nx >= 0 && nx < W) { sum += gray[ny * W + nx]; cnt++; }
           }
         }
-        const val = sum / count;
-        blurred[y * W + x] = val;
-        if (val < minB) minB = val;
-        if (val > maxB) maxB = val;
+        const v = sum / cnt;
+        blurred[y * W + x] = v;
+        if (v < gMin) gMin = v;
+        if (v > gMax) gMax = v;
       }
     }
 
-    // Dynamic Threshold: position at 56% between min and max brightness
-    const threshold = minB + (maxB - minB) * 0.56;
+    // ── 3. Adaptive threshold ─────────────────────────────────────────────────
+    const thresh = gMin + (gMax - gMin) * 0.52;
 
-    // Find connected components of pixels above threshold
+    // ── 4. BFS → largest bright component ────────────────────────────────────
     const visited = new Uint8Array(W * H);
-    let bestComponent: { x: number; y: number }[] = [];
+    let bestComp: { x: number; y: number }[] = [];
     let bestScore = -1;
 
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const idx = y * W + x;
-        if (blurred[idx] > threshold && !visited[idx]) {
-          const comp: { x: number; y: number }[] = [];
-          const queue: number[] = [idx];
-          visited[idx] = 1;
+        if (blurred[idx] <= thresh || visited[idx]) continue;
 
-          let sumX = 0;
-          let sumY = 0;
+        const comp: { x: number; y: number }[] = [];
+        const queue = [idx];
+        visited[idx] = 1;
+        let sumX = 0, sumY = 0, head = 0;
 
-          let qHead = 0;
-          while (qHead < queue.length) {
-            const curr = queue[qHead++];
-            const cx = curr % W;
-            const cy = Math.floor(curr / W);
-            comp.push({ x: cx, y: cy });
-            sumX += cx;
-            sumY += cy;
+        while (head < queue.length) {
+          const cur = queue[head++];
+          const cx = cur % W, cy = (cur / W) | 0;
+          comp.push({ x: cx, y: cy });
+          sumX += cx; sumY += cy;
 
-            const neighbors = [
-              { x: cx - 1, y: cy },
-              { x: cx + 1, y: cy },
-              { x: cx, y: cy - 1 },
-              { x: cx, y: cy + 1 }
-            ];
-
-            for (const n of neighbors) {
-              if (n.x >= 0 && n.x < W && n.y >= 0 && n.y < H) {
-                const nIdx = n.y * W + n.x;
-                if (blurred[nIdx] > threshold && !visited[nIdx]) {
-                  visited[nIdx] = 1;
-                  queue.push(nIdx);
-                }
-              }
+          const neighbors = [cur - 1, cur + 1, cur - W, cur + W];
+          for (const ni of neighbors) {
+            const nx = ni % W, ny = (ni / W) | 0;
+            if (ni >= 0 && ni < W * H && nx >= 0 && nx < W && ny >= 0 && ny < H
+                && blurred[ni] > thresh && !visited[ni]) {
+              visited[ni] = 1;
+              queue.push(ni);
             }
           }
+        }
 
-          const area = comp.length;
-          const centerX = sumX / area;
-          const centerY = sumY / area;
-          const distToFrameCenter = Math.hypot(centerX - W / 2, centerY - H / 2);
-          
-          const score = area / (1.0 + distToFrameCenter * 0.22);
-          if (score > bestScore) {
-            bestScore = score;
-            bestComponent = comp;
+        const area = comp.length;
+        const distToCenter = Math.hypot(sumX / area - W / 2, sumY / area - H / 2);
+        const score = area / (1 + distToCenter * 0.12);
+        if (score > bestScore) { bestScore = score; bestComp = comp; }
+      }
+    }
+
+    // ── 5. Four perspective corners (diagonal extremes) ───────────────────────
+    let minSum = Infinity, maxSum = -Infinity;
+    let minDiff = Infinity, maxDiff = -Infinity;
+
+    // Default (full-frame fallback)
+    let p1 = { x: W * 0.12, y: H * 0.08 };
+    let p2 = { x: W * 0.88, y: H * 0.08 };
+    let p3 = { x: W * 0.88, y: H * 0.92 };
+    let p4 = { x: W * 0.12, y: H * 0.92 };
+
+    for (const pt of bestComp) {
+      const s = pt.x + pt.y, d = pt.x - pt.y;
+      if (s < minSum) { minSum = s; p1 = pt; }
+      if (s > maxSum) { maxSum = s; p3 = pt; }
+      if (d > maxDiff) { maxDiff = d; p2 = pt; }
+      if (d < minDiff) { minDiff = d; p4 = pt; }
+    }
+
+    // ── 6. Sobel corner refinement ────────────────────────────────────────────
+    const refine = (pt: { x: number; y: number }, radius = 8) => {
+      let best = pt, maxMag = -1;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const cx = (pt.x + dx) | 0, cy = (pt.y + dy) | 0;
+          if (cx > 1 && cx < W - 2 && cy > 1 && cy < H - 2) {
+            const gx =
+              (gray[(cy-1)*W+(cx+1)] + 2*gray[cy*W+(cx+1)] + gray[(cy+1)*W+(cx+1)]) -
+              (gray[(cy-1)*W+(cx-1)] + 2*gray[cy*W+(cx-1)] + gray[(cy+1)*W+(cx-1)]);
+            const gy =
+              (gray[(cy+1)*W+(cx-1)] + 2*gray[(cy+1)*W+cx] + gray[(cy+1)*W+(cx+1)]) -
+              (gray[(cy-1)*W+(cx-1)] + 2*gray[(cy-1)*W+cx] + gray[(cy-1)*W+(cx+1)]);
+            const mag = gx * gx + gy * gy;
+            if (mag > maxMag) { maxMag = mag; best = { x: cx, y: cy }; }
           }
         }
       }
-    }
+      return best;
+    };
 
-    // Find bounding rectangle of the largest bright component
-    let minX = W, maxX = 0, minY = H, maxY = 0;
-    const brightCount = bestComponent.length;
+    p1 = refine(p1);
+    p2 = refine(p2);
+    p3 = refine(p3);
+    p4 = refine(p4);
 
-    if (bestComponent.length > 0) {
-      for (const pt of bestComponent) {
-        if (pt.x < minX) minX = pt.x;
-        if (pt.x > maxX) maxX = pt.x;
-        if (pt.y < minY) minY = pt.y;
-        if (pt.y > maxY) maxY = pt.y;
-      }
-    } else {
-      // fallback defaults
-      minX = 12; maxX = 68; minY = 12; maxY = 108;
-    }
+    // ── 7. Validity check ─────────────────────────────────────────────────────
+    const brightCount = bestComp.length;
+    const frameArea   = W * H;
 
-    const docW = maxX - minX;
-    const docH = maxY - minY;
-    const docArea = docW * docH;
-    const frameArea = W * H;
+    // Bounding box of the quad
+    const bx1 = Math.min(p1.x, p4.x), bx2 = Math.max(p2.x, p3.x);
+    const by1 = Math.min(p1.y, p2.y), by2 = Math.max(p3.y, p4.y);
+    const bw   = bx2 - bx1, bh = by2 - by1;
+    const bboxAspect = bw / Math.max(1, bh);
 
-    // Aspect ratio check: document should be roughly paper-shaped (0.5 – 2.0)
-    const aspectRatio = docW / Math.max(1, docH);
-    const confidence = Math.min(1, brightCount / (frameArea * 0.10));
+    const confidence = Math.min(1, brightCount / (frameArea * 0.09));
 
     const isValid =
-      docArea > frameArea * 0.10 &&
-      docArea < frameArea * 0.97 &&
-      docW > W * 0.20 &&
-      docH > H * 0.20 &&
-      aspectRatio > 0.4 &&
-      aspectRatio < 2.2;
+      brightCount > frameArea * 0.07 &&
+      brightCount < frameArea * 0.97 &&
+      bw > W * 0.18 && bh > H * 0.18 &&
+      bboxAspect > 0.3 && bboxAspect < 3.0;
 
     if (isValid) {
-      // Small inward padding so the green rect doesn't hug content edges
-      const padX = docW * 0.012;
-      const padY = docH * 0.012;
+      const toP = (pt: { x: number; y: number }) => ({
+        x: (pt.x / W) * 100,
+        y: (pt.y / H) * 100,
+      });
 
-      const rx1 = ((minX + padX) / W) * 100;
-      const ry1 = ((minY + padY) / H) * 100;
-      const rx2 = ((maxX - padX) / W) * 100;
-      const ry2 = ((maxY - padY) / H) * 100;
-
-      // Build axis-aligned rectangle QuadPoints
-      const rawQuad: QuadPoints = {
-        p1: { x: rx1, y: ry1 }, // top-left
-        p2: { x: rx2, y: ry1 }, // top-right
-        p3: { x: rx2, y: ry2 }, // bottom-right
-        p4: { x: rx1, y: ry2 }, // bottom-left
+      const raw: QuadPoints = {
+        p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4),
       };
 
-      // Temporal smoothing low-pass filter
-      let smoothedQuad: QuadPoints;
-      if (lastQuadRef.current) {
-        const last = lastQuadRef.current;
-        const k = 0.60; // Smoothing weight
-        smoothedQuad = {
-          p1: { x: last.p1.x * k + rawQuad.p1.x * (1 - k), y: last.p1.y * k + rawQuad.p1.y * (1 - k) },
-          p2: { x: last.p2.x * k + rawQuad.p2.x * (1 - k), y: last.p2.y * k + rawQuad.p2.y * (1 - k) },
-          p3: { x: last.p3.x * k + rawQuad.p3.x * (1 - k), y: last.p3.y * k + rawQuad.p3.y * (1 - k) },
-          p4: { x: last.p4.x * k + rawQuad.p4.x * (1 - k), y: last.p4.y * k + rawQuad.p4.y * (1 - k) },
-        };
-      } else {
-        smoothedQuad = rawQuad;
-      }
+      // Exponential moving average
+      const k = 0.55;
+      const quad: QuadPoints = lastQuadRef.current
+        ? {
+            p1: { x: lastQuadRef.current.p1.x * k + raw.p1.x * (1-k), y: lastQuadRef.current.p1.y * k + raw.p1.y * (1-k) },
+            p2: { x: lastQuadRef.current.p2.x * k + raw.p2.x * (1-k), y: lastQuadRef.current.p2.y * k + raw.p2.y * (1-k) },
+            p3: { x: lastQuadRef.current.p3.x * k + raw.p3.x * (1-k), y: lastQuadRef.current.p3.y * k + raw.p3.y * (1-k) },
+            p4: { x: lastQuadRef.current.p4.x * k + raw.p4.x * (1-k), y: lastQuadRef.current.p4.y * k + raw.p4.y * (1-k) },
+          }
+        : raw;
 
-      lastQuadRef.current = smoothedQuad;
-      onDetection(smoothedQuad, confidence);
+      lastQuadRef.current = quad;
+      onDetection(quad, confidence);
     } else {
-      // No valid document found — emit zero confidence and reset
       lastQuadRef.current = null;
       onDetection(
-        {
-          p1: { x: 12, y: 10 },
-          p2: { x: 88, y: 10 },
-          p3: { x: 88, y: 90 },
-          p4: { x: 12, y: 90 },
-        },
-        0
+        { p1: { x: 12, y: 8 }, p2: { x: 88, y: 8 }, p3: { x: 88, y: 92 }, p4: { x: 12, y: 92 } },
+        0,
       );
     }
 
@@ -283,10 +232,9 @@ export function useDocumentDetection({
 
   useEffect(() => {
     if (active) {
-      animFrameRef.current = requestAnimationFrame(detect);
+      frameCountRef.current = 0;
+      animFrameRef.current  = requestAnimationFrame(detect);
     }
-    return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    };
+    return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   }, [active, detect]);
 }
