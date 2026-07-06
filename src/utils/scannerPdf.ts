@@ -285,39 +285,63 @@ export function detectDocumentEdges(img: HTMLImageElement): QuadPoints {
   }
 
   const avg = brightness.reduce((a, b) => a + b, 0) / brightness.length;
-  const threshold = Math.min(avg * 1.15, 220);
+  const threshold = Math.min(avg * 1.18, 215);
 
-  let minX = W, maxX = 0, minY = H, maxY = 0;
+  let minSum = W + H, maxSum = 0;
+  let minDiff = W + H, maxDiff = -W - H;
+  let p1 = { x: 15, y: 10 };
+  let p2 = { x: 85, y: 10 };
+  let p3 = { x: 85, y: 90 };
+  let p4 = { x: 15, y: 90 };
   let brightCount = 0;
 
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       if (brightness[y * W + x] > threshold) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+        const sum = x + y;
+        const diff = x - y;
+
+        if (sum < minSum) {
+          minSum = sum;
+          p1 = { x, y };
+        }
+        if (sum > maxSum) {
+          maxSum = sum;
+          p3 = { x, y };
+        }
+        if (diff > maxDiff) {
+          maxDiff = diff;
+          p2 = { x, y };
+        }
+        if (diff < minDiff) {
+          minDiff = diff;
+          p4 = { x, y };
+        }
         brightCount++;
       }
     }
   }
 
+  const minX = Math.min(p1.x, p4.x);
+  const maxX = Math.max(p2.x, p3.x);
+  const minY = Math.min(p1.y, p2.y);
+  const maxY = Math.max(p3.y, p4.y);
   const docArea = (maxX - minX) * (maxY - minY);
   const frameArea = W * H;
   const isValid =
-    docArea > frameArea * 0.1 &&
-    docArea < frameArea * 0.97 &&
+    docArea > frameArea * 0.08 &&
+    docArea < frameArea * 0.98 &&
     (maxX - minX) > W * 0.15 &&
     (maxY - minY) > H * 0.15;
 
   if (isValid) {
-    const padX = (maxX - minX) * 0.03;
-    const padY = (maxY - minY) * 0.03;
+    const padX = (maxX - minX) * 0.015;
+    const padY = (maxY - minY) * 0.015;
     return {
-      p1: { x: ((minX + padX) / W) * 100, y: ((minY + padY) / H) * 100 },
-      p2: { x: ((maxX - padX) / W) * 100, y: ((minY + padY) / H) * 100 },
-      p3: { x: ((maxX - padX) / W) * 100, y: ((maxY - padY) / H) * 100 },
-      p4: { x: ((minX + padX) / W) * 100, y: ((maxY - padY) / H) * 100 }
+      p1: { x: ((p1.x + padX) / W) * 100, y: ((p1.y + padY) / H) * 100 },
+      p2: { x: ((p2.x - padX) / W) * 100, y: ((p2.y + padY) / H) * 100 },
+      p3: { x: ((p3.x - padX) / W) * 100, y: ((p3.y - padY) / H) * 100 },
+      p4: { x: ((p4.x + padX) / W) * 100, y: ((p4.y - padY) / H) * 100 }
     };
   }
 

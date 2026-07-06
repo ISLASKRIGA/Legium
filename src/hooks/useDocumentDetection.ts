@@ -14,14 +14,16 @@ interface UseDocumentDetectionOptions {
 }
 
 /**
- * Detects document boundaries in real-time from a video stream using canvas pixel analysis.
+ * Detects document boundaries in real-time from a video stream using extreme points detection.
  * Algorithm:
  * 1. Draw video frame to an offscreen canvas at low resolution for performance
- * 2. Convert to grayscale
- * 3. Find the bounding region of bright pixels (document = white/light on darker background)
- * 4. Return the 4 corners as percentages of video dimensions
- *
- * Works best with: white/light documents on darker surfaces (table, desk, etc.)
+ * 2. Convert to grayscale and threshold
+ * 3. Find extreme points of the bright quadrilateral region:
+ *    - Top-Left: minimizes x + y
+ *    - Top-Right: maximizes x - y
+ *    - Bottom-Right: maximizes x + y
+ *    - Bottom-Left: minimizes x - y
+ * 4. Apply a temporal low-pass filter to smooth coordinates and prevent jitter
  */
 export function useDocumentDetection({
   videoRef,
@@ -30,6 +32,7 @@ export function useDocumentDetection({
 }: UseDocumentDetectionOptions) {
   const animFrameRef = useRef<number | null>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastQuadRef = useRef<QuadPoints | null>(null);
 
   const detect = useCallback(() => {
     const video = videoRef.current;
@@ -70,56 +73,94 @@ export function useDocumentDetection({
 
     // Find average brightness to set adaptive threshold
     const avg = brightness.reduce((a, b) => a + b, 0) / brightness.length;
-    const threshold = Math.min(avg * 1.15, 220); // document brighter than background
+    const threshold = Math.min(avg * 1.18, 215);
 
-    // Scan for bounding box of bright region (the document)
-    let minX = W, maxX = 0, minY = H, maxY = 0;
+    // Extreme points for tilted quad
+    let minSum = W + H, maxSum = 0;
+    let minDiff = W + H, maxDiff = -W - H;
+    let p1 = { x: 15, y: 10 };
+    let p2 = { x: 85, y: 10 };
+    let p3 = { x: 85, y: 90 };
+    let p4 = { x: 15, y: 90 };
     let brightCount = 0;
 
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         if (brightness[y * W + x] > threshold) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
+          const sum = x + y;
+          const diff = x - y;
+
+          if (sum < minSum) {
+            minSum = sum;
+            p1 = { x, y };
+          }
+          if (sum > maxSum) {
+            maxSum = sum;
+            p3 = { x, y };
+          }
+          if (diff > maxDiff) {
+            maxDiff = diff;
+            p2 = { x, y };
+          }
+          if (diff < minDiff) {
+            minDiff = diff;
+            p4 = { x, y };
+          }
           brightCount++;
         }
       }
     }
 
+    const minX = Math.min(p1.x, p4.x);
+    const maxX = Math.max(p2.x, p3.x);
+    const minY = Math.min(p1.y, p2.y);
+    const maxY = Math.max(p3.y, p4.y);
     const docArea = (maxX - minX) * (maxY - minY);
     const frameArea = W * H;
-    const confidence = Math.min(1, brightCount / (frameArea * 0.15));
+    const confidence = Math.min(1, brightCount / (frameArea * 0.12));
 
-    // Only report if the detected region is large enough to be a document
-    // (at least 15% of frame area, not the whole frame)
     const isValid =
-      docArea > frameArea * 0.1 &&
-      docArea < frameArea * 0.97 &&
+      docArea > frameArea * 0.08 &&
+      docArea < frameArea * 0.98 &&
       (maxX - minX) > W * 0.15 &&
       (maxY - minY) > H * 0.15;
 
     if (isValid) {
-      // Add some padding inward to hug the document edges
-      const padX = (maxX - minX) * 0.03;
-      const padY = (maxY - minY) * 0.03;
+      const padX = (maxX - minX) * 0.015;
+      const padY = (maxY - minY) * 0.015;
 
-      const quad: QuadPoints = {
-        p1: { x: ((minX + padX) / W) * 100, y: ((minY + padY) / H) * 100 },
-        p2: { x: ((maxX - padX) / W) * 100, y: ((minY + padY) / H) * 100 },
-        p3: { x: ((maxX - padX) / W) * 100, y: ((maxY - padY) / H) * 100 },
-        p4: { x: ((minX + padX) / W) * 100, y: ((maxY - padY) / H) * 100 },
+      const rawQuad: QuadPoints = {
+        p1: { x: ((p1.x + padX) / W) * 100, y: ((p1.y + padY) / H) * 100 },
+        p2: { x: ((p2.x - padX) / W) * 100, y: ((p2.y + padY) / H) * 100 },
+        p3: { x: ((p3.x - padX) / W) * 100, y: ((p3.y - padY) / H) * 100 },
+        p4: { x: ((p4.x + padX) / W) * 100, y: ((p4.y - padY) / H) * 100 },
       };
-      onDetection(quad, confidence);
+
+      // Temporal smoothing low-pass filter
+      let smoothedQuad: QuadPoints;
+      if (lastQuadRef.current) {
+        const last = lastQuadRef.current;
+        const k = 0.65; // Smoothing weight
+        smoothedQuad = {
+          p1: { x: last.p1.x * k + rawQuad.p1.x * (1 - k), y: last.p1.y * k + rawQuad.p1.y * (1 - k) },
+          p2: { x: last.p2.x * k + rawQuad.p2.x * (1 - k), y: last.p2.y * k + rawQuad.p2.y * (1 - k) },
+          p3: { x: last.p3.x * k + rawQuad.p3.x * (1 - k), y: last.p3.y * k + rawQuad.p3.y * (1 - k) },
+          p4: { x: last.p4.x * k + rawQuad.p4.x * (1 - k), y: last.p4.y * k + rawQuad.p4.y * (1 - k) },
+        };
+      } else {
+        smoothedQuad = rawQuad;
+      }
+
+      lastQuadRef.current = smoothedQuad;
+      onDetection(smoothedQuad, confidence);
     } else {
-      // No clear document — return default wide frame
+      // Default crop frame
       onDetection(
         {
-          p1: { x: 15, y: 10 },
-          p2: { x: 85, y: 10 },
-          p3: { x: 83, y: 90 },
-          p4: { x: 17, y: 90 },
+          p1: { x: 12, y: 10 },
+          p2: { x: 88, y: 10 },
+          p3: { x: 86, y: 90 },
+          p4: { x: 14, y: 90 },
         },
         0
       );
