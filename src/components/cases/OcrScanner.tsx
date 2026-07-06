@@ -13,7 +13,22 @@ interface OcrScannerProps {
   onClose: () => void;
 }
 
-type FilterType = 'original' | 'magic' | 'bw';
+type FilterType = 'original' | 'lighten' | 'magic' | 'bw' | 'grayscale';
+
+const getFilterStyle = (filter: FilterType): string => {
+  switch (filter) {
+    case 'lighten':
+      return 'brightness(1.15) contrast(1.1)';
+    case 'magic':
+      return 'contrast(1.22) brightness(1.08) saturate(1.1)';
+    case 'bw':
+      return 'grayscale(1) contrast(1.4) brightness(1.1)';
+    case 'grayscale':
+      return 'grayscale(1)';
+    default:
+      return 'none';
+  }
+};
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
   const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
@@ -827,109 +842,121 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'aligning' && originalImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '320px', gap: '20px', background: '#1c1c1e', flexGrow: 1 }}>
-          <h4 style={{ fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <RefreshCw size={18} className="spinning" style={{ color: '#00ff80' }} /> Alineando y Rectificando
-          </h4>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          {/* Blurry Background */}
+          <img 
+            src={originalImage} 
+            alt="Scan aligning background"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(16px) brightness(0.35)', zIndex: 1 }} 
+          />
           
-          <div 
-            style={{ 
-              position: 'relative', 
-              width: '220px', 
-              height: '300px', 
-              borderRadius: '10px', 
-              overflow: 'hidden', 
-              boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
-              background: '#121214'
-            }}
-          >
-            <img 
-              src={originalImage} 
-              alt="Scan aligning"
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover',
-                opacity: 0.65
-              }} 
-            />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '22px', zIndex: 2, width: '100%' }}>
+            <h4 style={{ fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+              <RefreshCw size={18} className="spinning" style={{ color: '#00ff80' }} /> Alineando y Rectificando
+            </h4>
             
-            {/* Outline overlay */}
-            <svg 
+            <div 
               style={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
-                width: '100%', 
-                height: '100%', 
-                pointerEvents: 'none'
+                position: 'relative', 
+                width: '78%', 
+                height: '52vh', 
+                borderRadius: '12px', 
+                overflow: 'hidden', 
+                boxShadow: '0 20px 45px rgba(0,0,0,0.65)',
+                background: '#121214'
               }}
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
             >
-              <polygon
-                points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                fill="rgba(0, 255, 128, 0.08)"
-                stroke="#00ff80"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
+              <img 
+                src={originalImage} 
+                alt="Scan aligning"
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'contain'
+                }} 
+              />
+              
+              {/* Outline overlay */}
+              <svg 
+                style={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  width: '100%', 
+                  height: '100%', 
+                  pointerEvents: 'none'
+                }}
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <polygon
+                  points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+                  fill="rgba(0, 255, 128, 0.08)"
+                  stroke="#00ff80"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  style={{
+                    filter: 'drop-shadow(0 0 4px #00ff80)',
+                    animation: 'warpPulse 1.2s ease-in-out infinite'
+                  }}
+                />
+              </svg>
+
+              {/* Sweep laser line */}
+              <div 
                 style={{
-                  filter: 'drop-shadow(0 0 4px #00ff80)',
-                  animation: 'warpPulse 1.2s ease-in-out infinite'
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '4px',
+                  background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
+                  boxShadow: '0 0 12px #00ff80, 0 0 4px #007aff',
+                  animation: 'sweepLaser 1.2s ease-in-out infinite',
+                  zIndex: 5
                 }}
               />
-            </svg>
-
-            {/* Sweep laser line */}
-            <div 
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '3px',
-                background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
-                boxShadow: '0 0 10px #00ff80, 0 0 3px #007aff',
-                animation: 'sweepLaser 1.2s ease-in-out infinite',
-                zIndex: 5
-              }}
-            />
+            </div>
+            
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', margin: 0, fontWeight: 500, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+              Procesando alineación y corrigiendo perspectiva...
+            </p>
           </div>
-
-          <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>
-            Procesando alineación y corrigiendo perspectiva...
-          </p>
         </div>
       )}
 
       {step === 'beautify' && capturedImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#1c1c1e', padding: '16px' }}>
-          <span className="health-label" style={{ textAlign: 'center', color: '#fff' }}>
-            Realce Digital (CamScanner) e Inicio de OCR
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#000', padding: 0, position: 'relative' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px', color: '#fff', alignItems: 'center', background: 'rgba(0,0,0,0.8)', height: '54px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <button onClick={() => { setStep('preview-full'); }} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', outline: 'none' }}>
+              <X size={24} />
+            </button>
+            <span style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '0.3px' }}>Ajuste de Filtro y PDF</span>
+            <div style={{ width: '24px' }} />
+          </div>
 
+          {/* Central Image Container */}
           <div 
             style={{ 
-              height: '240px', 
+              flexGrow: 1,
               width: '100%', 
-              background: '#121214', 
-              borderRadius: '12px', 
-              overflow: 'hidden', 
+              background: '#0a0a0c', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
-              boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.5)',
-              position: 'relative'
+              position: 'relative',
+              padding: '20px'
             }}
           >
             <div 
               style={{ 
                 position: 'relative', 
-                maxWidth: '90%', 
-                maxHeight: '90%', 
-                overflow: 'hidden',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
-                borderRadius: '4px' 
+                maxWidth: '100%', 
+                maxHeight: '100%', 
+                boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
+                borderRadius: '4px',
+                overflow: 'hidden'
               }}
             >
               <img 
@@ -937,130 +964,197 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 alt="Enhanced Preview" 
                 style={{ 
                   maxWidth: '100%', 
-                  maxHeight: '100%', 
+                  maxHeight: '52vh', 
                   display: 'block',
                   filter: getFilterStyle(activeFilter),
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.25s ease'
                 }} 
               />
             </div>
+          </div>
+
+          {/* Bottom control panel */}
+          <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(10,10,12,0.95)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingBottom: '24px' }}>
             
-            <div 
-              style={{ 
-                position: 'absolute', 
-                top: '10px', 
-                right: '10px', 
-                background: 'rgba(0,122,255,0.85)', 
-                color: '#fff', 
-                fontSize: '10px', 
-                fontWeight: 700, 
-                padding: '3px 8px', 
-                borderRadius: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              <Wand2 size={10} /> Realce Automático Activo
+            {/* Horizontal Filter Picker list */}
+            <div style={{ overflowX: 'auto', padding: '14px 10px', display: 'flex', justifyContent: 'center', gap: '14px', whiteSpace: 'nowrap', userSelect: 'none', background: 'rgba(0,0,0,0.3)' }}>
+              <button
+                onClick={() => setActiveFilter('original')}
+                style={{ 
+                  background: activeFilter === 'original' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: activeFilter === 'original' ? '#00ff80' : 'rgba(255,255,255,0.6)',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              >
+                <span>Sin Manusc.</span>
+              </button>
+
+              <button
+                onClick={() => setActiveFilter('lighten')}
+                style={{ 
+                  background: activeFilter === 'lighten' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: activeFilter === 'lighten' ? '#00ff80' : 'rgba(255,255,255,0.6)',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              >
+                <span>Aclarar</span>
+              </button>
+
+              <button
+                onClick={() => setActiveFilter('magic')}
+                style={{ 
+                  background: activeFilter === 'magic' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: activeFilter === 'magic' ? '#00ff80' : 'rgba(255,255,255,0.6)',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              >
+                <span>Mejorar</span>
+              </button>
+
+              <button
+                onClick={() => setActiveFilter('bw')}
+                style={{ 
+                  background: activeFilter === 'bw' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: activeFilter === 'bw' ? '#00ff80' : 'rgba(255,255,255,0.6)',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              >
+                <span>Eco</span>
+              </button>
+
+              <button
+                onClick={() => setActiveFilter('grayscale')}
+                style={{ 
+                  background: activeFilter === 'grayscale' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: activeFilter === 'grayscale' ? '#00ff80' : 'rgba(255,255,255,0.6)',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              >
+                <span>Grises</span>
+              </button>
             </div>
-          </div>
 
-          {/* CamScanner Filter select list */}
-          <div style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <button
-              onClick={() => setActiveFilter('original')}
-              style={{ 
-                background: activeFilter === 'original' ? '#fff' : 'transparent',
-                border: activeFilter === 'original' ? '1px solid rgba(0,0,0,0.1)' : 'none',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '11px',
-                color: activeFilter === 'original' ? '#111' : 'rgba(255,255,255,0.6)',
-                fontWeight: activeFilter === 'original' ? 600 : 400
-              }}
-            >
-              <span style={{ fontSize: '14px' }}>📷</span>
-              Original
-            </button>
+            {/* Document PDF filename entry */}
+            <div style={{ padding: '8px 24px 0 24px' }}>
+              <input 
+                type="text" 
+                value={fileName} 
+                onChange={(e) => setFileName(e.target.value)} 
+                placeholder="Nombre del PDF"
+                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', textAlign: 'center' }}
+              />
+            </div>
 
-            <button
-              onClick={() => setActiveFilter('magic')}
-              style={{ 
-                background: activeFilter === 'magic' ? 'var(--primary-blue)' : 'transparent',
-                border: 'none',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '11px',
-                color: activeFilter === 'magic' ? '#fff' : 'rgba(255,255,255,0.6)',
-                fontWeight: activeFilter === 'magic' ? 600 : 400
-              }}
-            >
-              <Sparkles size={12} style={{ color: activeFilter === 'magic' ? '#fff' : 'var(--primary-gold)' }} />
-              Realce Mágico
-            </button>
+            {/* Bottom action panel - matches CamScanner example */}
+            <div className="scanner-controls" style={{ padding: '14px 28px 4px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              
+              <button 
+                onClick={() => {
+                  setStep('capture');
+                  startCamera();
+                }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
+              >
+                <RotateCcw size={18} />
+                <span>Re-tomar</span>
+              </button>
 
-            <button
-              onClick={() => setActiveFilter('bw')}
-              style={{ 
-                background: activeFilter === 'bw' ? '#fff' : 'transparent',
-                border: activeFilter === 'bw' ? '1px solid rgba(0,0,0,0.1)' : 'none',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '11px',
-                color: activeFilter === 'bw' ? '#111' : 'rgba(255,255,255,0.6)',
-                fontWeight: activeFilter === 'bw' ? 600 : 400
-              }}
-            >
-              <span style={{ fontSize: '14px' }}>🏁</span>
-              B y N
-            </button>
-          </div>
+              <button 
+                onClick={() => rotateImage('left')}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
+              >
+                <span style={{ fontSize: '16px', lineHeight: 1 }}>↩️</span>
+                <span>Izquierda</span>
+              </button>
 
-          <div className="form-group" style={{ margin: '0 4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#fff' }}>Nombre del Documento PDF</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              value={fileName} 
-              onChange={(e) => setFileName(e.target.value)} 
-              placeholder="Ej. Demanda_Juan.pdf"
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
-            />
-          </div>
+              <button 
+                onClick={() => setStep('preview-full')}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
+              >
+                <span style={{ fontSize: '16px', lineHeight: 1 }}>📐</span>
+                <span>Recortar</span>
+              </button>
 
-          <div className="scanner-controls" style={{ gap: '12px' }}>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => {
-                setStep('preview-full');
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff' }}
-            >
-              Ajustar Esquinas
-            </button>
-            
-            <button 
-              className="btn btn-primary" 
-              onClick={startOcrProcessing}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
-            >
-              Convertir a PDF <ChevronRight size={16} />
-            </button>
+              <button 
+                onClick={startOcrProcessing}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
+              >
+                <FileText size={18} style={{ color: 'var(--primary-gold)' }} />
+                <span>OCR</span>
+              </button>
+
+              <button 
+                onClick={startOcrProcessing}
+                style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  borderRadius: '50%', 
+                  background: '#00ff80', 
+                  color: '#000', 
+                  border: 'none', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,255,128,0.3)',
+                  padding: 0,
+                  outline: 'none'
+                }}
+              >
+                <Check size={22} style={{ strokeWidth: 3 }} />
+              </button>
+
+            </div>
           </div>
         </div>
       )}
