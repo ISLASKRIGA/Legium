@@ -13,6 +13,7 @@ interface ClientDashboardProps {
   onAddCase: (newCase: Case) => void;
   onAddLog: (action: string, status: 'Success' | 'Warning' | 'Denied') => void;
   onShowToast: (title: string, message: string, type: 'success' | 'warning' | 'danger') => void;
+  onOpenScanner?: () => void;
 }
 
 export const ClientDashboard: React.FC<ClientDashboardProps> = ({
@@ -22,7 +23,8 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
   searchQuery,
   onAddCase,
   onAddLog,
-  onShowToast
+  onShowToast,
+  onOpenScanner
 }) => {
   const [activeModal, setActiveModal] = useState<'none' | 'scanner' | 'pdf'>('none');
   const [scannerSheetOpen, setScannerSheetOpen] = useState(false);
@@ -126,7 +128,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
         <div style={{ display: 'flex', gap: '10px' }}>
           <GlassButton 
             className="btn-primary" 
-            onClick={() => setActiveModal('scanner')}
+            onClick={() => onOpenScanner ? onOpenScanner() : setActiveModal('scanner')}
           >
             <Camera size={16} /> Escanear Nuevo Documento
           </GlassButton>

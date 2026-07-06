@@ -3,6 +3,10 @@ import { Navbar } from './components/shared/Navbar';
 import { Topbar } from './components/shared/Topbar';
 import { LoginView } from './components/shared/LoginView';
 import { ToastContainer, ToastMessage } from './components/shared/Toast';
+import { OcrScanner } from './components/cases/OcrScanner';
+import { DocumentScanner } from './components/cases/DocumentScanner';
+import { LayoutDashboard, Briefcase, Users, Camera, LogOut } from 'lucide-react';
+
 
 import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
@@ -42,6 +46,7 @@ export const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [globalScannerOpen, setGlobalScannerOpen] = useState(false);
 
   // Hash URL Sync
   useEffect(() => {
@@ -367,6 +372,7 @@ export const App: React.FC = () => {
                   onAddCase={handleAddCase}
                   onAddLog={addLogEntry}
                   onShowToast={showToast}
+                  onOpenScanner={() => setGlobalScannerOpen(true)}
                 />
               ) : (
                 <DashboardView
@@ -440,6 +446,132 @@ export const App: React.FC = () => {
         toasts={toasts} 
         onClose={handleCloseToast} 
       />
+
+      {/* Global Scanner Modal */}
+      {globalScannerOpen && (
+        <div className="modal active" style={{ zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="modal-content" style={{ maxWidth: '480px', width: '100%', height: '82vh', padding: 0, overflow: 'hidden', background: '#1c1c1e', display: 'flex', flexDirection: 'column', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', alignItems: 'center', background: '#000', color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: '15px' }}>
+                {currentUser.role === 'Cliente' ? 'Escanear Escrito Judicial' : 'Escanear Documento de Caso'}
+              </span>
+              <button 
+                onClick={() => setGlobalScannerOpen(false)} 
+                style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ flexGrow: 1, height: 'calc(100% - 50px)', overflow: 'hidden' }}>
+              {currentUser.role === 'Cliente' ? (
+                <OcrScanner
+                  currentUser={currentUser}
+                  onOcrComplete={(newCase, newDoc, fileBlob) => {
+                    handleAddCase(newCase);
+                    setGlobalScannerOpen(false);
+                  }}
+                  onClose={() => setGlobalScannerOpen(false)}
+                />
+              ) : (
+                <DocumentScanner
+                  onScanComplete={async (newDoc, fileBlob) => {
+                    if (activeCaseId) {
+                      const targetCase = cases.find(c => c.id === activeCaseId);
+                      if (targetCase) {
+                        const updatedCase = {
+                          ...targetCase,
+                          documents: [...targetCase.documents, newDoc]
+                        };
+                        handleUpdateCase(updatedCase);
+                        showToast('Documento Guardado', `Documento adjuntado al expediente de ${targetCase.opposingParty}.`, 'success');
+                      }
+                    } else {
+                      // Attach to first case as fallback
+                      const firstCase = cases[0];
+                      if (firstCase) {
+                        const updatedCase = {
+                          ...firstCase,
+                          documents: [...firstCase.documents, newDoc]
+                        };
+                        handleUpdateCase(updatedCase);
+                        showToast('Documento Guardado', `Guardado en ${firstCase.title} (Expediente por defecto)`, 'success');
+                      }
+                    }
+                    setGlobalScannerOpen(false);
+                  }}
+                  onClose={() => setGlobalScannerOpen(false)}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Bottom Tab Bar */}
+      <div className="mobile-bottom-nav">
+        <button 
+          className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => handleTabChange('dashboard')}
+        >
+          <LayoutDashboard size={20} />
+          <span>Inicio</span>
+        </button>
+
+        {currentUser.role !== 'Cliente' && (
+          <button 
+            className={`nav-item ${activeTab === 'cases' ? 'active' : ''}`}
+            onClick={() => handleTabChange('cases')}
+          >
+            <Briefcase size={20} />
+            <span>Casos</span>
+          </button>
+        )}
+
+        {/* Center Camera Plus Button */}
+        <button 
+          onClick={() => setGlobalScannerOpen(true)}
+          style={{
+            position: 'relative',
+            top: '-14px',
+            width: '54px',
+            height: '54px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #00ff80, #007aff)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(0, 255, 128, 0.4)',
+            border: '3px solid #1c1c1e',
+            cursor: 'pointer',
+            zIndex: 100,
+            flexShrink: 0
+          }}
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Camera size={22} style={{ strokeWidth: 2.2 }} />
+            <span style={{ position: 'absolute', right: '-4px', bottom: '-4px', fontSize: '11px', fontWeight: 900, backgroundColor: '#ff3b30', borderRadius: '50%', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.2px solid #fff' }}>+</span>
+          </div>
+        </button>
+
+        {currentUser.role !== 'Cliente' && (
+          <button 
+            className={`nav-item ${activeTab === 'clients' ? 'active' : ''}`}
+            onClick={() => handleTabChange('clients')}
+          >
+            <Users size={20} />
+            <span>Clientes</span>
+          </button>
+        )}
+
+        <button 
+          className="nav-item"
+          onClick={handleLogout}
+        >
+          <LogOut size={20} style={{ color: 'var(--danger)' }} />
+          <span>Salir</span>
+        </button>
+      </div>
     </div>
   );
 };

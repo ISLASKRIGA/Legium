@@ -78,10 +78,10 @@ export function useDocumentDetection({
     // Extreme points for tilted quad
     let minSum = W + H, maxSum = 0;
     let minDiff = W + H, maxDiff = -W - H;
-    let p1 = { x: 15, y: 10 };
-    let p2 = { x: 85, y: 10 };
-    let p3 = { x: 85, y: 90 };
-    let p4 = { x: 15, y: 90 };
+      let p1 = { x: 12, y: 12 };
+    let p2 = { x: 68, y: 12 };
+    let p3 = { x: 68, y: 108 };
+    let p4 = { x: 12, y: 108 };
     let brightCount = 0;
 
     for (let y = 0; y < H; y++) {

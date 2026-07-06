@@ -191,8 +191,17 @@ export const warpPerspective = (
       let coeffs: number[];
       try {
         coeffs = solveGaussian(A, B);
+        if (!coeffs || coeffs.some(c => isNaN(c) || !isFinite(c))) {
+          throw new Error('NaN or Infinite coefficients in solved system');
+        }
       } catch (err) {
-        reject(new Error('Puntos de alineamiento inválidos o colineales.'));
+        console.warn('Perspective warp failed, using fallback copy:', err);
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        resolve({
+          dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+          width: targetWidth,
+          height: targetHeight
+        });
         return;
       }
 
