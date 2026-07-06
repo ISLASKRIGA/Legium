@@ -16,7 +16,7 @@ interface OcrScannerProps {
 type FilterType = 'original' | 'magic' | 'bw';
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'aligning' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
+  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -34,10 +34,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   });
   const [sheetDetected, setSheetDetected] = useState(false);
   const [detectionConfidence, setDetectionConfidence] = useState(0);
-  const [autoCapturing, setAutoCapturing] = useState(false);
-  const autoCapCountRef = useRef(0);
 
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
+
+  // Drag corners state
+  const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
 
   // OCR processing states
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -104,21 +106,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       setSheetDetected(detected);
 
       if (detected) {
-        autoCapCountRef.current += 1;
-        if (autoCapCountRef.current >= 18) {
-          setScannerMsg('✓ Documento detectado — manteniendo encuadre...');
-        } else if (autoCapCountRef.current >= 8) {
-          setScannerMsg('✔ Encuadre óptimo — capturando automáticamente...');
-        } else {
-          setScannerMsg('Detectando documento...');
-        }
-        // Auto-capture after 1.5s of stable high-confidence detection
-        if (autoCapCountRef.current === 25 && !autoCapturing) {
-          setAutoCapturing(true);
-          capturePhoto();
-        }
+        setScannerMsg('✓ Documento enfocado');
       } else {
-        autoCapCountRef.current = 0;
         setScannerMsg('Apunta la cámara al escrito judicial...');
       }
     }
@@ -161,8 +150,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         const dataUrl = canvas.toDataURL('image/jpeg');
         setOriginalImage(dataUrl);
         stopCamera();
-        setStep('aligning');
-        processAlignment(dataUrl, edgePoints);
+        setStep('preview-full');
       }
     }
   };
@@ -180,8 +168,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           const tempImg = new Image();
           tempImg.onload = () => {
             const detectedQuad = detectDocumentEdges(tempImg);
-            setStep('aligning');
-            processAlignment(dataUrl, detectedQuad);
+            setEdgePoints(detectedQuad);
+            setStep('preview-full');
           };
           tempImg.src = dataUrl;
         }
@@ -189,6 +177,54 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       reader.readAsDataURL(file);
     }
   };
+
+  // Drag Corners event handlers
+  const handleCornerMouseDown = (e: React.MouseEvent, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveCorner(corner);
+  };
+
+  const handleCornerTouchStart = (corner: 'p1' | 'p2' | 'p3' | 'p4') => {
+    setActiveCorner(corner);
+  };
+
+  const handleCornerMouseMove = (e: React.MouseEvent) => {
+    if (!activeCorner || !previewContainerRef.current) return;
+    e.preventDefault();
+
+    const rect = previewContainerRef.current.getBoundingClientRect();
+    const x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
+    const y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
+
+    setEdgePoints((prev) => ({
+      ...prev,
+      [activeCorner]: { x, y }
+    }));
+  };
+
+  const handleCornerTouchMove = (e: React.TouchEvent) => {
+    if (!activeCorner || !previewContainerRef.current) return;
+    const touch = e.touches[0];
+    const rect = previewContainerRef.current.getBoundingClientRect();
+    const x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
+    const y = Math.min(Math.max(0, ((touch.clientY - rect.top) / rect.height) * 100), 100);
+
+    setEdgePoints((prev) => ({
+      ...prev,
+      [activeCorner]: { x, y }
+    }));
+  };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setActiveCorner(null);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
 
   // Run Tesseract OCR and parse results
   const runRealOcr = async (imageSrc: string) => {
@@ -544,6 +580,142 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         </div>
       )}
 
+      {step === 'preview-full' && originalImage && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between' }}>
+          <span style={{ textAlign: 'center', color: '#fff', fontSize: '12px', fontWeight: 600 }}>
+            Ajusta los 4 puntos para encuadrar los bordes de la hoja
+          </span>
+
+          <div 
+            ref={previewContainerRef}
+            onMouseMove={handleCornerMouseMove}
+            onTouchMove={handleCornerTouchMove}
+            style={{ 
+              position: 'relative', 
+              width: '100%', 
+              flexGrow: 1,
+              height: 'calc(100vh - 200px)',
+              borderRadius: '12px', 
+              overflow: 'hidden', 
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+              background: '#121214',
+              userSelect: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <img 
+              src={originalImage} 
+              alt="Scan Preview Full"
+              draggable={false}
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: '100%', 
+                objectFit: 'contain',
+                display: 'block'
+              }} 
+            />
+            
+            {/* Draggable Polygon Overlay */}
+            <svg 
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                width: '100%', 
+                height: '100%', 
+                zIndex: 10
+              }}
+            >
+              <polygon
+                points={`
+                  ${edgePoints.p1.x}%,${edgePoints.p1.y}%
+                  ${edgePoints.p2.x}%,${edgePoints.p2.y}%
+                  ${edgePoints.p3.x}%,${edgePoints.p3.y}%
+                  ${edgePoints.p4.x}%,${edgePoints.p4.y}%
+                `}
+                style={{
+                  fill: 'rgba(0, 122, 255, 0.15)',
+                  stroke: 'var(--primary-blue)',
+                  strokeWidth: '2'
+                }}
+              />
+              
+              {/* Corner handles */}
+              <circle 
+                cx={`${edgePoints.p1.x}%`} 
+                cy={`${edgePoints.p1.y}%`} 
+                r="11" 
+                fill="#fff" 
+                stroke="var(--primary-blue)" 
+                strokeWidth="3.5" 
+                style={{ cursor: 'move' }}
+                onMouseDown={(e) => handleCornerMouseDown(e, 'p1')}
+                onTouchStart={() => handleCornerTouchStart('p1')}
+              />
+              <circle 
+                cx={`${edgePoints.p2.x}%`} 
+                cy={`${edgePoints.p2.y}%`} 
+                r="11" 
+                fill="#fff" 
+                stroke="var(--primary-blue)" 
+                strokeWidth="3.5" 
+                style={{ cursor: 'move' }}
+                onMouseDown={(e) => handleCornerMouseDown(e, 'p2')}
+                onTouchStart={() => handleCornerTouchStart('p2')}
+              />
+              <circle 
+                cx={`${edgePoints.p3.x}%`} 
+                cy={`${edgePoints.p3.y}%`} 
+                r="11" 
+                fill="#fff" 
+                stroke="var(--primary-blue)" 
+                strokeWidth="3.5" 
+                style={{ cursor: 'move' }}
+                onMouseDown={(e) => handleCornerMouseDown(e, 'p3')}
+                onTouchStart={() => handleCornerTouchStart('p3')}
+              />
+              <circle 
+                cx={`${edgePoints.p4.x}%`} 
+                cy={`${edgePoints.p4.y}%`} 
+                r="11" 
+                fill="#fff" 
+                stroke="var(--primary-blue)" 
+                strokeWidth="3.5" 
+                style={{ cursor: 'move' }}
+                onMouseDown={(e) => handleCornerMouseDown(e, 'p4')}
+                onTouchStart={() => handleCornerTouchStart('p4')}
+              />
+            </svg>
+          </div>
+
+          <div className="scanner-controls" style={{ gap: '12px' }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => {
+                setStep('capture');
+                setOriginalImage(null);
+                startCamera();
+              }}
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
+            >
+              Reintentar
+            </button>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => {
+                setStep('aligning');
+                processAlignment(originalImage, edgePoints);
+              }}
+              style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              Alinear y Recortar <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {step === 'aligning' && originalImage && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '320px', gap: '20px', background: '#1c1c1e', flexGrow: 1 }}>
           <h4 style={{ fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -765,14 +937,11 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <button 
               className="btn btn-secondary" 
               onClick={() => {
-                setStep('capture');
-                setCapturedImage(null);
-                setOriginalImage(null);
-                startCamera();
+                setStep('preview-full');
               }}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff' }}
             >
-              <RotateCcw size={16} /> Reintentar
+              Ajustar Esquinas
             </button>
             
             <button 
@@ -780,7 +949,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               onClick={startOcrProcessing}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
             >
-              Procesar Escrito Judicial <ChevronRight size={16} />
+              Convertir a PDF <ChevronRight size={16} />
             </button>
           </div>
         </div>
@@ -793,7 +962,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <Cpu size={24} style={{ position: 'absolute', top: '13px', left: '13px', color: '#fff' }} />
           </div>
           
-          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Extrayendo Información Procesal</h4>
+          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Generando PDF y Procesando OCR</h4>
           
           <div style={{ width: '100%', maxWidth: '280px', height: '6px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
             <div 
