@@ -71,14 +71,38 @@ export function useDocumentDetection({
       brightness[i] = 0.299 * r + 0.587 * g + 0.114 * b;
     }
 
-    // Find average brightness to set adaptive threshold
-    const avg = brightness.reduce((a, b) => a + b, 0) / brightness.length;
-    const threshold = Math.min(avg * 1.18, 215);
+    // Noise Reduction: Apply 3x3 box blur to filter out text lines, keyboard keycaps, and specks
+    const blurred: number[] = new Array(W * H);
+    let minB = 255;
+    let maxB = 0;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let sum = 0;
+        let count = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (ny >= 0 && ny < H && nx >= 0 && nx < W) {
+              sum += brightness[ny * W + nx];
+              count++;
+            }
+          }
+        }
+        const val = sum / count;
+        blurred[y * W + x] = val;
+        if (val < minB) minB = val;
+        if (val > maxB) maxB = val;
+      }
+    }
+
+    // Dynamic Threshold: position at 58% of the range between darkest and brightest pixels
+    const threshold = minB + (maxB - minB) * 0.58;
 
     // Extreme points for tilted quad
     let minSum = W + H, maxSum = 0;
     let minDiff = W + H, maxDiff = -W - H;
-      let p1 = { x: 12, y: 12 };
+    let p1 = { x: 12, y: 12 };
     let p2 = { x: 68, y: 12 };
     let p3 = { x: 68, y: 108 };
     let p4 = { x: 12, y: 108 };
@@ -86,7 +110,7 @@ export function useDocumentDetection({
 
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        if (brightness[y * W + x] > threshold) {
+        if (blurred[y * W + x] > threshold) {
           const sum = x + y;
           const diff = x - y;
 

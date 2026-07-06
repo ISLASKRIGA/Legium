@@ -165,7 +165,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         const dataUrl = canvas.toDataURL('image/jpeg');
         setOriginalImage(dataUrl);
         stopCamera();
-        setStep('preview-full');
+        
+        // Immediately start perspective warp and align transition!
+        setStep('aligning');
+        processAlignment(dataUrl, edgePoints);
       }
     }
   };
@@ -184,7 +187,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           tempImg.onload = () => {
             const detectedQuad = detectDocumentEdges(tempImg);
             setEdgePoints(detectedQuad);
-            setStep('preview-full');
+            // Immediately start perspective warp and align transition!
+            setStep('aligning');
+            processAlignment(dataUrl, detectedQuad);
           };
           tempImg.src = dataUrl;
         }
@@ -214,13 +219,35 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         const rotatedUrl = canvas.toDataURL('image/jpeg');
         setOriginalImage(rotatedUrl);
 
-        // Run edge detection on rotated image
-        const tempImg = new Image();
-        tempImg.onload = () => {
-          const detectedQuad = detectDocumentEdges(tempImg);
-          setEdgePoints(detectedQuad);
-        };
-        tempImg.src = rotatedUrl;
+        if (step === 'beautify' && capturedImage) {
+          const croppedImg = new Image();
+          croppedImg.onload = () => {
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = croppedImg.height;
+            cropCanvas.height = croppedImg.width;
+            const cropCtx = cropCanvas.getContext('2d');
+            if (cropCtx) {
+              if (direction === 'left') {
+                cropCtx.translate(0, croppedImg.width);
+                cropCtx.rotate(-Math.PI / 2);
+              } else {
+                cropCtx.translate(croppedImg.height, 0);
+                cropCtx.rotate(Math.PI / 2);
+              }
+              cropCtx.drawImage(croppedImg, 0, 0);
+              setCapturedImage(cropCanvas.toDataURL('image/jpeg'));
+            }
+          };
+          croppedImg.src = capturedImage;
+        } else {
+          // Run edge detection on rotated image
+          const tempImg = new Image();
+          tempImg.onload = () => {
+            const detectedQuad = detectDocumentEdges(tempImg);
+            setEdgePoints(detectedQuad);
+          };
+          tempImg.src = rotatedUrl;
+        }
       }
     };
     img.src = originalImage;
