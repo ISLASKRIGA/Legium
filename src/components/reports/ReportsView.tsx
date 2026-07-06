@@ -26,16 +26,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ currentUser, cases, fi
   const casesChartInst = useRef<Chart | null>(null);
   const billingChartInst = useRef<Chart | null>(null);
 
-  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   // Group cases by practice area
   const areas = ['Civil', 'Penal', 'Laboral', 'Tributario', 'Corporativo'];
   const counts = areas.map((area) => cases.filter((c) => c.practiceArea === area).length);
@@ -79,7 +69,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ currentUser, cases, fi
             maintainAspectRatio: false,
             plugins: {
               legend: {
-                position: isMobile ? 'bottom' : 'right',
+                position: 'right',
                 labels: {
                   color: 'hsl(215, 20%, 72%)',
                   font: {
@@ -220,8 +210,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ currentUser, cases, fi
         billingChartInst.current.destroy();
       }
     };
-  }, [cases, financials, isAllowed, isMobile]);
-
+  }, [cases, financials, isAllowed]);
 
   if (!isAllowed) {
     return (
@@ -286,8 +275,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ currentUser, cases, fi
         </div>
 
         {/* Charts Layout */}
-        <div className="reports-layout" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '20px' }}>
-
+        <div className="reports-layout" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginTop: '20px' }}>
           <div className="glass-card">
             <h3 className="section-title" style={{ marginBottom: '16px' }}>Distribución de Casos por Área</h3>
             <div className="chart-container" style={{ height: '220px', position: 'relative' }}>

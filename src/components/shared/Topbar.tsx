@@ -137,7 +137,6 @@ export const Topbar: React.FC<TopbarProps> = ({
           {/* Notifications Dropdown Panel */}
           {showNotifications && (
             <div 
-              className="notifications-dropdown"
               style={{
                 position: 'absolute',
                 top: '100%',
@@ -157,7 +156,6 @@ export const Topbar: React.FC<TopbarProps> = ({
                 animation: 'fade-in 0.2s ease-out'
               }}
             >
-
               <div 
                 style={{ 
                   display: 'flex', 
