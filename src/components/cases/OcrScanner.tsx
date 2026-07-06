@@ -498,11 +498,11 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const mid4 = getMidpointProps(p4, p1);
 
   return (
-    <div className="scanner-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1c1c1e', padding: 0 }}>
+    <div className="scanner-container" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', background: '#000', padding: 0, position: 'relative', overflow: 'hidden' }}>
       
       {/* Top Bar for camera */}
       {step === 'capture' && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px', color: '#fff', alignItems: 'center', background: '#000', height: '54px' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', padding: '16px 20px', color: '#fff', alignItems: 'center', background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)', height: '54px', zIndex: 10 }}>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', outline: 'none' }}>
             <X size={24} />
           </button>
@@ -519,8 +519,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'capture' && (
-        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', height: '100%', justifyContent: 'space-between' }}>
-          <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 240px)', width: '100%', position: 'relative', borderRadius: 0, overflow: 'hidden', background: '#000' }}>
+        <>
+          <div className="camera-preview-wrapper" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden', background: '#000', zIndex: 1 }}>
             {hasCamera ? (
               <video
                 ref={videoRef}
@@ -586,9 +586,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             {/* Status badge */}
             <div
               style={{
-                position: 'absolute', bottom: '52px', left: '50%',
+                position: 'absolute', bottom: '150px', left: '50%',
                 transform: 'translateX(-50%)',
-                background: sheetDetected ? 'rgba(0, 255, 128, 0.9)' : 'rgba(255, 255, 255, 0.25)',
+                background: sheetDetected ? 'rgba(0, 255, 128, 0.9)' : 'rgba(0, 0, 0, 0.55)',
                 color: '#fff', fontSize: '11px', padding: '6px 14px',
                 borderRadius: '99px', fontWeight: 600,
                 backdropFilter: 'blur(10px)', zIndex: 5,
@@ -600,7 +600,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             </div>
 
             {/* Floating Individual / Lote pill inside camera feed */}
-            <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', display: 'flex', background: 'rgba(0,0,0,0.6)', padding: '3px', borderRadius: '20px', zIndex: 5, border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ position: 'absolute', bottom: '108px', left: '50%', transform: 'translateX(-50%)', display: 'flex', background: 'rgba(0,0,0,0.6)', padding: '3px', borderRadius: '20px', zIndex: 5, border: '1px solid rgba(255,255,255,0.1)' }}>
               <span style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', fontSize: '11.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '18px' }}>Individual</span>
               <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '18px', cursor: 'pointer' }}>Lote</span>
             </div>
@@ -608,84 +608,87 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
-          {/* Mode selector slider */}
-          <div style={{ background: '#000', overflowX: 'auto', padding: '12px 0 6px 0', display: 'flex', justifyContent: 'center', gap: '20px', whiteSpace: 'nowrap', borderTop: '1px solid rgba(255,255,255,0.05)', userSelect: 'none' }}>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Tarjeta de identidad</span>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Firmar</span>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-              <span style={{ position: 'absolute', top: '-11px', width: '5px', height: '5px', backgroundColor: '#e2883e', borderRadius: '50%' }} />
-              <span style={{ color: '#00ff80', fontSize: '11.5px', fontWeight: 700 }}>Escanear</span>
+          {/* Floating Bottom Menu & Controls */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.4) 80%, transparent)', zIndex: 10, paddingBottom: '24px' }}>
+            {/* Mode selector slider */}
+            <div style={{ overflowX: 'auto', padding: '12px 0 6px 0', display: 'flex', justifyContent: 'center', gap: '20px', whiteSpace: 'nowrap', userSelect: 'none' }}>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Tarjeta de identidad</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Firmar</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                <span style={{ position: 'absolute', top: '-11px', width: '5px', height: '5px', backgroundColor: '#e2883e', borderRadius: '50%' }} />
+                <span style={{ color: '#00ff80', fontSize: '11.5px', fontWeight: 700 }}>Escanear</span>
+              </div>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>A Word</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Conjunto</span>
             </div>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>A Word</span>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Conjunto</span>
-          </div>
 
-          {/* Camera controls - matches CamScanner example */}
-          <div className="scanner-controls" style={{ background: '#000', padding: '16px 36px 28px 36px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {/* Grid button (Left) */}
-            <button
-              onClick={() => {}}
-              style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none', opacity: 0.9 }}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="5" height="5" />
-                <rect x="10" y="3" width="5" height="5" />
-                <rect x="17" y="3" width="5" height="5" />
-                <rect x="3" y="10" width="5" height="5" />
-                <rect x="10" y="10" width="5" height="5" />
-                <rect x="17" y="10" width="5" height="5" />
-                <rect x="3" y="17" width="5" height="5" />
-                <rect x="10" y="17" width="5" height="5" />
-                <rect x="17" y="17" width="5" height="5" />
-              </svg>
-            </button>
-
-            {hasCamera ? (
+            {/* Camera controls */}
+            <div className="scanner-controls" style={{ padding: '8px 36px 8px 36px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Grid button (Left) */}
               <button
-                onClick={capturePhoto}
-                style={{ 
-                  width: '68px', 
-                  height: '68px', 
-                  borderRadius: '50%', 
-                  border: '5px solid #00ff80', 
-                  background: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  padding: 0,
-                  outline: 'none',
-                  boxShadow: '0 0 16px rgba(0,255,128,0.2)'
-                }}
+                onClick={() => {}}
+                style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none', opacity: 0.9 }}
               >
-                <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#fff' }} />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="5" height="5" />
+                  <rect x="10" y="3" width="5" height="5" />
+                  <rect x="17" y="3" width="5" height="5" />
+                  <rect x="3" y="10" width="5" height="5" />
+                  <rect x="10" y="10" width="5" height="5" />
+                  <rect x="17" y="10" width="5" height="5" />
+                  <rect x="3" y="17" width="5" height="5" />
+                  <rect x="10" y="17" width="5" height="5" />
+                  <rect x="17" y="17" width="5" height="5" />
+                </svg>
               </button>
-            ) : (
-              <div style={{ width: '68px', height: '68px' }} />
-            )}
 
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              onChange={handleFileUpload}
-            />
-            
-            {/* Import gallery button (Right) */}
-            <button
-              className="btn btn-icon"
-              onClick={() => fileInputRef.current?.click()}
-              style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none' }}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="M20.4 14.5L16 10 4 20" />
-              </svg>
-            </button>
+              {hasCamera ? (
+                <button
+                  onClick={capturePhoto}
+                  style={{ 
+                    width: '68px', 
+                    height: '68px', 
+                    borderRadius: '50%', 
+                    border: '5px solid #00ff80', 
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                    outline: 'none',
+                    boxShadow: '0 0 16px rgba(0,255,128,0.2)'
+                  }}
+                >
+                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#fff' }} />
+                </button>
+              ) : (
+                <div style={{ width: '68px', height: '68px' }} />
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={handleFileUpload}
+              />
+              
+              {/* Import gallery button (Right) */}
+              <button
+                className="btn btn-icon"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none' }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M20.4 14.5L16 10 4 20" />
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {step === 'preview-full' && originalImage && (

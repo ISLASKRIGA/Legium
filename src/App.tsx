@@ -452,46 +452,20 @@ export const App: React.FC = () => {
       <AnimatePresence>
         {globalScannerOpen && currentUser.role === 'Cliente' && (
           <motion.div 
-            className="modal active" 
+            className="global-scanner-modal" 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
-            style={{ zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(0,0,0,0.5)' }}
           >
             <motion.div 
-              className="modal-content" 
+              className="global-scanner-content" 
               initial={{ scale: 0.08, y: 320, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.08, y: 320, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              style={{ 
-                maxWidth: '480px', 
-                width: '100%', 
-                height: '82vh', 
-                padding: 0, 
-                overflow: 'hidden', 
-                background: '#1c1c1e', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                borderTopLeftRadius: '24px', 
-                borderTopRightRadius: '24px', 
-                borderBottomLeftRadius: '24px', 
-                borderBottomRightRadius: '24px', 
-                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-                transformOrigin: 'bottom center'
-              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', alignItems: 'center', background: '#000', color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
-                <span style={{ fontWeight: 700, fontSize: '15px' }}>Escanear Escrito Judicial</span>
-                <button 
-                  onClick={() => setGlobalScannerOpen(false)} 
-                  style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}
-                >
-                  ✕
-                </button>
-              </div>
-              <div style={{ flexGrow: 1, height: 'calc(100% - 50px)', overflow: 'hidden' }}>
+              <div style={{ flexGrow: 1, height: '100%', overflow: 'hidden' }}>
                 <OcrScanner
                   currentUser={currentUser}
                   onOcrComplete={(newCase, newDoc, fileBlob) => {
