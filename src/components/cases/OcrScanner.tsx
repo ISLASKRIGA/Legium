@@ -602,28 +602,41 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               </div>
             )}
 
-            {/* SVG Edge Detection Overlay */}
-            {hasCamera && sheetDetected && (
-              <svg
-                style={{
-                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                  pointerEvents: 'none', zIndex: 4
-                }}
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-              >
-                <polygon
-                  points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+            {/* SVG Rectangle Detection Overlay */}
+            {hasCamera && sheetDetected && (() => {
+              const rx = p1.x;
+              const ry = p1.y;
+              const rw = p2.x - p1.x;
+              const rh = p4.y - p1.y;
+              const cs = 4; // corner size in viewBox units
+              return (
+                <svg
                   style={{
-                    fill: 'rgba(0, 255, 128, 0.08)',
-                    stroke: '#00ff80',
-                    strokeWidth: '1.2',
-                    transition: 'all 0.08s ease-out',
-                    filter: 'drop-shadow(0 0 3px #00ff80)'
+                    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                    pointerEvents: 'none', zIndex: 4
                   }}
-                />
-              </svg>
-            )}
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                >
+                  {/* Shaded rect fill */}
+                  <rect
+                    x={rx} y={ry} width={rw} height={rh}
+                    fill="rgba(0, 255, 128, 0.10)"
+                    stroke="#00ff80"
+                    strokeWidth="0.9"
+                    style={{ transition: 'all 0.10s ease-out', filter: 'drop-shadow(0 0 3px #00ff80)' }}
+                  />
+                  {/* Corner brackets – top-left */}
+                  <polyline points={`${rx},${ry + cs} ${rx},${ry} ${rx + cs},${ry}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
+                  {/* top-right */}
+                  <polyline points={`${rx + rw - cs},${ry} ${rx + rw},${ry} ${rx + rw},${ry + cs}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
+                  {/* bottom-right */}
+                  <polyline points={`${rx + rw},${ry + rh - cs} ${rx + rw},${ry + rh} ${rx + rw - cs},${ry + rh}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
+                  {/* bottom-left */}
+                  <polyline points={`${rx + cs},${ry + rh} ${rx},${ry + rh} ${rx},${ry + rh - cs}`} fill="none" stroke="#00ff80" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              );
+            })()}
 
             {/* Status badge */}
             <div

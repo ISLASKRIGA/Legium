@@ -196,74 +196,62 @@ export function useDocumentDetection({
       }
     }
 
-    let minSum = W + H, maxSum = 0;
-    let minDiff = W + H, maxDiff = -W - H;
-    let p1 = { x: 12, y: 12 };
-    let p2 = { x: 68, y: 12 };
-    let p3 = { x: 68, y: 108 };
-    let p4 = { x: 12, y: 108 };
+    // Find bounding rectangle of the largest bright component
+    let minX = W, maxX = 0, minY = H, maxY = 0;
     const brightCount = bestComponent.length;
 
     if (bestComponent.length > 0) {
       for (const pt of bestComponent) {
-        const sum = pt.x + pt.y;
-        const diff = pt.x - pt.y;
-
-        if (sum < minSum) {
-          minSum = sum;
-          p1 = pt;
-        }
-        if (sum > maxSum) {
-          maxSum = sum;
-          p3 = pt;
-        }
-        if (diff > maxDiff) {
-          maxDiff = diff;
-          p2 = pt;
-        }
-        if (diff < minDiff) {
-          minDiff = diff;
-          p4 = pt;
-        }
+        if (pt.x < minX) minX = pt.x;
+        if (pt.x > maxX) maxX = pt.x;
+        if (pt.y < minY) minY = pt.y;
+        if (pt.y > maxY) maxY = pt.y;
       }
+    } else {
+      // fallback defaults
+      minX = 12; maxX = 68; minY = 12; maxY = 108;
     }
 
-    // Corner Refinement using Sobel edge gradients
-    p1 = refineCorner(brightness, W, H, p1);
-    p2 = refineCorner(brightness, W, H, p2);
-    p3 = refineCorner(brightness, W, H, p3);
-    p4 = refineCorner(brightness, W, H, p4);
-
-    const minX = Math.min(p1.x, p4.x);
-    const maxX = Math.max(p2.x, p3.x);
-    const minY = Math.min(p1.y, p2.y);
-    const maxY = Math.max(p3.y, p4.y);
-    const docArea = (maxX - minX) * (maxY - minY);
+    const docW = maxX - minX;
+    const docH = maxY - minY;
+    const docArea = docW * docH;
     const frameArea = W * H;
-    const confidence = Math.min(1, brightCount / (frameArea * 0.12));
+
+    // Aspect ratio check: document should be roughly paper-shaped (0.5 – 2.0)
+    const aspectRatio = docW / Math.max(1, docH);
+    const confidence = Math.min(1, brightCount / (frameArea * 0.10));
 
     const isValid =
-      docArea > frameArea * 0.08 &&
-      docArea < frameArea * 0.98 &&
-      (maxX - minX) > W * 0.15 &&
-      (maxY - minY) > H * 0.15;
+      docArea > frameArea * 0.10 &&
+      docArea < frameArea * 0.97 &&
+      docW > W * 0.20 &&
+      docH > H * 0.20 &&
+      aspectRatio > 0.4 &&
+      aspectRatio < 2.2;
 
     if (isValid) {
-      const padX = (maxX - minX) * 0.015;
-      const padY = (maxY - minY) * 0.015;
+      // Small inward padding so the green rect doesn't hug content edges
+      const padX = docW * 0.012;
+      const padY = docH * 0.012;
 
+      const rx1 = ((minX + padX) / W) * 100;
+      const ry1 = ((minY + padY) / H) * 100;
+      const rx2 = ((maxX - padX) / W) * 100;
+      const ry2 = ((maxY - padY) / H) * 100;
+
+      // Build axis-aligned rectangle QuadPoints
       const rawQuad: QuadPoints = {
-        p1: { x: ((p1.x + padX) / W) * 100, y: ((p1.y + padY) / H) * 100 },
-        p2: { x: ((p2.x - padX) / W) * 100, y: ((p2.y + padY) / H) * 100 },
-        p3: { x: ((p3.x - padX) / W) * 100, y: ((p3.y - padY) / H) * 100 },
-        p4: { x: ((p4.x + padX) / W) * 100, y: ((p4.y - padY) / H) * 100 },
+        p1: { x: rx1, y: ry1 }, // top-left
+        p2: { x: rx2, y: ry1 }, // top-right
+        p3: { x: rx2, y: ry2 }, // bottom-right
+        p4: { x: rx1, y: ry2 }, // bottom-left
       };
 
       // Temporal smoothing low-pass filter
       let smoothedQuad: QuadPoints;
       if (lastQuadRef.current) {
         const last = lastQuadRef.current;
-        const k = 0.65; // Smoothing weight
+        const k = 0.60; // Smoothing weight
         smoothedQuad = {
           p1: { x: last.p1.x * k + rawQuad.p1.x * (1 - k), y: last.p1.y * k + rawQuad.p1.y * (1 - k) },
           p2: { x: last.p2.x * k + rawQuad.p2.x * (1 - k), y: last.p2.y * k + rawQuad.p2.y * (1 - k) },
@@ -277,13 +265,14 @@ export function useDocumentDetection({
       lastQuadRef.current = smoothedQuad;
       onDetection(smoothedQuad, confidence);
     } else {
-      // Default crop frame
+      // No valid document found — emit zero confidence and reset
+      lastQuadRef.current = null;
       onDetection(
         {
           p1: { x: 12, y: 10 },
           p2: { x: 88, y: 10 },
-          p3: { x: 86, y: 90 },
-          p4: { x: 14, y: 90 },
+          p3: { x: 88, y: 90 },
+          p4: { x: 12, y: 90 },
         },
         0
       );
