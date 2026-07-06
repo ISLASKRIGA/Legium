@@ -336,7 +336,7 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${currentUser.role === 'Cliente' ? 'client-mobile' : ''}`}>
       <Navbar 
         activeTab={activeTab} 
         onTabChange={handleTabChange} 
@@ -448,13 +448,11 @@ export const App: React.FC = () => {
       />
 
       {/* Global Scanner Modal */}
-      {globalScannerOpen && (
+      {globalScannerOpen && currentUser.role === 'Cliente' && (
         <div className="modal active" style={{ zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div className="modal-content" style={{ maxWidth: '480px', width: '100%', height: '82vh', padding: 0, overflow: 'hidden', background: '#1c1c1e', display: 'flex', flexDirection: 'column', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', alignItems: 'center', background: '#000', color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: '15px' }}>
-                {currentUser.role === 'Cliente' ? 'Escanear Escrito Judicial' : 'Escanear Documento de Caso'}
-              </span>
+              <span style={{ fontWeight: 700, fontSize: '15px' }}>Escanear Escrito Judicial</span>
               <button 
                 onClick={() => setGlobalScannerOpen(false)} 
                 style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}
@@ -463,115 +461,66 @@ export const App: React.FC = () => {
               </button>
             </div>
             <div style={{ flexGrow: 1, height: 'calc(100% - 50px)', overflow: 'hidden' }}>
-              {currentUser.role === 'Cliente' ? (
-                <OcrScanner
-                  currentUser={currentUser}
-                  onOcrComplete={(newCase, newDoc, fileBlob) => {
-                    handleAddCase(newCase);
-                    setGlobalScannerOpen(false);
-                  }}
-                  onClose={() => setGlobalScannerOpen(false)}
-                />
-              ) : (
-                <DocumentScanner
-                  onScanComplete={async (newDoc, fileBlob) => {
-                    if (activeCaseId) {
-                      const targetCase = cases.find(c => c.id === activeCaseId);
-                      if (targetCase) {
-                        const updatedCase = {
-                          ...targetCase,
-                          documents: [...targetCase.documents, newDoc]
-                        };
-                        handleUpdateCase(updatedCase);
-                        showToast('Documento Guardado', `Documento adjuntado al expediente de ${targetCase.opposingParty}.`, 'success');
-                      }
-                    } else {
-                      // Attach to first case as fallback
-                      const firstCase = cases[0];
-                      if (firstCase) {
-                        const updatedCase = {
-                          ...firstCase,
-                          documents: [...firstCase.documents, newDoc]
-                        };
-                        handleUpdateCase(updatedCase);
-                        showToast('Documento Guardado', `Guardado en ${firstCase.title} (Expediente por defecto)`, 'success');
-                      }
-                    }
-                    setGlobalScannerOpen(false);
-                  }}
-                  onClose={() => setGlobalScannerOpen(false)}
-                />
-              )}
+              <OcrScanner
+                currentUser={currentUser}
+                onOcrComplete={(newCase, newDoc, fileBlob) => {
+                  handleAddCase(newCase);
+                  setGlobalScannerOpen(false);
+                }}
+                onClose={() => setGlobalScannerOpen(false)}
+              />
             </div>
           </div>
         </div>
       )}
 
-      {/* Mobile Bottom Tab Bar */}
-      <div className="mobile-bottom-nav">
-        <button 
-          className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => handleTabChange('dashboard')}
-        >
-          <LayoutDashboard size={20} />
-          <span>Inicio</span>
-        </button>
-
-        {currentUser.role !== 'Cliente' && (
+      {/* Mobile Bottom Tab Bar (Only for Clients) */}
+      {currentUser.role === 'Cliente' && (
+        <div className="mobile-bottom-nav">
           <button 
-            className={`nav-item ${activeTab === 'cases' ? 'active' : ''}`}
-            onClick={() => handleTabChange('cases')}
+            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => handleTabChange('dashboard')}
           >
-            <Briefcase size={20} />
-            <span>Casos</span>
+            <LayoutDashboard size={20} />
+            <span>Inicio</span>
           </button>
-        )}
 
-        {/* Center Camera Plus Button */}
-        <button 
-          onClick={() => setGlobalScannerOpen(true)}
-          style={{
-            position: 'relative',
-            top: '-14px',
-            width: '54px',
-            height: '54px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #00ff80, #007aff)',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(0, 255, 128, 0.4)',
-            border: '3px solid #1c1c1e',
-            cursor: 'pointer',
-            zIndex: 100,
-            flexShrink: 0
-          }}
-        >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Camera size={22} style={{ strokeWidth: 2.2 }} />
-            <span style={{ position: 'absolute', right: '-4px', bottom: '-4px', fontSize: '11px', fontWeight: 900, backgroundColor: '#ff3b30', borderRadius: '50%', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.2px solid #fff' }}>+</span>
-          </div>
-        </button>
-
-        {currentUser.role !== 'Cliente' && (
+          {/* Center Camera Plus Button */}
           <button 
-            className={`nav-item ${activeTab === 'clients' ? 'active' : ''}`}
-            onClick={() => handleTabChange('clients')}
+            onClick={() => setGlobalScannerOpen(true)}
+            style={{
+              position: 'relative',
+              top: '-14px',
+              width: '54px',
+              height: '54px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #00ff80, #007aff)',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(0, 255, 128, 0.4)',
+              border: '3px solid #fff',
+              cursor: 'pointer',
+              zIndex: 100,
+              flexShrink: 0
+            }}
           >
-            <Users size={20} />
-            <span>Clientes</span>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Camera size={22} style={{ strokeWidth: 2.2 }} />
+              <span style={{ position: 'absolute', right: '-4px', bottom: '-4px', fontSize: '11px', fontWeight: 900, backgroundColor: '#ff3b30', borderRadius: '50%', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.2px solid #fff' }}>+</span>
+            </div>
           </button>
-        )}
 
-        <button 
-          className="nav-item"
-          onClick={handleLogout}
-        >
-          <LogOut size={20} style={{ color: 'var(--danger)' }} />
-          <span>Salir</span>
-        </button>
-      </div>
+          <button 
+            className="nav-item"
+            onClick={handleLogout}
+          >
+            <LogOut size={20} style={{ color: 'var(--danger)' }} />
+            <span>Salir</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

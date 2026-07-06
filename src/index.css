@@ -1879,13 +1879,13 @@ textarea.form-control {
     left: 0;
     right: 0;
     height: 64px;
-    background: rgba(28, 28, 30, 0.88) !important;
-    backdrop-filter: blur(24px) saturate(120%) !important;
-    -webkit-backdrop-filter: blur(24px) saturate(120%) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(20px) saturate(120%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
     z-index: 999;
     padding-bottom: env(safe-area-inset-bottom);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
   }
 
   .mobile-bottom-nav .nav-item {
@@ -1895,8 +1895,8 @@ textarea.form-control {
     justify-content: center;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 9px;
+    color: var(--text-secondary);
+    font-size: 10px;
     font-weight: 600;
     gap: 3px;
     cursor: pointer;
@@ -1907,25 +1907,26 @@ textarea.form-control {
   }
 
   .mobile-bottom-nav .nav-item.active {
-    color: #00ff80 !important;
+    color: var(--primary-blue) !important;
   }
 
   /* Adjust main container to clear the bottom nav on mobile */
-  .app-container {
+  .app-container.client-mobile {
     padding-bottom: 64px !important;
   }
 
-  .sidebar {
+  .client-mobile .sidebar {
     display: none !important;
   }
 
-  .topbar {
+  .client-mobile .topbar {
     padding-left: 16px !important;
   }
   
-  .mobile-toggle {
+  .client-mobile .mobile-toggle {
     display: none !important;
   }
 }
+
 
 
