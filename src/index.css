@@ -1362,8 +1362,8 @@ textarea.form-control {
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 4px !important;
-    padding: 8px 12px !important;
+    gap: 3px !important; /* reduced gap */
+    padding: 6px 8px !important; /* reduced padding */
     border-radius: 20px !important;
     color: var(--text-secondary) !important;
     font-size: 9px !important;
@@ -1374,8 +1374,8 @@ textarea.form-control {
   }
   
   .menu-item a svg {
-    width: 18px !important;
-    height: 18px !important;
+    width: 16px !important; /* reduced size */
+    height: 16px !important;
     stroke: var(--text-secondary) !important;
   }
   
@@ -1390,13 +1390,59 @@ textarea.form-control {
   }
   
   .page-container {
-    padding-bottom: 100px !important;
+    padding: 16px 12px 100px 12px !important; /* compact layout spacing */
   }
   
   .dashboard-layout {
     grid-template-columns: 1fr;
   }
+
+  .section-header {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+
+  .topbar {
+    padding: 0 12px !important;
+  }
+
+  /* Hide the text in logout button on mobile, making it icon-only */
+  #btn-logout span {
+    display: none !important;
+  }
+  
+  #btn-logout {
+    padding: 10px !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    min-width: unset !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Constrain notifications dropdown on mobile */
+  .notifications-dropdown {
+    width: 290px !important;
+    right: -10px !important;
+  }
 }
+
+@media (max-width: 400px) {
+  .sidebar {
+    left: 10px !important;
+    right: 10px !important;
+    width: calc(100% - 20px) !important;
+    padding: 0 4px !important;
+  }
+  
+  .menu-item a {
+    padding: 6px 3px !important;
+    font-size: 8px !important;
+  }
+}
+
 
 /* ==================== DOCUMENT UPLOAD & LIST ==================== */
 .file-upload-zone {
