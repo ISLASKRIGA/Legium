@@ -1,58 +1,50 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@insforge/sdk';
 import { Case } from './types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const insforgeUrl = import.meta.env.VITE_INSFORGE_URL as string | undefined;
+const insforgeAnonKey = import.meta.env.VITE_INSFORGE_ANON_KEY as string | undefined;
 
-const isConfiguredValue = (value: string | undefined) => {
-  if (!value) return false;
-  return !value.includes('REEMPLAZA_CON_TU') && !value.includes('xxxx.supabase.co');
-};
+const hasConfig = !!(insforgeUrl && insforgeAnonKey);
 
-const hasSupabaseConfig = isConfiguredValue(supabaseUrl) && isConfiguredValue(supabaseAnonKey);
-
-if (!hasSupabaseConfig && import.meta.env.DEV) {
-  console.warn(
-    '[Legium] Supabase no está configurado. Crea un archivo .env con:\n' +
-    'VITE_SUPABASE_URL=https://xxxx.supabase.co\n' +
-    'VITE_SUPABASE_ANON_KEY=eyJ...'
-  );
-}
-
-export const supabase = hasSupabaseConfig
-  ? createClient(supabaseUrl, supabaseAnonKey)
+export const insforge = hasConfig
+  ? createClient({
+      baseUrl: insforgeUrl,
+      anonKey: insforgeAnonKey,
+    })
   : null;
 
-export const isSupabaseConfigured = () => hasSupabaseConfig;
+// Keep exports compatible with previous Supabase client to avoid breaking imports elsewhere
+export const supabase = insforge;
+
+export const isSupabaseConfigured = () => hasConfig;
 
 /**
- * Upload a PDF blob to Supabase Storage.
- * Returns the public URL or null if Supabase is not configured.
+ * Upload a PDF blob to InsForge Storage.
+ * Returns the public URL or null if not configured.
  */
 export const uploadPdfToSupabase = async (
   docId: string,
   pdfBlob: Blob,
   caseId: string
 ): Promise<string | null> => {
-  if (!supabase) return null;
+  if (!insforge) return null;
   const path = caseId + '/' + docId + '.pdf';
-  const { error } = await supabase.storage
+  const { data, error } = await insforge.storage
     .from('legal-documents')
-    .upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true });
+    .upload(path, pdfBlob);
   if (error) {
-    console.error('[Supabase Storage] Upload error:', error.message);
+    console.error('[InsForge Storage] Upload error:', error.message);
     return null;
   }
-  const { data } = supabase.storage.from('legal-documents').getPublicUrl(path);
-  return data?.publicUrl ?? null;
+  return data?.url ?? null;
 };
 
 /**
- * Save or update a case record in the Supabase cases table.
+ * Save or update a case record in the cases table.
  */
 export const saveCaseRecord = async (caseObj: Case): Promise<void> => {
-  if (!supabase) return;
-  const { error } = await supabase.from('cases').upsert({
+  if (!insforge) return;
+  const { error } = await insforge.database.from('cases').upsert([{
     id: caseObj.id,
     title: caseObj.title,
     client_id: caseObj.clientId,
@@ -70,14 +62,14 @@ export const saveCaseRecord = async (caseObj: Case): Promise<void> => {
     timeline: caseObj.timeline,
     tasks: caseObj.tasks,
     notes: caseObj.notes,
-  });
+  }]);
   if (error) {
-    console.error('[Supabase] Case upsert error:', error.message);
+    console.error('[InsForge] Case upsert error:', error.message);
   }
 };
 
 /**
- * Save a document record to the Supabase documents table.
+ * Save a document record to the documents table.
  */
 export const saveDocumentRecord = async (doc: {
   id: string;
@@ -88,8 +80,8 @@ export const saveDocumentRecord = async (doc: {
   ocrText: string;
   pdfUrl: string | null;
 }) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('documents').insert({
+  if (!insforge) return;
+  const { error } = await insforge.database.from('documents').insert([{
     id: doc.id,
     case_id: doc.caseId,
     name: doc.name,
@@ -97,12 +89,13 @@ export const saveDocumentRecord = async (doc: {
     upload_date: doc.uploadDate,
     ocr_text: doc.ocrText,
     pdf_url: doc.pdfUrl,
-  });
-  if (error) console.error('[Supabase] Document insert error:', error.message);
+    pdf_key: doc.caseId + '/' + doc.id + '.pdf', // save key too
+  }]);
+  if (error) console.error('[InsForge] Document insert error:', error.message);
 };
 
 /**
- * Save a notification record to the Supabase notifications table.
+ * Save a notification record to the notifications table.
  */
 export const saveNotificationRecord = async (noti: {
   id: string;
@@ -113,8 +106,8 @@ export const saveNotificationRecord = async (noti: {
   caseId?: string;
   targetRole?: string;
 }) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('notifications').insert({
+  if (!insforge) return;
+  const { error } = await insforge.database.from('notifications').insert([{
     id: noti.id,
     title: noti.title,
     message: noti.message,
@@ -122,6 +115,6 @@ export const saveNotificationRecord = async (noti: {
     read: noti.read,
     case_id: noti.caseId || null,
     target_role: noti.targetRole || null,
-  });
-  if (error) console.error('[Supabase] Notification insert error:', error.message);
+  }]);
+  if (error) console.error('[InsForge] Notification insert error:', error.message);
 };

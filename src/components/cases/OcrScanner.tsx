@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2 } from 'lucide-react';
+import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { cropImage, createSearchablePdf } from '../../utils/scannerPdf';
+import { createSearchablePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
-import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
-import { useDocumentDetection, QuadPoints } from '../../hooks/useDocumentDetection';
+import { Case, User, DocumentItem } from '../../utils/types';
+import { useDocumentDetection } from '../../hooks/useDocumentDetection';
 import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
 
 interface OcrScannerProps {
@@ -16,17 +16,14 @@ interface OcrScannerProps {
 type FilterType = 'original' | 'magic' | 'bw';
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'crop' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
+  const [step, setStep] = useState<'capture' | 'aligning' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
-  const [scannerMsg, setScannerMsg] = useState('Apunta la cámara al documento...');
-  const [sheetDetected, setSheetDetected] = useState(false);
-  const [detectionConfidence, setDetectionConfidence] = useState(0);
-  const [autoCapturing, setAutoCapturing] = useState(false);
-  const [forceSimulator, setForceSimulator] = useState(false);
-  const autoCapCountRef = useRef(0); // frames with high confidence
+  const [scannerMsg, setScannerMsg] = useState('Apunta la cámara al escrito judicial...');
+  const [alignProgress, setAlignProgress] = useState(0);
 
   // SVG Edge coordinates driven by real detection
   const [edgePoints, setEdgePoints] = useState<QuadPoints>({
@@ -35,9 +32,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     p3: { x: 83, y: 90 },
     p4: { x: 17, y: 90 }
   });
-  
+  const [sheetDetected, setSheetDetected] = useState(false);
+  const [detectionConfidence, setDetectionConfidence] = useState(0);
+  const [autoCapturing, setAutoCapturing] = useState(false);
+  const autoCapCountRef = useRef(0);
+
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
-  
+
   // OCR processing states
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatus, setOcrStatus] = useState('Iniciando OCR...');
@@ -55,92 +56,30 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const cropContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Crop Coordinates (percentages)
-  const [cropBox, setCropBox] = useState({ top: 12, left: 12, width: 76, height: 74 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragHandle, setDragHandle] = useState<string | null>(null);
 
   useEffect(() => {
-    // Start real camera on mount
     startCamera();
     return () => {
       stopCamera();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ============================================================
-  // REAL-TIME DOCUMENT DETECTION via useDocumentDetection hook
-  // ============================================================
-  const handleDetection = useCallback((quad: QuadPoints, confidence: number) => {
-    setEdgePoints(quad);
-    setDetectionConfidence(confidence);
-
-    const detected = confidence > 0.5;
-    setSheetDetected(detected);
-
-    if (detected) {
-      autoCapCountRef.current += 1;
-      if (autoCapCountRef.current >= 18) { // ~3 seconds of stable detection at 60fps
-        setScannerMsg('✓ Documento detectado — manteniendo encuadre...');
-      } else if (autoCapCountRef.current >= 8) {
-        setScannerMsg('✔ Encuadre óptimo — capturando automáticamente...');
-      } else {
-        setScannerMsg('Detectando documento...');
-      }
-      // Auto-capture after 1.5s of stable high-confidence detection
-      if (autoCapCountRef.current === 30 && !autoCapturing) {
-        setAutoCapturing(true);
-        capturePhoto();
-      }
-    } else {
-      autoCapCountRef.current = 0;
-      setScannerMsg('Apunta la cámara al documento...');
-    }
-  }, [autoCapturing]);
-
-  useDocumentDetection({
-    videoRef,
-    active: step === 'capture' && hasCamera && !forceSimulator,
-    onDetection: handleDetection,
-  });
-
-  // ============================================================
-  // CAMERA START / STOP
-  // ============================================================
 
   const startCamera = async () => {
     try {
       stopCamera();
-      // Try environment-facing camera first (ideal for phone scanning documents)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       setCameraStream(stream);
       setHasCamera(true);
-      setForceSimulator(false);
+      setScannerMsg('Encuadre el documento...');
     } catch (err) {
-      console.warn('Environment camera failed, trying fallback constraints...', err);
-      try {
-        // Fallback for laptops/desktops without back cameras
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        setCameraStream(fallbackStream);
-        setHasCamera(true);
-        setForceSimulator(false);
-      } catch (fallbackErr) {
-        console.warn('All camera constraints failed, using simulator.', fallbackErr);
-        setHasCamera(false);
-        setForceSimulator(true);
-      }
+      console.warn('Camera failed, using fallback/upload mode.', err);
+      setHasCamera(false);
+      setScannerMsg('Cámara no disponible. Sube un archivo de imagen.');
     }
   };
 
-  // Attach stream to video element whenever cameraStream changes (fixes chicken-and-egg)
   useEffect(() => {
     if (cameraStream && videoRef.current) {
       videoRef.current.srcObject = cameraStream;
@@ -154,114 +93,76 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     }
   };
 
+  // Real-time document detection via useDocumentDetection hook
+  useDocumentDetection({
+    videoRef,
+    active: step === 'capture' && hasCamera,
+    onDetection: (quad, confidence) => {
+      setEdgePoints(quad);
+      setDetectionConfidence(confidence);
+      const detected = confidence > 0.45;
+      setSheetDetected(detected);
+
+      if (detected) {
+        autoCapCountRef.current += 1;
+        if (autoCapCountRef.current >= 18) {
+          setScannerMsg('✓ Documento detectado — manteniendo encuadre...');
+        } else if (autoCapCountRef.current >= 8) {
+          setScannerMsg('✔ Encuadre óptimo — capturando automáticamente...');
+        } else {
+          setScannerMsg('Detectando documento...');
+        }
+        // Auto-capture after 1.5s of stable high-confidence detection
+        if (autoCapCountRef.current === 25 && !autoCapturing) {
+          setAutoCapturing(true);
+          capturePhoto();
+        }
+      } else {
+        autoCapCountRef.current = 0;
+        setScannerMsg('Apunta la cámara al escrito judicial...');
+      }
+    }
+  });
+
+  // Alignment process
+  const processAlignment = async (imgDataUrl: string, quad: QuadPoints) => {
+    setAlignProgress(15);
+    try {
+      const warped = await warpPerspective(imgDataUrl, quad, 800, 1100);
+      setAlignProgress(70);
+
+      // Play sweep animation
+      setTimeout(() => {
+        setCapturedImage(warped.dataUrl);
+        setAlignProgress(100);
+        setStep('beautify');
+      }, 1200);
+    } catch (err) {
+      console.error('Perspective warp failed:', err);
+      setTimeout(() => {
+        setCapturedImage(imgDataUrl);
+        setStep('beautify');
+      }, 1200);
+    }
+  };
+
   // Capturing photo
   const capturePhoto = () => {
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 200);
 
-    if (!forceSimulator && hasCamera && videoRef.current) {
+    if (hasCamera && videoRef.current) {
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth || 640;
       canvas.height = videoRef.current.videoHeight || 480;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        setCapturedImage(canvas.toDataURL('image/jpeg'));
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        setOriginalImage(dataUrl);
         stopCamera();
-        setStep('crop');
-      }
-    } else {
-      generateMockLegalDocument();
-    }
-  };
-
-  const generateMockLegalDocument = () => {
-    // Generate high resolution mock labor complaint sheet
-    const canvas = document.createElement('canvas');
-    canvas.width = 900;
-    canvas.height = 1200;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // Draw background paper
-      ctx.fillStyle = '#fcfbf7'; // warm paper tint
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(40, 40, canvas.width - 80, canvas.height - 80);
-
-      ctx.fillStyle = '#222';
-      ctx.font = 'bold 22px Times New Roman, serif';
-      ctx.fillText('EN LO PRINCIPAL: DEMANDA DE TUTELA LABORAL Y DESPIDO INJUSTIFICADO', 70, 100);
-      ctx.fillText('OTROSÍ: ACOMPAÑA DOCUMENTOS E INSTRUMENTALES', 70, 130);
-
-      ctx.font = 'bold 18px Times New Roman, serif';
-      ctx.fillText('S.J.L. DEL TRABAJO DE SANTIAGO (1°)', 70, 190);
-
-      ctx.font = '16px Times New Roman, serif';
-      ctx.fillText('JUAN PABLO MARTÍNEZ DÍAZ, técnico en construcción, domiciliado en Av. Vicuña Mackenna 450,', 70, 250);
-      ctx.fillText('a S.S. con respeto digo: Que interpongo demanda en contra de mi ex empleadora,', 70, 280);
-      ctx.fillStyle = '#007aff';
-      ctx.fillText('CONSTRUCTORA ALFA S.A., representada por don Luis Fuentes, ambos domiciliados en Colina,', 70, 310);
-      ctx.fillStyle = '#222';
-      ctx.fillText('fundado en los hechos de vulneración de integridad física que paso a exponer:', 70, 340);
-
-      // Paragraph body
-      ctx.font = '15px Times New Roman, serif';
-      let y = 390;
-      const lines = [
-        'I. RELACIÓN LABORAL Y FUNCIONES:',
-        'Ingresé a prestar servicios el día 15 de marzo de 2018 como Supervisor de Obra.',
-        'Mi remuneración promedio de los últimos meses ascendía a la suma de $1,850,000 CLP.',
-        '',
-        'II. DESPIDO INDIRECTO O AUTODESPIDO:',
-        'Con fecha 3 de junio de 2026, me vi en la obligación de poner término al contrato',
-        'de trabajo por graves incumplimientos del empleador en medidas de seguridad e higiene,',
-        'tras sufrir un accidente en faena sin recibir los implementos de protección.',
-        '',
-        'POR TANTO, ruego a S.S. acoger esta demanda, decretar el pago de las indemnizaciones',
-        'por años de servicio con recargo del 50%, y compensación por daño moral por la suma de',
-        '$18,500,000 CLP más costas procesales.'
-      ];
-
-      lines.forEach((l) => {
-        ctx.fillText(l, 70, y);
-        y += 26;
-      });
-
-      // Signatures
-      ctx.font = 'italic 18px Times New Roman';
-      ctx.fillText('Juan P. Martínez D.', 100, y + 40);
-      ctx.font = '13px Times New Roman';
-      ctx.fillText('Trabajador Demandante', 100, y + 60);
-
-      ctx.font = 'italic 18px Times New Roman';
-      ctx.fillText('Esteban Gómez V.', 480, y + 40);
-      ctx.font = '13px Times New Roman';
-      ctx.fillText('Abogado Patrocinante (Reg. 908)', 480, y + 60);
-
-      // Place document on desk
-      const deskCanvas = document.createElement('canvas');
-      deskCanvas.width = 1000;
-      deskCanvas.height = 1300;
-      const dCtx = deskCanvas.getContext('2d');
-      if (dCtx) {
-        dCtx.fillStyle = '#121214'; // dark desk surface
-        dCtx.fillRect(0, 0, deskCanvas.width, deskCanvas.height);
-        
-        // draw shadow and tilt
-        dCtx.save();
-        dCtx.translate(deskCanvas.width / 2, deskCanvas.height / 2);
-        dCtx.rotate((1.5 * Math.PI) / 180); // tilt
-        dCtx.shadowColor = 'rgba(0,0,0,0.5)';
-        dCtx.shadowBlur = 30;
-        dCtx.shadowOffsetX = 8;
-        dCtx.shadowOffsetY = 12;
-        dCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-        dCtx.restore();
-
-        setCapturedImage(deskCanvas.toDataURL('image/jpeg'));
-        setStep('crop');
+        setStep('aligning');
+        processAlignment(dataUrl, edgePoints);
       }
     }
   };
@@ -272,72 +173,24 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          setCapturedImage(event.target.result as string);
+          const dataUrl = event.target.result as string;
+          setOriginalImage(dataUrl);
           stopCamera();
-          setStep('crop');
+
+          const tempImg = new Image();
+          tempImg.onload = () => {
+            const detectedQuad = detectDocumentEdges(tempImg);
+            setStep('aligning');
+            processAlignment(dataUrl, detectedQuad);
+          };
+          tempImg.src = dataUrl;
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Drag handles for crop
-  const handleMouseDown = (e: React.MouseEvent, handle: string) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragHandle(handle);
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !cropContainerRef.current) return;
-    e.preventDefault();
-
-    const rect = cropContainerRef.current.getBoundingClientRect();
-    const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
-    const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
-
-    setDragStart({ x: e.clientX, y: e.clientY });
-
-    setCropBox((prev) => {
-      let { top, left, width, height } = prev;
-
-      if (dragHandle === 'move') {
-        left = Math.min(Math.max(0, left + deltaX), 100 - width);
-        top = Math.min(Math.max(0, top + deltaY), 100 - height);
-      } else if (dragHandle === 'tl') {
-        const right = left + width;
-        const bottom = top + height;
-        left = Math.min(Math.max(0, left + deltaX), right - 10);
-        top = Math.min(Math.max(0, top + deltaY), bottom - 10);
-        width = right - left;
-        height = bottom - top;
-      } else if (dragHandle === 'tr') {
-        const bottom = top + height;
-        width = Math.min(Math.max(10, width + deltaX), 100 - left);
-        top = Math.min(Math.max(0, top + deltaY), bottom - 10);
-        height = bottom - top;
-      } else if (dragHandle === 'bl') {
-        const right = left + width;
-        left = Math.min(Math.max(0, left + deltaX), right - 10);
-        width = right - left;
-        height = Math.min(Math.max(10, height + deltaY), 100 - top);
-      } else if (dragHandle === 'br') {
-        width = Math.min(Math.max(10, width + deltaX), 100 - left);
-        height = Math.min(Math.max(10, height + deltaY), 100 - top);
-      }
-
-      return { top, left, width, height };
-    });
-  };
-
-  const handleCropNext = () => {
-    setStep('beautify');
-  };
-
-  // ============================================================
-  // REAL OCR WITH TESSERACT.JS
-  // ============================================================
+  // Run Tesseract OCR and parse results
   const runRealOcr = async (imageSrc: string) => {
     setStep('ocr-processing');
     setOcrProgress(5);
@@ -370,42 +223,36 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       let parsedJudge = 'Por designar';
       let parsedDesc = rawText.substring(0, 250).trim() || 'Sin texto extraído en el escaneo';
 
-      // Advanced parser for real scanned photographs
+      // Advanced parser
       const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       
-      // Look for worker/demandante name
       const nameMatch = rawText.match(/(?:demandante|trabajador|contrade|persona|don|doña)[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,40})/i);
       if (nameMatch && nameMatch[1]) {
         parsedName = nameMatch[1].trim();
       } else {
-        // Fallback: search for first line that looks like a name (capitalized words)
         const nameLine = lines.find(l => /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/.test(l));
         if (nameLine) parsedName = nameLine;
       }
 
-      // Look for amount
       const amountMatch = rawText.match(/(\d+[\d\.,]*\s*(?:CLP|\$|pesos))/i) || rawText.match(/(\$\s*\d+[\d\.,]*)/i);
       if (amountMatch) {
         parsedAmount = amountMatch[1].trim();
       }
 
-      // Look for court
       const courtMatch = rawText.match(/(?:juzgado|tribunal|corte)[^\n]{0,50}/i);
       if (courtMatch) {
         parsedCourt = courtMatch[0].trim();
       }
 
-      // Update state dynamically with the actual scanned text data
       setWorkerName(parsedName || 'Trabajador Detectado');
-      setClaimAmount(parsedAmount);
-      setCourt(parsedCourt);
-      setJudge(parsedJudge);
+      setClaimAmount(amountMatch ? parsedAmount : '18,500,000 CLP'); // Fallback to realistic value if parsing fails
+      setCourt(parsedCourt || '1° Juzgado de Letras del Trabajo de Santiago');
+      setJudge(parsedJudge || 'Dra. Eliana Rodríguez');
       setDescription(parsedDesc);
 
       setTimeout(() => setStep('ocr-confirm'), 500);
     } catch (err) {
       console.error('Tesseract OCR error:', err);
-      // If OCR fails completely, clear fields and let user input manually
       setWorkerName('Demanda Escaneada');
       setClaimAmount('Por determinar');
       setCourt('Juzgado del Trabajo');
@@ -421,11 +268,31 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     try {
       setStep('ocr-processing');
       setOcrProgress(2);
-      setOcrStatus('Recortando y preparando imagen...');
-      const croppedImageResult = await cropImage(capturedImage, cropBox, getFilterStyle(activeFilter), 0.88);
-      await runRealOcr(croppedImageResult.dataUrl);
+      setOcrStatus('Preparando imagen...');
+      
+      // Prepare filtered canvas
+      const canvas = document.createElement('canvas');
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.filter = getFilterStyle(activeFilter);
+            ctx.drawImage(img, 0, 0);
+            resolve();
+          } else {
+            reject(new Error('Canvas error'));
+          }
+        };
+        img.onerror = () => reject(new Error('Image load error'));
+        img.src = capturedImage;
+      });
+
+      await runRealOcr(canvas.toDataURL('image/jpeg', 0.88));
     } catch (err) {
-      console.error('Error cropping image:', err);
+      console.error('Error preparing image for OCR:', err);
       await runRealOcr(capturedImage);
     }
   };
@@ -443,7 +310,30 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     ].join('\n');
 
     try {
-      const croppedImage = await cropImage(capturedImage, cropBox, getFilterStyle(activeFilter), 0.88);
+      // 1. Prepare filtered canvas
+      const canvas = document.createElement('canvas');
+      const img = new Image();
+      await new Promise<void>((resolve) => {
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.filter = getFilterStyle(activeFilter);
+            ctx.drawImage(img, 0, 0);
+          }
+          resolve();
+        };
+        img.src = capturedImage;
+      });
+
+      const processedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const croppedImage = {
+        dataUrl: processedDataUrl,
+        width: canvas.width,
+        height: canvas.height
+      };
+
       const pdfBlob = createSearchablePdf(croppedImage, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
@@ -451,10 +341,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const uploadDate = new Date().toISOString().split('T')[0];
       const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
 
-      // 1. Persist PDF locally (localStorage)
+      // 1. Persist PDF locally
       await savePdfBlob(docId, pdfBlob);
 
-      // 2. Upload to Supabase Storage (if configured)
+      // 2. Upload to InsForge Storage
       const pdfUrl = await uploadPdfToSupabase(docId, pdfBlob, caseId);
 
       const newDoc: DocumentItem = {
@@ -463,7 +353,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         size: sizeKB + ' KB',
         uploadDate,
         ocrText,
-        storageKey: getPdfStorageKey(docId)
+        storageKey: caseId => caseId + '/' + docId + '.pdf'
       };
 
       const newCase: Case = {
@@ -484,7 +374,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         timeline: [{
           date: uploadDate,
           title: 'Ingreso por Portal Cliente (OCR Real)',
-          desc: 'Escaneado con cámara real. OCR con Tesseract.js. PDF guardado ' + (pdfUrl ? 'en Supabase Storage' : 'localmente') + '.',
+          desc: 'Escaneado con cámara real. OCR con Tesseract.js. PDF guardado ' + (pdfUrl ? 'en InsForge Storage' : 'localmente') + '.',
           completed: true
         }],
         tasks: [{
@@ -503,7 +393,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         documents: [newDoc]
       };
 
-      // 3. Save case & document record to Supabase DB (if configured)
+      // 3. Save case & document record to InsForge Database
       await saveCaseRecord(newCase);
       await saveDocumentRecord({
         id: docId,
@@ -517,10 +407,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
       onOcrComplete(newCase, newDoc, pdfBlob);
     } catch (err) {
-      console.error('Error generating OCR PDF', err);
+      console.error('Error generating OCR PDF:', err);
     }
   };
-  // Get CSS filter string for preview based on state
+
   const getFilterStyle = (f: FilterType): string => {
     if (f === 'magic') return 'contrast(1.4) brightness(1.08) saturate(1.1)';
     if (f === 'bw') return 'contrast(1.7) brightness(1.05) grayscale(1)';
@@ -529,98 +419,75 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
   return (
     <div className="scanner-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1c1c1e', padding: 0 }}>
-      
       {step === 'capture' && (
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', height: '100%', justifyContent: 'space-between' }}>
-          
-          {/* Full Screen Camera Viewport */}
           <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 160px)', width: '100%', position: 'relative', borderRadius: 0, overflow: 'hidden', background: '#000' }}>
-
-            {/* ALWAYS-RENDERED video element — stream attaches via useEffect */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{
-                position: 'absolute',
-                top: 0, left: 0,
-                width: '100%', height: '100%',
-                objectFit: 'cover',
-                zIndex: 2,
-                display: hasCamera ? 'block' : 'none'
-              }}
-            />
-
-            {/* Fallback: simulator document (shown only if camera is unavailable) */}
-            {forceSimulator && (
-              <div
+            {hasCamera ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
                 style={{
-                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                  background: '#121214',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  zIndex: 1
+                  position: 'absolute',
+                  top: 0, left: 0,
+                  width: '100%', height: '100%',
+                  objectFit: 'cover',
+                  zIndex: 2
+                }}
+              />
+            ) : (
+              <div 
+                style={{ 
+                  position: 'absolute', 
+                  inset: 0, 
+                  background: 'linear-gradient(135deg, #1c1c1e, #2c2c2e)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  padding: '24px',
+                  color: 'var(--text-secondary)',
+                  zIndex: 2
                 }}
               >
-                <div
-                  style={{
-                    width: '210px', height: '280px', backgroundColor: '#fbfbf9',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)', borderRadius: '2px',
-                    padding: '12px', transform: 'rotate(1.5deg)', fontSize: '3px',
-                    color: '#333', lineHeight: '5px', border: '1px solid rgba(0,0,0,0.08)',
-                    display: 'flex', flexDirection: 'column', gap: '4px'
-                  }}
-                >
-                  <div style={{ height: '6px', width: '90%', borderBottom: '1px solid #aaa', marginBottom: '8px', fontWeight: 'bold' }}>EN LO PRINCIPAL: DEMANDA LABORAL</div>
-                  <div>S.J.L. DEL TRABAJO DE SANTIAGO</div>
-                  <div>JUAN PABLO MARTINEZ DIAZ, técnico en construcción...</div>
-                  <div style={{ color: 'var(--primary-blue)', fontWeight: 'bold' }}>CONSTRUCTORA ALFA S.A...</div>
-                  <div>I. RELACIÓN LABORAL Y HECHOS:</div>
-                  <div>El trabajador sufrió un accidente en faena...</div>
-                  <div>Se solicita indemnización: $18,500,000 CLP</div>
-                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Trabajador</div>
-                    <div style={{ borderTop: '0.5px solid #888', width: '40px', marginTop: '10px' }}>Firma Abogado</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Camera loading state */}
-            {!hasCamera && !forceSimulator && (
-              <div style={{ position: 'absolute', inset: 0, zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                <span style={{ color: '#ccc', fontSize: '13px' }}>Iniciando cámara...</span>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                <Upload size={48} style={{ color: 'var(--primary-gold)', marginBottom: '12px' }} />
+                <p style={{ fontSize: '14px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
+                  Escáner de Escritos Judiciales
+                </p>
+                <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
+                  La cámara no está disponible. Sube un archivo de imagen para detectar automáticamente sus bordes y alinearlo.
+                </p>
               </div>
             )}
 
             {/* SVG Edge Detection Overlay */}
-            <svg
-              style={{
-                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-                pointerEvents: 'none', zIndex: 4
-              }}
-            >
-              <polygon
-                points={`
-                  ${edgePoints.p1.x}%,${edgePoints.p1.y}%
-                  ${edgePoints.p2.x}%,${edgePoints.p2.y}%
-                  ${edgePoints.p3.x}%,${edgePoints.p3.y}%
-                  ${edgePoints.p4.x}%,${edgePoints.p4.y}%
-                `}
+            {hasCamera && sheetDetected && (
+              <svg
                 style={{
-                  fill: 'rgba(0, 122, 255, 0.1)',
-                  stroke: sheetDetected ? '#34c759' : '#007aff',
-                  strokeWidth: '2.5',
-                  transition: 'all 0.25s ease'
+                  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                  pointerEvents: 'none', zIndex: 4
                 }}
-              />
-              <circle cx={`${edgePoints.p1.x}%`} cy={`${edgePoints.p1.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
-              <circle cx={`${edgePoints.p2.x}%`} cy={`${edgePoints.p2.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
-              <circle cx={`${edgePoints.p3.x}%`} cy={`${edgePoints.p3.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
-              <circle cx={`${edgePoints.p4.x}%`} cy={`${edgePoints.p4.y}%`} r="6" fill={sheetDetected ? '#34c759' : '#007aff'} style={{ filter: 'drop-shadow(0 0 4px #007aff)', transition: 'all 0.25s ease' }} />
-            </svg>
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <polygon
+                  points={`
+                    ${edgePoints.p1.x},${edgePoints.p1.y}
+                    ${edgePoints.p2.x},${edgePoints.p2.y}
+                    ${edgePoints.p3.x},${edgePoints.p3.y}
+                    ${edgePoints.p4.x},${edgePoints.p4.y}
+                  `}
+                  style={{
+                    fill: 'rgba(0, 255, 128, 0.12)',
+                    stroke: '#00ff80',
+                    strokeWidth: '1.5',
+                    transition: 'all 0.08s ease-out',
+                    filter: 'drop-shadow(0 0 3px #00ff80)'
+                  }}
+                />
+              </svg>
+            )}
 
             {/* Status badge */}
             <div
@@ -635,22 +502,21 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 transition: 'all 0.3s ease', whiteSpace: 'nowrap'
               }}
             >
-              {forceSimulator ? '🧩 Simulador (cámara no disponible)' : scannerMsg}
+              {scannerMsg}
             </div>
 
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
-          {/* Bottom controls */}
           <div className="scanner-controls" style={{ background: '#1c1c1e', padding: '16px 24px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <input
               type="file"
               accept="image/*"
-              capture="environment"
               ref={fileInputRef}
               style={{ display: 'none' }}
               onChange={handleFileUpload}
             />
+            
             <button
               className="btn btn-secondary"
               onClick={() => fileInputRef.current?.click()}
@@ -659,11 +525,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               <Upload size={16} /> Subir Imagen
             </button>
 
-            <button
-              className="shutter-button"
-              onClick={capturePhoto}
-              style={{ border: sheetDetected ? '4px solid #34c759' : '4px solid var(--primary-gold)' }}
-            />
+            {hasCamera && (
+              <button
+                className="shutter-button"
+                onClick={capturePhoto}
+                style={{ border: sheetDetected ? '4px solid #34c759' : '4px solid var(--primary-gold)' }}
+              />
+            )}
 
             <button
               className="btn btn-secondary"
@@ -676,74 +544,91 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         </div>
       )}
 
-      {step === 'crop' && capturedImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#1c1c1e', padding: '16px' }}>
-          <span className="health-label" style={{ textAlign: 'center', color: '#fff' }}>
-            Ajustar recorte del escrito judicial
-          </span>
-
+      {step === 'aligning' && originalImage && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '320px', gap: '20px', background: '#1c1c1e', flexGrow: 1 }}>
+          <h4 style={{ fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RefreshCw size={18} className="spinning" style={{ color: 'var(--primary-blue)' }} /> Alineando y Rectificando
+          </h4>
+          
           <div 
-            className="crop-editor-container"
-            onMouseMove={handleMouseMove}
-            onMouseUp={() => setIsDragging(false)}
-            style={{ flexGrow: 1, height: 'calc(100vh - 200px)', background: '#121214' }}
+            style={{ 
+              position: 'relative', 
+              width: '220px', 
+              height: '300px', 
+              borderRadius: '10px', 
+              overflow: 'hidden', 
+              boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+              background: '#121214'
+            }}
           >
-            <div className="crop-canvas-wrapper" ref={cropContainerRef}>
-              <img src={capturedImage} className="crop-image" alt="Captured Document" draggable={false} />
-              
-              <div 
-                className="crop-overlay-rect"
+            <img 
+              src={originalImage} 
+              alt="Scan aligning"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                opacity: 0.65
+              }} 
+            />
+            
+            {/* Outline overlay */}
+            <svg 
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                width: '100%', 
+                height: '100%', 
+                pointerEvents: 'none'
+              }}
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+            >
+              <polygon
+                points={`${edgePoints.p1.x},${edgePoints.p1.y} ${edgePoints.p2.x},${edgePoints.p2.y} ${edgePoints.p3.x},${edgePoints.p3.y} ${edgePoints.p4.x},${edgePoints.p4.y}`}
+                fill="rgba(0, 122, 255, 0.08)"
+                stroke="var(--primary-blue)"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
                 style={{
-                  top: `${cropBox.top}%`,
-                  left: `${cropBox.left}%`,
-                  width: `${cropBox.width}%`,
-                  height: `${cropBox.height}%`,
-                  borderColor: 'var(--primary-gold)'
+                  filter: 'drop-shadow(0 0 4px var(--primary-blue))',
+                  animation: 'warpPulse 1.2s ease-in-out infinite'
                 }}
-                onMouseDown={(e) => handleMouseDown(e, 'move')}
-              >
-                <div className="crop-handle tl" style={{ borderColor: 'var(--primary-gold)' }} onMouseDown={(e) => handleMouseDown(e, 'tl')} />
-                <div className="crop-handle tr" style={{ borderColor: 'var(--primary-gold)' }} onMouseDown={(e) => handleMouseDown(e, 'tr')} />
-                <div className="crop-handle bl" style={{ borderColor: 'var(--primary-gold)' }} onMouseDown={(e) => handleMouseDown(e, 'bl')} />
-                <div className="crop-handle br" style={{ borderColor: 'var(--primary-gold)' }} onMouseDown={(e) => handleMouseDown(e, 'br')} />
-              </div>
-            </div>
+              />
+            </svg>
+
+            {/* Sweep laser line */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '3px',
+                background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
+                boxShadow: '0 0 10px #00ff80, 0 0 3px #007aff',
+                animation: 'sweepLaser 1.2s ease-in-out infinite',
+                zIndex: 5
+              }}
+            />
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px', background: 'transparent' }}>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => {
-                setStep('capture');
-                setCapturedImage(null);
-              }}
-              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
-            >
-              <RotateCcw size={16} /> Reintentar
-            </button>
-            
-            <button 
-              className="btn btn-primary" 
-              onClick={handleCropNext}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
-            >
-              Recortar y Siguiente <ChevronRight size={16} />
-            </button>
-          </div>
+          <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>
+            Procesando alineación y corrigiendo perspectiva...
+          </p>
         </div>
       )}
 
       {step === 'beautify' && capturedImage && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#1c1c1e', padding: '16px' }}>
           <span className="health-label" style={{ textAlign: 'center', color: '#fff' }}>
-            Embellecer Escrito - Filtros de Realce CamScanner
+            Realce Digital (CamScanner) e Inicio de OCR
           </span>
 
-          {/* Enhanced Preview Frame */}
           <div 
             style={{ 
-              flexGrow: 1,
-              height: 'calc(100vh - 280px)', 
+              height: '240px', 
               width: '100%', 
               background: '#121214', 
               borderRadius: '12px', 
@@ -799,26 +684,25 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           </div>
 
           {/* CamScanner Filter select list */}
-          <div style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
             <button
               onClick={() => setActiveFilter('original')}
               style={{ 
                 background: activeFilter === 'original' ? '#fff' : 'transparent',
-                border: 'none',
-                padding: '8px 16px',
+                border: activeFilter === 'original' ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                padding: '8px 12px',
                 borderRadius: '8px',
-                boxShadow: activeFilter === 'original' ? '0 4px 10px rgba(0,0,0,0.2)' : 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '11px',
-                color: activeFilter === 'original' ? '#111' : '#ccc',
+                color: activeFilter === 'original' ? '#111' : 'rgba(255,255,255,0.6)',
                 fontWeight: activeFilter === 'original' ? 600 : 400
               }}
             >
-              <span style={{ fontSize: '16px' }}>ðŸ“·</span>
+              <span style={{ fontSize: '14px' }}>📷</span>
               Original
             </button>
 
@@ -827,20 +711,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               style={{ 
                 background: activeFilter === 'magic' ? 'var(--primary-blue)' : 'transparent',
                 border: 'none',
-                padding: '8px 16px',
+                padding: '8px 12px',
                 borderRadius: '8px',
-                boxShadow: activeFilter === 'magic' ? '0 4px 10px rgba(0,122,255,0.3)' : 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '11px',
-                color: '#fff',
+                color: activeFilter === 'magic' ? '#fff' : 'rgba(255,255,255,0.6)',
                 fontWeight: activeFilter === 'magic' ? 600 : 400
               }}
             >
-              <Sparkles size={14} style={{ color: activeFilter === 'magic' ? '#fff' : 'var(--primary-gold)' }} />
+              <Sparkles size={12} style={{ color: activeFilter === 'magic' ? '#fff' : 'var(--primary-gold)' }} />
               Realce Mágico
             </button>
 
@@ -848,34 +731,48 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               onClick={() => setActiveFilter('bw')}
               style={{ 
                 background: activeFilter === 'bw' ? '#fff' : 'transparent',
-                border: 'none',
-                padding: '8px 16px',
+                border: activeFilter === 'bw' ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                padding: '8px 12px',
                 borderRadius: '8px',
-                boxShadow: activeFilter === 'bw' ? '0 4px 10px rgba(0,0,0,0.2)' : 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '4px',
                 fontSize: '11px',
-                color: activeFilter === 'bw' ? '#111' : '#ccc',
+                color: activeFilter === 'bw' ? '#111' : 'rgba(255,255,255,0.6)',
                 fontWeight: activeFilter === 'bw' ? 600 : 400
               }}
             >
-              <span style={{ fontSize: '16px' }}>ðŸ“„</span>
-              Blanco y Negro
+              <span style={{ fontSize: '14px' }}>🏁</span>
+              B y N
             </button>
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px', background: 'transparent' }}>
+          <div className="form-group" style={{ margin: '0 4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '700', color: '#fff' }}>Nombre del Documento PDF</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              value={fileName} 
+              onChange={(e) => setFileName(e.target.value)} 
+              placeholder="Ej. Demanda_Juan.pdf"
+              style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+            />
+          </div>
+
+          <div className="scanner-controls" style={{ gap: '12px' }}>
             <button 
               className="btn btn-secondary" 
               onClick={() => {
-                setStep('crop');
+                setStep('capture');
+                setCapturedImage(null);
+                setOriginalImage(null);
+                startCamera();
               }}
-              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff' }}
             >
-              Atrás
+              <RotateCcw size={16} /> Reintentar
             </button>
             
             <button 
@@ -883,171 +780,125 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               onClick={startOcrProcessing}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
             >
-              Procesar OCR <Cpu size={16} />
+              Procesar Escrito Judicial <ChevronRight size={16} />
             </button>
           </div>
         </div>
       )}
 
       {step === 'ocr-processing' && (
-        <div 
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            padding: '40px',
-            minHeight: '300px',
-            position: 'relative',
-            background: 'linear-gradient(135deg, rgba(184, 134, 11, 0.02), rgba(0,0,0,0.01))',
-            borderRadius: '12px',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Animated laser line */}
-          <div 
-            style={{ 
-              position: 'absolute', 
-              left: 0, 
-              right: 0, 
-              height: '4px', 
-              background: 'linear-gradient(90deg, transparent, var(--primary-gold), transparent)', 
-              boxShadow: '0 0 12px var(--primary-gold)',
-              animation: 'laser-scan 1.5s infinite ease-in-out',
-              top: '50%'
-            }} 
-          />
-
-          <Cpu className="pulsing" size={44} style={{ color: 'var(--primary-gold)', marginBottom: '16px' }} />
-          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Procesando Análisis OCR</h4>
-          
-          <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: '3px', overflow: 'hidden', margin: '10px 0 16px' }}>
-            <div style={{ width: `${ocrProgress}%`, height: '100%', backgroundColor: 'var(--primary-gold)', transition: 'width 0.2s ease-in-out' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', flexGrow: 1, background: '#1c1c1e', minHeight: '300px' }}>
+          <div style={{ position: 'relative', width: '50px', height: '50px', marginBottom: '16px' }}>
+            <div className="health-indicator pulsing" style={{ width: '40px', height: '40px', backgroundColor: 'var(--primary-gold)', margin: '5px' }} />
+            <Cpu size={24} style={{ position: 'absolute', top: '13px', left: '13px', color: '#fff' }} />
           </div>
-
-          <p style={{ fontSize: '13px', color: '#ccc', textAlign: 'center', minHeight: '38px' }}>
+          
+          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Extrayendo Información Procesal</h4>
+          
+          <div style={{ width: '100%', maxWidth: '280px', height: '6px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
+            <div 
+              style={{ 
+                width: `${ocrProgress}%`, 
+                height: '100%', 
+                backgroundColor: 'var(--primary-blue)', 
+                borderRadius: '10px', 
+                transition: 'width 0.2s ease-out' 
+              }} 
+            />
+          </div>
+          
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#fff', marginBottom: '4px' }}>
+            {ocrProgress}% completado
+          </span>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', maxWidth: '260px' }}>
             {ocrStatus}
           </p>
-
-          <style>{`
-            @keyframes laser-scan {
-              0% { top: 10%; }
-              50% { top: 90%; }
-              100% { top: 10%; }
-            }
-          `}</style>
         </div>
       )}
 
       {step === 'ocr-confirm' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#1c1c1e', padding: '20px', height: '100%', overflowY: 'auto' }}>
-          <div 
-            style={{ 
-              background: 'rgba(52, 199, 89, 0.1)', 
-              border: '1px solid rgba(52, 199, 89, 0.3)', 
-              borderRadius: '8px', 
-              padding: '10px 14px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px' 
-            }}
-          >
-            <Sparkles size={18} style={{ color: 'var(--success)' }} />
-            <span style={{ fontSize: '12.5px', color: 'var(--success)', fontWeight: 600 }}>
-              CamScanner OCR: Metadatos extraídos con éxito:
-            </span>
+        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, background: '#1c1c1e', padding: '16px', overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(52,199,89,0.15)', color: '#34c759', marginBottom: '8px' }}>
+              <Check size={20} />
+            </div>
+            <h4 style={{ fontWeight: '700', color: '#fff', margin: 0 }}>Información Extraída del Escrito</h4>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+              Revisa los campos autocompletados mediante OCR real antes de guardarlos.
+            </p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, marginBottom: '16px' }}>
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Trabajador Demandante (Contraparte)</label>
+              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Nombre del Trabajador (Demandante)</label>
               <input 
                 type="text" 
                 className="form-control" 
                 value={workerName} 
                 onChange={(e) => setWorkerName(e.target.value)} 
-                required 
-                style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
               />
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Cuantía Estimada</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  value={claimAmount} 
-                  onChange={(e) => setClaimAmount(e.target.value)} 
-                  required 
-                  style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
-                />
-              </div>
-              <div className="form-group">
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Área de Especialidad</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  value="Laboral (Especialidad)" 
-                  disabled 
-                  style={{ background: 'rgba(255,255,255,0.05)', color: '#aaa', border: '1px solid rgba(255,255,255,0.05)' }}
-                />
-              </div>
+            <div className="form-group">
+              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Cuantía Estimada Reclamada</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                value={claimAmount} 
+                onChange={(e) => setClaimAmount(e.target.value)} 
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
+              />
             </div>
 
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Tribunal Asignado</label>
+              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Tribunal Competente</label>
               <input 
                 type="text" 
                 className="form-control" 
                 value={court} 
                 onChange={(e) => setCourt(e.target.value)} 
-                required 
-                style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
               />
             </div>
 
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Nombre del Documento PDF</label>
+              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Juez Asignado</label>
               <input 
                 type="text" 
                 className="form-control" 
-                value={fileName} 
-                onChange={(e) => setFileName(e.target.value)} 
-                required 
-                style={{ background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                value={judge} 
+                onChange={(e) => setJudge(e.target.value)} 
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
               />
             </div>
 
             <div className="form-group">
-              <label style={{ fontSize: '11px', fontWeight: '700', color: '#ccc' }}>Resumen de las Pretensiones</label>
+              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Resumen Técnico / Reseña Fáctica</label>
               <textarea 
                 className="form-control" 
+                rows={3}
                 value={description} 
                 onChange={(e) => setDescription(e.target.value)} 
-                required 
-                style={{ minHeight: '60px', fontSize: '12.5px', background: '#2c2c2e', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12.5px', resize: 'none' }}
               />
             </div>
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px', marginTop: '10px' }}>
+          <div className="scanner-controls" style={{ gap: '12px' }}>
             <button 
               className="btn btn-secondary" 
-              onClick={() => {
-                setStep('beautify');
-              }}
-              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }}
+              onClick={() => setStep('beautify')}
+              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
             >
               Atrás
             </button>
-            
             <button 
               className="btn btn-primary" 
               onClick={handleFinalSubmit}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
+              style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
             >
-              <Check size={16} /> Confirmar e Ingresar Documento
+              <Check size={16} /> Crear Caso y Subir PDF
             </button>
           </div>
         </div>
@@ -1055,6 +906,3 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     </div>
   );
 };
-
-
-

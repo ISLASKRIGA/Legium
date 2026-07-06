@@ -1823,3 +1823,44 @@ textarea.form-control {
   justify-content: center;
   gap: 8px;
 }
+
+/* Custom Document Scanner Animations & Styling */
+.spinning {
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sweepLaser {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 98%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.8;
+  }
+}
+
+@keyframes warpPulse {
+  0% {
+    filter: drop-shadow(0 0 2px var(--primary-blue));
+    opacity: 0.8;
+  }
+  50% {
+    filter: drop-shadow(0 0 6px var(--primary-blue)) drop-shadow(0 0 2px #00ff80);
+    opacity: 0.95;
+  }
+  100% {
+    filter: drop-shadow(0 0 2px var(--primary-blue));
+    opacity: 0.8;
+  }
+}
+

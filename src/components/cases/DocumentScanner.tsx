@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, FileText, X, RotateCcw, Upload, Check, Image as ImageIcon, ChevronRight, Sparkles, Wand2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Wand2, RefreshCw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { cropImage, createSearchablePdf, DEFAULT_SCANNED_OCR_TEXT } from '../../utils/scannerPdf';
+import { createSearchablePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT } from '../../utils/scannerPdf';
 import { getPdfStorageKey } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
+import { useDocumentDetection } from '../../hooks/useDocumentDetection';
 
 interface DocumentScannerProps {
   onScanComplete: (newDoc: DocumentItem, fileBlob: Blob) => void;
@@ -11,13 +12,25 @@ interface DocumentScannerProps {
 }
 
 export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'crop' | 'beautify' | 'ocr' | 'saving'>('capture');
+  const [step, setStep] = useState<'capture' | 'aligning' | 'beautify' | 'ocr' | 'saving'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
   const [scannerMsg, setScannerMsg] = useState('Coloque el documento en el recuadro');
   const [fileName, setFileName] = useState(`Documento_Escaneado_${Date.now().toString().slice(-4)}.pdf`);
+  
+  // Real-time detection state
+  const [edgePoints, setEdgePoints] = useState<QuadPoints>({
+    p1: { x: 15, y: 10 },
+    p2: { x: 85, y: 10 },
+    p3: { x: 83, y: 90 },
+    p4: { x: 17, y: 90 }
+  });
+  const [sheetDetected, setSheetDetected] = useState(false);
+  const [detectionConfidence, setDetectionConfidence] = useState(0);
+  const [alignProgress, setAlignProgress] = useState(0);
   
   // OCR states
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -27,13 +40,6 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   // Video Ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Crop Coordinates (percentages of container)
-  const [cropBox, setCropBox] = useState({ top: 10, left: 10, width: 80, height: 80 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragHandle, setDragHandle] = useState<string | null>(null); // 'tl', 'tr', 'bl', 'br', or 'move'
-  const cropContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Check camera access and start
   useEffect(() => {
@@ -56,9 +62,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       setHasCamera(true);
       setScannerMsg('Escáner de Cámara Activo');
     } catch (err) {
-      console.warn('No webcam access or no camera found, using simulator.', err);
+      console.warn('No webcam access or no camera found, using file upload mode.', err);
       setHasCamera(false);
-      setScannerMsg('Modo Simulación: Cámara no detectada');
+      setScannerMsg('Cámara no disponible. Sube un archivo de imagen.');
     }
   };
 
@@ -69,13 +75,52 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     }
   };
 
-  // Trigger Flash Shutter
+  // Run real-time edge detection when in capture step
+  useDocumentDetection({
+    videoRef,
+    active: step === 'capture' && hasCamera,
+    onDetection: (quad, confidence) => {
+      setEdgePoints(quad);
+      setDetectionConfidence(confidence);
+      setSheetDetected(confidence > 0.45);
+      if (confidence > 0.45) {
+        setScannerMsg('✓ Documento enfocado');
+      } else {
+        setScannerMsg('Encuadre el documento...');
+      }
+    }
+  });
+
+  // Alignment and Warping Process
+  const processAlignment = async (imgDataUrl: string, quad: QuadPoints) => {
+    setAlignProgress(15);
+    try {
+      // Warp perspective to flatten/straighten sheet
+      const warped = await warpPerspective(imgDataUrl, quad, 800, 1100);
+      setAlignProgress(70);
+
+      // Play alignment animation
+      setTimeout(() => {
+        setCapturedImage(warped.dataUrl);
+        setAlignProgress(100);
+        setStep('beautify');
+      }, 1200);
+    } catch (err) {
+      console.error('Alignment failed:', err);
+      // Fallback
+      setTimeout(() => {
+        setCapturedImage(imgDataUrl);
+        setStep('beautify');
+      }, 1200);
+    }
+  };
+
+  // Capture Photo
   const capturePhoto = () => {
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 300);
 
     if (hasCamera && videoRef.current) {
-      // Capture from video stream
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth || 640;
       canvas.height = videoRef.current.videoHeight || 480;
@@ -83,110 +128,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg');
-        setCapturedImage(dataUrl);
+        setOriginalImage(dataUrl);
         stopCamera();
-        setStep('crop');
-      }
-    } else {
-      // Simulate capturing a document
-      generateMockDocument();
-    }
-  };
-
-  // Create a high-fidelity simulated document image
-  const generateMockDocument = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 1000;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // Draw simulated paper sheet
-      ctx.fillStyle = '#fefefe';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw document styling (borders, headers)
-      ctx.strokeStyle = '#cda250'; // Gold border
-      ctx.lineWidth = 15;
-      ctx.strokeRect(40, 40, canvas.width - 80, canvas.height - 80);
-
-      // Header Text
-      ctx.fillStyle = '#1c1c1e';
-      ctx.font = 'bold 36px Times New Roman, serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('PODER JUDICIAL DE SANTIAGO', canvas.width / 2, 120);
-
-      ctx.font = '22px Times New Roman, serif';
-      ctx.fillText('DOCUMENTO DE RESPALDO PROCESAL', canvas.width / 2, 160);
-
-      // Horizontal separator line
-      ctx.beginPath();
-      ctx.moveTo(100, 200);
-      ctx.lineTo(canvas.width - 100, 200);
-      ctx.strokeStyle = '#e5e5ea';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Simulated Legal paragraphs
-      ctx.fillStyle = '#3a3a3c';
-      ctx.font = '16px Courier New, monospace';
-      ctx.textAlign = 'left';
-
-      const paragraphs = [
-        'En Santiago de Chile, a 4 de julio de 2026, las partes comparecientes',
-        'acuerdan y ratifican los hitos pactados en el marco del procedimiento.',
-        '',
-        'SECCIÓN PRIMERA - DE LAS OBLIGACIONES:',
-        'El demandante conviene en acompañar todos los documentos requeridos,',
-        'incluyendo comprobantes de transferencia y copias de deslindes.',
-        '',
-        'SECCIÓN SEGUNDA - DE LOS PLAZOS:',
-        'Los plazos fatales acordados para responder traslados se fijan en',
-        'un término máximo de 5 días hábiles a contar de esta notificación.',
-        '',
-        'Firma y Constancia Legal de Aceptación Digital:',
-        '____________________________________________'
-      ];
-
-      let yPos = 260;
-      paragraphs.forEach((text) => {
-        ctx.fillText(text, 100, yPos);
-        yPos += 35;
-      });
-
-      // Signature details
-      ctx.fillStyle = '#007aff';
-      ctx.font = 'italic 18px Brush Script MT, cursive, sans-serif';
-      ctx.fillText('Alejandro Torres G.', 150, yPos + 30);
-      ctx.fillStyle = '#222';
-      ctx.font = '14px Courier New';
-      ctx.fillText('Ing. Alejandro Torres - TI Administrador', 100, yPos + 60);
-
-      // Add camera grid distortion simulation for realistic scanning crop feel
-      const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = 900;
-      finalCanvas.height = 1100;
-      const fCtx = finalCanvas.getContext('2d');
-      if (fCtx) {
-        // Draw dark background (desk surface)
-        fCtx.fillStyle = '#1c1c1e';
-        fCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-        
-        // Draw wooden grain details or table texture
-        fCtx.fillStyle = 'rgba(255,255,255,0.02)';
-        for (let i = 0; i < finalCanvas.height; i += 10) {
-          fCtx.fillRect(0, i, finalCanvas.width, 4);
-        }
-
-        // Draw document rotated slightly on the desk to require cropping/straightening
-        fCtx.save();
-        fCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
-        fCtx.rotate((2 * Math.PI) / 180); // 2 degrees tilt
-        fCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
-        fCtx.restore();
-
-        const dataUrl = finalCanvas.toDataURL('image/jpeg');
-        setCapturedImage(dataUrl);
-        setStep('crop');
+        setStep('aligning');
+        processAlignment(dataUrl, edgePoints);
       }
     }
   };
@@ -198,82 +143,23 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          setCapturedImage(event.target.result as string);
+          const dataUrl = event.target.result as string;
+          setOriginalImage(dataUrl);
           stopCamera();
-          setStep('crop');
+          
+          // Run edge detection on the uploaded image static file
+          const tempImg = new Image();
+          tempImg.onload = () => {
+            const detectedQuad = detectDocumentEdges(tempImg);
+            setStep('aligning');
+            processAlignment(dataUrl, detectedQuad);
+          };
+          tempImg.src = dataUrl;
         }
       };
       reader.readAsDataURL(file);
     }
   };
-
-  // Dragging crop handles
-  const handleMouseDown = (e: React.MouseEvent, handle: string) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragHandle(handle);
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !cropContainerRef.current) return;
-    e.preventDefault();
-
-    const rect = cropContainerRef.current.getBoundingClientRect();
-    const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
-    const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
-
-    setDragStart({ x: e.clientX, y: e.clientY });
-
-    setCropBox((prev) => {
-      let { top, left, width, height } = prev;
-
-      if (dragHandle === 'move') {
-        left = Math.min(Math.max(0, left + deltaX), 100 - width);
-        top = Math.min(Math.max(0, top + deltaY), 100 - height);
-      } else if (dragHandle === 'tl') {
-        const right = left + width;
-        const bottom = top + height;
-        left = Math.min(Math.max(0, left + deltaX), right - 10);
-        top = Math.min(Math.max(0, top + deltaY), bottom - 10);
-        width = right - left;
-        height = bottom - top;
-      } else if (dragHandle === 'tr') {
-        const bottom = top + height;
-        width = Math.min(Math.max(10, width + deltaX), 100 - left);
-        top = Math.min(Math.max(0, top + deltaY), bottom - 10);
-        height = bottom - top;
-      } else if (dragHandle === 'bl') {
-        const right = left + width;
-        left = Math.min(Math.max(0, left + deltaX), right - 10);
-        width = right - left;
-        height = Math.min(Math.max(10, height + deltaY), 100 - top);
-      } else if (dragHandle === 'br') {
-        width = Math.min(Math.max(10, width + deltaX), 100 - left);
-        height = Math.min(Math.max(10, height + deltaY), 100 - top);
-      }
-
-      return { top, left, width, height };
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setDragHandle(null);
-  };
-
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-        setDragHandle(null);
-      }
-    };
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [isDragging]);
 
   const getFilterStyle = (f: 'original' | 'magic' | 'bw'): string => {
     if (f === 'magic') return 'contrast(1.4) brightness(1.08) saturate(1.1)';
@@ -286,15 +172,39 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     if (!capturedImage) return;
     setStep('ocr');
     setOcrProgress(5);
-    setOcrStatus('Recortando y aplicando filtros...');
+    setOcrStatus('Preparando imagen...');
 
     try {
-      // 1. Recortar la imagen con el filtro seleccionado
-      const croppedImage = await cropImage(capturedImage, cropBox, getFilterStyle(activeFilter), 0.88);
-      
-      // 2. Ejecutar OCR real con Tesseract.js
+      // 1. Prepare filtered/beautified image
+      const canvas = document.createElement('canvas');
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.filter = getFilterStyle(activeFilter);
+            ctx.drawImage(img, 0, 0);
+            resolve();
+          } else {
+            reject(new Error('No se pudo preparar canvas.'));
+          }
+        };
+        img.onerror = () => reject(new Error('Error al cargar imagen procesada.'));
+        img.src = capturedImage;
+      });
+
+      const processedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const croppedImageResult = {
+        dataUrl: processedDataUrl,
+        width: canvas.width,
+        height: canvas.height
+      };
+
+      // 2. OCR real with Tesseract.js
       setOcrStatus('Iniciando motor de OCR...');
-      const result = await Tesseract.recognize(croppedImage.dataUrl, 'spa', {
+      const result = await Tesseract.recognize(processedDataUrl, 'spa', {
         logger: (m) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round(10 + m.progress * 85);
@@ -313,9 +223,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       setOcrProgress(100);
       setOcrStatus('Texto extraído correctamente.');
 
-      // 3. Generar PDF y completar
+      // 3. Generate PDF and complete
       setStep('saving');
-      const pdfBlob = createSearchablePdf(croppedImage, extractedText);
+      const pdfBlob = createSearchablePdf(croppedImageResult, extractedText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
       const docId = 'doc-' + Date.now();
 
@@ -325,7 +235,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         size: sizeKB + ' KB',
         uploadDate: new Date().toISOString().split('T')[0],
         ocrText: extractedText,
-        storageKey: getPdfStorageKey(docId)
+        storageKey: caseId => caseId + '/' + docId + '.pdf'
       };
 
       onScanComplete(newDoc, pdfBlob);
@@ -339,31 +249,61 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     <div className="scanner-container">
       {step === 'capture' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div className="camera-preview-wrapper">
+          <div className="camera-preview-wrapper" style={{ position: 'relative' }}>
             {hasCamera ? (
-              <video ref={videoRef} autoPlay playsInline className="camera-video" />
+              <video ref={videoRef} autoPlay playsInline className="camera-video" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <div 
                 style={{ 
                   width: '100%', 
-                  height: '100%', 
+                  height: '240px', 
                   background: 'linear-gradient(135deg, #1c1c1e, #2c2c2e)', 
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   padding: '24px',
-                  color: 'var(--text-secondary)'
+                  color: 'var(--text-secondary)',
+                  borderRadius: '12px'
                 }}
               >
-                <ImageIcon size={44} style={{ color: 'var(--primary-gold)', marginBottom: '12px' }} />
+                <Upload size={44} style={{ color: 'var(--primary-gold)', marginBottom: '12px' }} />
                 <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
-                  Simulador de Escáner Activado
+                  Escáner de Imagen
                 </p>
                 <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
-                  La cámara no está disponible. Al hacer clic en "Capturar" se generará un documento formal de demostración procesal.
+                  La cámara no está disponible. Sube un archivo de imagen para detectar automáticamente sus bordes y alinearlo.
                 </p>
               </div>
+            )}
+
+            {/* Glowing borders driven by real detection */}
+            {hasCamera && sheetDetected && (
+              <svg 
+                style={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  width: '100%', 
+                  height: '100%', 
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <polygon
+                  points={`${edgePoints.p1.x},${edgePoints.p1.y} ${edgePoints.p2.x},${edgePoints.p2.y} ${edgePoints.p3.x},${edgePoints.p3.y} ${edgePoints.p4.x},${edgePoints.p4.y}`}
+                  fill="rgba(0, 255, 128, 0.12)"
+                  stroke="#00ff80"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                  style={{
+                    filter: 'drop-shadow(0 0 3px #00ff80)',
+                    transition: 'all 0.08s ease-out'
+                  }}
+                />
+              </svg>
             )}
 
             {/* Guide overlay */}
@@ -394,11 +334,13 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               <Upload size={16} /> Subir Foto
             </button>
 
-            <button 
-              className="shutter-button" 
-              onClick={capturePhoto} 
-              title="Tomar foto del documento"
-            />
+            {hasCamera && (
+              <button 
+                className="shutter-button" 
+                onClick={capturePhoto} 
+                title="Tomar foto del documento"
+              />
+            )}
 
             <button 
               className="btn btn-secondary" 
@@ -411,76 +353,86 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         </div>
       )}
 
-      {step === 'crop' && capturedImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <span className="health-label" style={{ textAlign: 'center' }}>
-            Ajusta los bordes azules para recortar y encuadrar el documento
-          </span>
-
+      {step === 'aligning' && originalImage && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '20px' }}>
+          <h4 style={{ fontWeight: '700', color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <RefreshCw size={18} className="spinning" style={{ color: 'var(--primary-blue)' }} /> Alineando y Rectificando
+          </h4>
+          
           <div 
-            className="crop-editor-container"
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
+            style={{ 
+              position: 'relative', 
+              width: '220px', 
+              height: '300px', 
+              borderRadius: '10px', 
+              overflow: 'hidden', 
+              boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+              background: '#121214'
+            }}
           >
-            <div 
-              className="crop-canvas-wrapper" 
-              ref={cropContainerRef}
+            <img 
+              src={originalImage} 
+              alt="Scan aligning"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                opacity: 0.65
+              }} 
+            />
+            
+            {/* Edge detection polygon outline overlay during sweep */}
+            <svg 
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                width: '100%', 
+                height: '100%', 
+                pointerEvents: 'none'
+              }}
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
             >
-              <img 
-                src={capturedImage} 
-                className="crop-image" 
-                alt="Document Captured" 
-                draggable={false} 
-              />
-              
-              {/* Resizable Crop Box overlay */}
-              <div 
-                className="crop-overlay-rect"
+              <polygon
+                points={`${edgePoints.p1.x},${edgePoints.p1.y} ${edgePoints.p2.x},${edgePoints.p2.y} ${edgePoints.p3.x},${edgePoints.p3.y} ${edgePoints.p4.x},${edgePoints.p4.y}`}
+                fill="rgba(0, 122, 255, 0.08)"
+                stroke="var(--primary-blue)"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
                 style={{
-                  top: `${cropBox.top}%`,
-                  left: `${cropBox.left}%`,
-                  width: `${cropBox.width}%`,
-                  height: `${cropBox.height}%`,
+                  filter: 'drop-shadow(0 0 4px var(--primary-blue))',
+                  animation: 'warpPulse 1.2s ease-in-out infinite'
                 }}
-                onMouseDown={(e) => handleMouseDown(e, 'move')}
-              >
-                {/* Drag Handles */}
-                <div className="crop-handle tl" onMouseDown={(e) => handleMouseDown(e, 'tl')} />
-                <div className="crop-handle tr" onMouseDown={(e) => handleMouseDown(e, 'tr')} />
-                <div className="crop-handle bl" onMouseDown={(e) => handleMouseDown(e, 'bl')} />
-                <div className="crop-handle br" onMouseDown={(e) => handleMouseDown(e, 'br')} />
-              </div>
-            </div>
+              />
+            </svg>
+
+            {/* Sweep laser line */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '3px',
+                background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
+                boxShadow: '0 0 10px #00ff80, 0 0 3px #007aff',
+                animation: 'sweepLaser 1.2s ease-in-out infinite',
+                zIndex: 5
+              }}
+            />
           </div>
 
-          <div className="scanner-controls" style={{ gap: '12px' }}>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => {
-                setStep('capture');
-                setCapturedImage(null);
-                startCamera();
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <RotateCcw size={16} /> Reintentar
-            </button>
-            
-            <button 
-              className="btn btn-primary" 
-              onClick={() => setStep('beautify')}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
-            >
-              Siguiente <ChevronRight size={16} />
-            </button>
-          </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+            Procesando alineación y corrigiendo perspectiva...
+          </p>
         </div>
       )}
 
       {step === 'beautify' && capturedImage && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <span className="health-label" style={{ textAlign: 'center' }}>
-            Filtros de Realce Digital (CamScanner) y Nombre del Archivo
+            Realce Digital (CamScanner) y Nombre del Archivo
           </span>
 
           {/* Enhanced Preview Frame */}
@@ -621,10 +573,15 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           <div className="scanner-controls" style={{ gap: '12px' }}>
             <button 
               className="btn btn-secondary" 
-              onClick={() => setStep('crop')}
+              onClick={() => {
+                setStep('capture');
+                setCapturedImage(null);
+                setOriginalImage(null);
+                startCamera();
+              }}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <RotateCcw size={16} /> Recortar
+              <RotateCcw size={16} /> Reintentar
             </button>
             
             <button 
@@ -703,7 +660,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           </div>
           <h4 style={{ fontWeight: '700', marginBottom: '6px' }}>Generando Archivo PDF</h4>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center', maxWidth: '280px' }}>
-            Aplicando filtros de contraste judicial, recortando márgenes y empaquetando en formato vectorial.
+            Generando PDF con capa de texto OCR y subiendo a InsForge Storage...
           </p>
         </div>
       )}
