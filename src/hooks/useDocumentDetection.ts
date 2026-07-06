@@ -76,6 +76,7 @@ export function useDocumentDetection({
     // ── 2. 5×5 box blur + find global min/max ─────────────────────────────────
     const blurred = new Float32Array(W * H);
     let gMin = 255, gMax = 0;
+
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         let sum = 0, cnt = 0;
@@ -93,7 +94,18 @@ export function useDocumentDetection({
     }
 
     // ── 3. Adaptive threshold ─────────────────────────────────────────────────
-    const thresh = gMin + (gMax - gMin) * 0.52;
+    // Bail out early if scene has no contrast (uniform background, no paper)
+    if (gMax - gMin < 30) {
+      lastQuadRef.current = null;
+      onDetection(
+        { p1: { x: 12, y: 8 }, p2: { x: 88, y: 8 }, p3: { x: 88, y: 92 }, p4: { x: 12, y: 92 } },
+        0,
+      );
+      animFrameRef.current = requestAnimationFrame(detect);
+      return;
+    }
+    // 0.63 → only captures genuinely white/bright paper, not mid-tone desk
+    const thresh = gMin + (gMax - gMin) * 0.63;
 
     // ── 4. BFS → largest bright component ────────────────────────────────────
     const visited = new Uint8Array(W * H);
@@ -152,8 +164,8 @@ export function useDocumentDetection({
       if (d < minDiff) { minDiff = d; p4 = pt; }
     }
 
-    // ── 6. Sobel corner refinement ────────────────────────────────────────────
-    const refine = (pt: { x: number; y: number }, radius = 8) => {
+    // ── 6. Sobel corner refinement (small radius = precise, doesn't wander) ────
+    const refine = (pt: { x: number; y: number }, radius = 4) => {
       let best = pt, maxMag = -1;
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
