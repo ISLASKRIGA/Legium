@@ -828,6 +828,14 @@ a:hover {
   border-bottom: 1px solid var(--border-color);
 }
 
+.task-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-grow: 1;
+}
+
+
 .task-item:last-child {
   border-bottom: none;
 }
@@ -1863,4 +1871,67 @@ textarea.form-control {
     opacity: 0.8;
   }
 }
+
+/* Responsive Tasks & Milestones styles for mobile */
+@media (max-width: 768px) {
+  /* Tareas Pendientes list responsive */
+  .task-item {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    padding: 10px 0 !important;
+  }
+  
+  .task-item-main {
+    width: 100% !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .task-date {
+    margin-left: 32px !important;
+    align-self: flex-start !important;
+  }
+
+  /* Milestones Table responsive card styling */
+  .custom-table, 
+  .custom-table thead, 
+  .custom-table tbody, 
+  .custom-table th, 
+  .custom-table td, 
+  .custom-table tr { 
+    display: block !important; 
+  }
+  
+  .custom-table thead {
+    display: none !important; /* Hide headers on mobile */
+  }
+  
+  .custom-table tr {
+    border-bottom: 1.5px solid var(--border-color) !important;
+    padding: 12px 4px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .custom-table td {
+    border: none !important;
+    padding: 6px 8px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 13px !important;
+    text-align: right !important;
+  }
+  
+  .custom-table td::before {
+    content: attr(data-label) !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary) !important;
+    float: left !important;
+    text-align: left !important;
+    margin-right: 12px !important;
+  }
+}
+
 

@@ -212,12 +212,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   ) : (
                     upcomingMilestones.map((m, idx) => (
                       <tr key={idx} style={{ cursor: 'pointer' }} onClick={() => onViewCase(m.caseId)}>
-                        <td style={{ color: 'var(--primary-gold)', fontWeight: 600 }}>{m.date}</td>
-                        <td>
+                        <td data-label="Fecha" style={{ color: 'var(--primary-gold)', fontWeight: 600 }}>{m.date}</td>
+                        <td data-label="Expediente">
                           {m.caseTitle} <span className="metric-sub">({m.caseId})</span>
                         </td>
-                        <td>{m.title}</td>
-                        <td>
+                        <td data-label="Hito">{m.title}</td>
+                        <td data-label="Estado">
                           <span className="badge badge-suspended">Pendiente</span>
                         </td>
                       </tr>
@@ -244,30 +244,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ) : (
                 filteredTasks.map((t) => (
                   <div key={t.id} className="task-item">
-                    <div 
-                      className="checkbox-custom" 
-                      onClick={() => onToggleTask(t.caseId, t.id)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <span className="task-label">
-                      {t.title}{' '}
-                      <span 
-                        className="metric-sub" 
-                        style={{ textDecoration: 'underline', cursor: 'pointer' }} 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewCase(t.caseId);
-                        }}
+                    <div className="task-item-main">
+                      <div 
+                        className="checkbox-custom" 
+                        onClick={() => onToggleTask(t.caseId, t.id)}
+                        style={{ cursor: 'pointer', flexShrink: 0, marginTop: '2px' }}
                       >
-                        ({t.caseId})
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                      <span className="task-label">
+                        {t.title}{' '}
+                        <span 
+                          className="metric-sub" 
+                          style={{ textDecoration: 'underline', cursor: 'pointer' }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewCase(t.caseId);
+                          }}
+                        >
+                          ({t.caseId})
+                        </span>
                       </span>
-                    </span>
+                    </div>
                     <span className="task-date">{t.dueDate}</span>
                   </div>
                 ))
               )}
+
             </div>
           </div>
         </div>
