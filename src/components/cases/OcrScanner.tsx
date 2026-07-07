@@ -898,11 +898,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     pointerEvents: 'none',
                     zIndex: 20
                   }}
- 
-
-
-
-               >
+                >
                   <img
                     src={originalImage}
                     alt="Lupa de recorte"
@@ -910,27 +906,17 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     style={{
                       position: 'absolute',
                       width: magnifier.width * zoom,
-                      height: magnifier.height
-
-
-
-
-
-
-
- * zoom,
+                      height: magnifier.height * zoom,
                       left: lensSize / 2 - pointX * zoom,
                       top: lensSize / 2 - pointY * zoom,
-                      objectFit: 'contain',
+                      display: 'block',
+                      maxWidth: 'none',
+                      maxHeight: 'none',
                       transform: 'translateZ(0)',
-                      userSelect: 'none'
- 
-
-
-
-
-
-                   }}
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      WebkitTouchCallout: 'none'
+                    }}
                   />
                   <div style={{ position: 'absolute', left: '50%', top: 10, bottom: 10, width: 1, background: 'rgba(0,255,128,0.75)', transform: 'translateX(-50%)' }} />
                   <div style={{ position: 'absolute', top: '50%', left: 10, right: 10, height: 1, background: 'rgba(0,255,128,0.75)', transform: 'translateY(-50%)' }} />

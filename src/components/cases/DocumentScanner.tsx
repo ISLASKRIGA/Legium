@@ -609,8 +609,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                 style={{ 
                   maxWidth: '100%', 
                   maxHeight: '100%', 
-                  objectFit: 'contain',
-                  display: 'block'
+                  display: 'block',
+                  width: 'auto',
+                  height: 'auto'
                 }} 
               />
             
