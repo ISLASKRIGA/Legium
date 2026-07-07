@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Wand2, RefreshCw, ChevronRight } from 'lucide-react';
+import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Wand2, RefreshCw, ChevronRight, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { createSearchablePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT } from '../../utils/scannerPdf';
+import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
@@ -15,7 +15,9 @@ interface DocumentScannerProps {
 type FilterType = 'original' | 'magic' | 'bw';
 
 export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'beautify' | 'ocr' | 'saving'>('capture');
+  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'beautify' | 'decide' | 'ocr' | 'saving'>('capture');
+  const [scanMode, setScanMode] = useState<'individual' | 'lote'>('individual');
+  const [scannedPages, setScannedPages] = useState<CroppedImageResult[]>([]);
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -289,32 +291,16 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     };
   }, []);
 
-  const handleFinalSave = async () => {
-    const finalImg = processedImage || capturedImage;
-    if (!finalImg) return;
-
+  const runOcrAndSave = async (pages: CroppedImageResult[]) => {
+    if (pages.length === 0) return;
     setStep('ocr');
     setOcrProgress(5);
     setOcrStatus('Preparando documento...');
 
     try {
-      const img = new Image();
-      await new Promise<void>((resolve) => {
-        img.onload = () => {
-          resolve();
-        };
-        img.src = finalImg;
-      });
-
-      const croppedImageResult = {
-        dataUrl: finalImg,
-        width: img.width,
-        height: img.height
-      };
-
-      // 2. OCR real with Tesseract.js
       setOcrStatus('Iniciando motor de OCR...');
-      const result = await Tesseract.recognize(finalImg, 'spa', {
+      const firstPageUrl = pages[0].dataUrl;
+      const result = await Tesseract.recognize(firstPageUrl, 'spa', {
         logger: (m) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round(10 + m.progress * 85);
@@ -335,7 +321,11 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
 
       // 3. Generate PDF and complete
       setStep('saving');
-      const pdfBlob = createSearchablePdf(croppedImageResult, extractedText);
+      
+      const pdfBlob = pages.length > 1 
+        ? createMultiPagePdf(pages, extractedText)
+        : createSearchablePdf(pages[0], extractedText);
+
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
       const docId = 'doc-' + Date.now();
 
@@ -356,6 +346,28 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       console.error('Error during OCR or PDF generation:', err);
       setStep('beautify');
     }
+  };
+
+  const handleFinalSave = async () => {
+    const finalImg = processedImage || capturedImage;
+    if (!finalImg) return;
+
+    const img = new Image();
+    img.onload = () => {
+      const rendered = {
+        dataUrl: finalImg,
+        width: img.width,
+        height: img.height
+      };
+      const nextPages = [...scannedPages, rendered];
+      setScannedPages(nextPages);
+      if (scanMode === 'individual') {
+        runOcrAndSave(nextPages);
+      } else {
+        setStep('decide');
+      }
+    };
+    img.src = finalImg;
   };
 
 
@@ -508,25 +520,46 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               {scannerMsg}
             </div>
 
-            {/* Floating Individual / Lote pill inside camera feed */}
-            <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', display: 'flex', background: 'rgba(0,0,0,0.6)', padding: '3px', borderRadius: '20px', zIndex: 5, border: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', fontSize: '11.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '18px' }}>Individual</span>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '18px', cursor: 'pointer' }}>Lote</span>
-            </div>
-
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
-          {/* Mode selector slider */}
-          <div style={{ background: '#000', overflowX: 'auto', padding: '12px 0 6px 0', display: 'flex', justifyContent: 'center', gap: '20px', whiteSpace: 'nowrap', borderTop: '1px solid rgba(255,255,255,0.05)', userSelect: 'none' }}>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Tarjeta de identidad</span>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Firmar</span>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-              <span style={{ position: 'absolute', top: '-11px', width: '5px', height: '5px', backgroundColor: '#e2883e', borderRadius: '50%' }} />
-              <span style={{ color: '#00ff80', fontSize: '11.5px', fontWeight: 700 }}>Escanear</span>
+          {/* Floating Bottom Menu & Controls */}
+          <div style={{ background: '#000', display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0', paddingTop: '10px' }}>
+            {/* Mode selector: Raised Individual / Lote pills */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '8px 0 6px 0', userSelect: 'none' }}>
+              <div style={{ display: 'flex', background: 'rgba(0,0,0,0.65)', padding: '3px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
+                <span
+                  onClick={() => setScanMode('individual')}
+                  style={{
+                    background: scanMode === 'individual' ? 'rgba(255,255,255,0.22)' : 'transparent',
+                    color: scanMode === 'individual' ? '#00ff80' : 'rgba(255,255,255,0.5)',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    padding: '5px 16px',
+                    borderRadius: '18px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  Individual
+                </span>
+                <span
+                  onClick={() => setScanMode('lote')}
+                  style={{
+                    background: scanMode === 'lote' ? 'rgba(255,255,255,0.22)' : 'transparent',
+                    color: scanMode === 'lote' ? '#00ff80' : 'rgba(255,255,255,0.5)',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    padding: '5px 16px',
+                    borderRadius: '18px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  Lote
+                </span>
+              </div>
             </div>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>A Word</span>
-            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Conjunto</span>
           </div>
 
           {/* Camera controls - matches CamScanner example */}
@@ -1110,6 +1143,66 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1, justifyContent: 'center' }}
             >
               Procesar y Guardar <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'decide' && scannedPages.length > 0 && (
+        <div style={{ position: 'absolute', inset: 0, background: '#0e0e10', display: 'flex', flexDirection: 'column', zIndex: 100 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.6)' }}>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}><X size={20} /></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Files size={15} style={{ color: '#00e5a0' }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                {scannedPages.length} {scannedPages.length === 1 ? 'página' : 'páginas'} escaneadas
+              </span>
+            </div>
+            <div style={{ width: 20 }} />
+          </div>
+
+          {/* Page thumbnails */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+            {scannedPages.map((page, i) => (
+              <div key={i} style={{ position: 'relative', width: '78%', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.6)', background: '#fff' }}>
+                <img src={page.dataUrl} alt={`Página ${i + 1}`} style={{ width: '100%', display: 'block' }} />
+                {/* Page badge */}
+                <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
+                  Pág. {i + 1}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom action bar */}
+          <div style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.07)', padding: '16px 28px 28px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+            {/* Añadir otra página */}
+            <button
+              onClick={() => {
+                setCapturedImage(null);
+                setOriginalImage(null);
+                setScanPhase('idle');
+                setStep('capture');
+                startCamera();
+              }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+            >
+              <div style={{ width: 52, height: 52, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)' }}>
+                <Plus size={24} />
+              </div>
+              Añadir página
+            </button>
+
+            {/* Continuar → OCR + PDF + finalización */}
+            <button
+              onClick={() => runOcrAndSave(scannedPages)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', color: '#00e5a0', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+            >
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#00e5a0', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 24px rgba(0,229,160,0.5)' }}>
+                <Check size={30} strokeWidth={2.8} color="#000" />
+              </div>
+              Continuar
             </button>
           </div>
         </div>

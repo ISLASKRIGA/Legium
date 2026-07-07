@@ -217,6 +217,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [magicContrast, setMagicContrast] = useState(1.35);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [scanMode, setScanMode] = useState<'individual' | 'lote'>('individual');
 
   useEffect(() => {
     if (capturedImage) {
@@ -854,27 +855,45 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               {scannerMsg}
             </div>
 
-            {/* Floating Individual / Lote pill inside camera feed */}
-            <div style={{ position: 'absolute', bottom: '108px', left: '50%', transform: 'translateX(-50%)', display: 'flex', background: 'rgba(0,0,0,0.6)', padding: '3px', borderRadius: '20px', zIndex: 5, border: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', fontSize: '11.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '18px' }}>Individual</span>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11.5px', fontWeight: 600, padding: '5px 14px', borderRadius: '18px', cursor: 'pointer' }}>Lote</span>
-            </div>
-
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
           {/* Floating Bottom Menu & Controls */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.4) 80%, transparent)', zIndex: 10, paddingBottom: '24px' }}>
-            {/* Mode selector slider */}
-            <div style={{ overflowX: 'auto', padding: '12px 0 6px 0', display: 'flex', justifyContent: 'center', gap: '20px', whiteSpace: 'nowrap', userSelect: 'none' }}>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Tarjeta de identidad</span>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Firmar</span>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-                <span style={{ position: 'absolute', top: '-11px', width: '5px', height: '5px', backgroundColor: '#e2883e', borderRadius: '50%' }} />
-                <span style={{ color: '#00ff80', fontSize: '11.5px', fontWeight: 700 }}>Escanear</span>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0.4) 80%, transparent)', zIndex: 10, paddingBottom: '24px', paddingTop: '10px' }}>
+            {/* Mode selector: Raised Individual / Lote pills */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '8px 0 16px 0', userSelect: 'none' }}>
+              <div style={{ display: 'flex', background: 'rgba(0,0,0,0.65)', padding: '3px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)' }}>
+                <span
+                  onClick={() => setScanMode('individual')}
+                  style={{
+                    background: scanMode === 'individual' ? 'rgba(255,255,255,0.22)' : 'transparent',
+                    color: scanMode === 'individual' ? '#00ff80' : 'rgba(255,255,255,0.5)',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    padding: '5px 16px',
+                    borderRadius: '18px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  Individual
+                </span>
+                <span
+                  onClick={() => setScanMode('lote')}
+                  style={{
+                    background: scanMode === 'lote' ? 'rgba(255,255,255,0.22)' : 'transparent',
+                    color: scanMode === 'lote' ? '#00ff80' : 'rgba(255,255,255,0.5)',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    padding: '5px 16px',
+                    borderRadius: '18px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  Lote
+                </span>
               </div>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>A Word</span>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11.5px', fontWeight: 600 }}>Conjunto</span>
             </div>
 
             {/* Camera controls */}
@@ -1449,7 +1468,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 Recortar
               </button>
 
-              {/* ✓ Palomita → pantalla decide */}
+              {/* ✓ Palomita → pantalla decide o directamente procesa */}
               <button
                 disabled={isEnhancing}
                 onClick={() => {
@@ -1462,9 +1481,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       width: img.width,
                       height: img.height,
                     };
-                    setScannedPages(prev => [...prev, rendered]);
+                    const nextPages = [...scannedPages, rendered];
+                    setScannedPages(nextPages);
                     setScanPhase('idle');
-                    setStep('decide');
+                    if (scanMode === 'individual') {
+                      // Trigger OCR directly on this single page!
+                      setStep('ocr-processing');
+                      setOcrProgress(2);
+                      setOcrStatus('Preparando imagen...');
+                      runRealOcr(finalImg);
+                    } else {
+                      // Multi-page batch mode -> go to decide screen
+                      setStep('decide');
+                    }
                   };
                   img.src = finalImg;
                 }}
