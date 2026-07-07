@@ -161,13 +161,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     onDetection: (quad, confidence) => {
       setEdgePoints(quad);
       setDetectionConfidence(confidence);
-      const detected = confidence > 0.45;
+      const detected = confidence > 0.34;
       setSheetDetected(detected);
 
       if (detected) {
-        setScannerMsg('✓ Listo para capturar');
+        setScannerMsg('Pagina detectada - listo para capturar');
       } else {
-        setScannerMsg('Apunta la cámara al escrito judicial...');
+        setScannerMsg('Alinea una pagina dentro del marco');
       }
     }
   });
@@ -628,7 +628,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             )}
 
             {/* ── SVG Perspective Quad Overlay ── */}
-            {hasCamera && sheetDetected && (
+            {hasCamera && (
               <svg
                 style={{
                   position: 'absolute', top: 0, left: 0,
@@ -649,15 +649,18 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 {/* Translucent fill */}
                 <polygon
                   points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                  fill="rgba(0,212,170,0.08)"
-                  stroke="#00d4aa"
-                  strokeWidth="0.35"
+                  fill={sheetDetected ? 'rgba(0,255,128,0.16)' : 'rgba(255,255,255,0.035)'}
+                  stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'}
+                  strokeWidth={sheetDetected ? '0.95' : '0.5'}
                   strokeLinejoin="round"
+                  strokeDasharray={sheetDetected ? '0' : '2 1.4'}
                   filter="url(#ocr-glow)"
                   style={{ transition: 'all 0.25s ease-out' }}
                 />
-
-
+                <polyline points={`${p1.x + 6},${p1.y} ${p1.x},${p1.y} ${p1.x},${p1.y + 6}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <polyline points={`${p2.x - 6},${p2.y} ${p2.x},${p2.y} ${p2.x},${p2.y + 6}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <polyline points={`${p3.x},${p3.y - 6} ${p3.x},${p3.y} ${p3.x - 6},${p3.y}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <polyline points={`${p4.x},${p4.y - 6} ${p4.x},${p4.y} ${p4.x + 6},${p4.y}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
 

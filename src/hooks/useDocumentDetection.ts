@@ -17,6 +17,23 @@ const DEFAULT_QUAD: QuadPoints = {
   p1: { x: 12, y: 8 }, p2: { x: 88, y: 8 },
   p3: { x: 88, y: 92 }, p4: { x: 12, y: 92 },
 };
+const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
+
+function expandQuad(quad: QuadPoints, amount = 1.035): QuadPoints {
+  const cx = (quad.p1.x + quad.p2.x + quad.p3.x + quad.p4.x) / 4;
+  const cy = (quad.p1.y + quad.p2.y + quad.p3.y + quad.p4.y) / 4;
+  const expand = (pt: { x: number; y: number }) => ({
+    x: clampPercent(cx + (pt.x - cx) * amount),
+    y: clampPercent(cy + (pt.y - cy) * amount),
+  });
+
+  return {
+    p1: expand(quad.p1),
+    p2: expand(quad.p2),
+    p3: expand(quad.p3),
+    p4: expand(quad.p4),
+  };
+}
 
 /**
  * Otsu binarisation on a pre-computed histogram with `totalN` samples.
@@ -160,7 +177,7 @@ export function useDocumentDetection({
     // ── 3. Achromatic mask + Otsu histogram ───────────────────────────────────
     // White paper: sat ≈ 0.   Colorful objects: sat >> 45.
     // This rejects: signs, posters, tiles with color, wooden desks, etc.
-    const SAT_THRESH = 45;
+    const SAT_THRESH = 62;
 
     const hist = new Uint32Array(256);
     let numAchromatic = 0;
@@ -183,7 +200,7 @@ export function useDocumentDetection({
     const { threshold: thresh, separability } = otsuOnHist(hist, numAchromatic);
 
     // η < 0.08: scene too uniform, no clear paper edge
-    if (separability < 0.08) {
+    if (separability < 0.055) {
       lastQuadRef.current = null;
       onDetection(DEFAULT_QUAD, 0);
       animFrameRef.current = requestAnimationFrame(detect);
@@ -220,7 +237,7 @@ export function useDocumentDetection({
         }
 
         const area = comp.length;
-        if (area < N * 0.04) continue; // discard tiny components
+        if (area < N * 0.03) continue; // discard tiny components
 
         // Prefer large, centrally-located components
         const cxC = sumX / area, cyC = sumY / area;
@@ -233,7 +250,7 @@ export function useDocumentDetection({
     const compArea = bestComp.length;
 
     // Reject: component too small (no paper) or too large (whole scene is white)
-    if (compArea < N * 0.06 || compArea > N * 0.93) {
+    if (compArea < N * 0.045 || compArea > N * 0.96) {
       lastQuadRef.current = null;
       onDetection(DEFAULT_QUAD, 0);
       animFrameRef.current = requestAnimationFrame(detect);
@@ -288,16 +305,16 @@ export function useDocumentDetection({
     const aspect = bw / Math.max(1, bh);
 
     // Confidence: based on Otsu quality + how much of the frame the paper covers
-    const confidence = Math.min(1, (separability + compArea / N) / 1.4);
+    const confidence = Math.min(1, (separability * 1.35 + compArea / N) / 1.25);
 
     const isValid =
-      compArea > N  * 0.06   &&
-      compArea < N  * 0.93   &&
+      compArea > N  * 0.045  &&
+      compArea < N  * 0.96   &&
       bw       > W  * 0.15   &&
       bh       > H  * 0.12   &&
       aspect   > 0.25        &&
       aspect   < 4.0         &&
-      confidence > 0.30;
+      confidence > 0.24;
 
     if (!isValid) {
       lastQuadRef.current = null;
@@ -312,7 +329,7 @@ export function useDocumentDetection({
       y: Math.max(0, Math.min(100, (pt.y / H) * 100)),
     });
 
-    const raw: QuadPoints = { p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) };
+    const raw: QuadPoints = expandQuad({ p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) });
 
     // High smoothing factor: 0.82 retains 82% of the previous position each frame
     // (was 0.55) — greatly reduces jitter while still tracking real movement.
