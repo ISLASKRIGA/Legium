@@ -35,25 +35,6 @@ function expandQuad(quad: QuadPoints, amount = 1.055): QuadPoints {
   };
 }
 
-function regularizeQuad(quad: QuadPoints, k = 0.92): QuadPoints {
-  const yTop = (quad.p1.y + quad.p2.y) / 2;
-  const yBot = (quad.p4.y + quad.p3.y) / 2;
-  const xLeft = (quad.p1.x + quad.p4.x) / 2;
-  const xRight = (quad.p2.x + quad.p3.x) / 2;
-
-  const blend = (rectPt: { x: number; y: number }, rawPt: { x: number; y: number }) => ({
-    x: rectPt.x * k + rawPt.x * (1 - k),
-    y: rectPt.y * k + rawPt.y * (1 - k),
-  });
-
-  return {
-    p1: blend({ x: xLeft, y: yTop }, quad.p1),
-    p2: blend({ x: xRight, y: yTop }, quad.p2),
-    p3: blend({ x: xRight, y: yBot }, quad.p3),
-    p4: blend({ x: xLeft, y: yBot }, quad.p4),
-  };
-}
-
 /**
  * Otsu binarisation on a pre-computed histogram with `totalN` samples.
  * Returns { threshold, separability }.
@@ -382,7 +363,6 @@ export function useDocumentDetection({
     });
 
     const raw: QuadPoints = expandQuad({ p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) });
-    const regularized = regularizeQuad(raw);
 
     const k = 0.82;
     const DEAD_ZONE = 0.8;
@@ -394,7 +374,7 @@ export function useDocumentDetection({
       );
     };
 
-    if (lastQuadRef.current && !shouldUpdate(lastQuadRef.current, regularized)) {
+    if (lastQuadRef.current && !shouldUpdate(lastQuadRef.current, raw)) {
       onDetection(lastQuadRef.current, confidence);
       animFrameRef.current = requestAnimationFrame(detect);
       return;
@@ -402,12 +382,12 @@ export function useDocumentDetection({
 
     const out: QuadPoints = lastQuadRef.current
       ? {
-          p1: { x: lastQuadRef.current.p1.x * k + regularized.p1.x * (1 - k), y: lastQuadRef.current.p1.y * k + regularized.p1.y * (1 - k) },
-          p2: { x: lastQuadRef.current.p2.x * k + regularized.p2.x * (1 - k), y: lastQuadRef.current.p2.y * k + regularized.p2.y * (1 - k) },
-          p3: { x: lastQuadRef.current.p3.x * k + regularized.p3.x * (1 - k), y: lastQuadRef.current.p3.y * k + regularized.p3.y * (1 - k) },
-          p4: { x: lastQuadRef.current.p4.x * k + regularized.p4.x * (1 - k), y: lastQuadRef.current.p4.y * k + regularized.p4.y * (1 - k) },
+          p1: { x: lastQuadRef.current.p1.x * k + raw.p1.x * (1 - k), y: lastQuadRef.current.p1.y * k + raw.p1.y * (1 - k) },
+          p2: { x: lastQuadRef.current.p2.x * k + raw.p2.x * (1 - k), y: lastQuadRef.current.p2.y * k + raw.p2.y * (1 - k) },
+          p3: { x: lastQuadRef.current.p3.x * k + raw.p3.x * (1 - k), y: lastQuadRef.current.p3.y * k + raw.p3.y * (1 - k) },
+          p4: { x: lastQuadRef.current.p4.x * k + raw.p4.x * (1 - k), y: lastQuadRef.current.p4.y * k + raw.p4.y * (1 - k) },
         }
-      : regularized;
+      : raw;
 
     lastQuadRef.current = out;
     onDetection(out, confidence);
