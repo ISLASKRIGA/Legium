@@ -19,7 +19,7 @@ const DEFAULT_QUAD: QuadPoints = {
 };
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
-function expandQuad(quad: QuadPoints, amount = 1.055): QuadPoints {
+function expandQuad(quad: QuadPoints, amount = 1.015): QuadPoints {
   const cx = (quad.p1.x + quad.p2.x + quad.p3.x + quad.p4.x) / 4;
   const cy = (quad.p1.y + quad.p2.y + quad.p3.y + quad.p4.y) / 4;
   const expand = (pt: { x: number; y: number }) => ({
@@ -306,31 +306,59 @@ export function useDocumentDetection({
       if (d < minDiff) { minDiff = d; p4 = { x, y }; }
     }
 
-    // ── 7. Sub-pixel Sobel corner snap (radius 5) ─────────────────────────────
-    const refine = (pt: { x: number; y: number }, radius = 5) => {
-      let best = pt, maxMag = -1;
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          const cx = (pt.x + dx) | 0, cy = (pt.y + dy) | 0;
-          if (cx > 1 && cx < W - 2 && cy > 1 && cy < H - 2) {
-            const gx =
-              (lumRaw[(cy-1)*W+(cx+1)] + 2*lumRaw[cy*W+(cx+1)] + lumRaw[(cy+1)*W+(cx+1)]) -
-              (lumRaw[(cy-1)*W+(cx-1)] + 2*lumRaw[cy*W+(cx-1)] + lumRaw[(cy+1)*W+(cx-1)]);
-            const gy =
-              (lumRaw[(cy+1)*W+(cx-1)] + 2*lumRaw[(cy+1)*W+cx] + lumRaw[(cy+1)*W+(cx+1)]) -
-              (lumRaw[(cy-1)*W+(cx-1)] + 2*lumRaw[(cy-1)*W+cx] + lumRaw[(cy-1)*W+(cx-1)]);
-            const mag = gx * gx + gy * gy;
-            if (mag > maxMag) { maxMag = mag; best = { x: cx, y: cy }; }
+    // Calculate center of best component
+    let sumX = 0, sumY = 0;
+    for (const idx of bestComp) {
+      sumX += idx % W;
+      sumY += (idx / W) | 0;
+    }
+    const cxC = sumX / compArea;
+    const cyC = sumY / compArea;
+
+    // ── 7. High-precision ray-casting edge snapper ─────────────────────────────
+    const snapToEdge = (pt: { x: number; y: number }) => {
+      const dx = pt.x - cxC;
+      const dy = pt.y - cyC;
+      const len = Math.hypot(dx, dy);
+      if (len < 5) return pt;
+
+      const ux = dx / len;
+      const uy = dy / len;
+
+      let bestD = len;
+      let maxGrad = -1;
+
+      // Scan along the ray from inside the page to outside
+      for (let d = len - 8; d <= len + 15; d += 0.5) {
+        const px = cxC + ux * d;
+        const py = cyC + uy * d;
+        const ix = Math.round(px);
+        const iy = Math.round(py);
+
+        if (ix > 1 && ix < W - 2 && iy > 1 && iy < H - 2) {
+          const idx = iy * W + ix;
+          const g = grad[idx];
+          if (g > maxGrad) {
+            maxGrad = g;
+            bestD = d;
           }
         }
       }
-      return best;
+
+      // If a clear edge was found, snap to it, otherwise return original extreme point
+      if (maxGrad > 1.2) {
+        return {
+          x: cxC + ux * bestD,
+          y: cyC + uy * bestD
+        };
+      }
+      return pt;
     };
 
-    p1 = refine(p1);
-    p2 = refine(p2);
-    p3 = refine(p3);
-    p4 = refine(p4);
+    p1 = snapToEdge(p1);
+    p2 = snapToEdge(p2);
+    p3 = snapToEdge(p3);
+    p4 = snapToEdge(p4);
 
     // ── 8. Validity check ─────────────────────────────────────────────────────
     const bx1 = Math.min(p1.x, p4.x), bx2 = Math.max(p2.x, p3.x);
