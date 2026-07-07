@@ -166,6 +166,74 @@ function solveGaussian(A: number[][], B: number[]): number[] {
   return X;
 }
 
+function detectSkewAngle(data: Uint8ClampedArray, w: number, h: number): number {
+  // Downsample for performance (max width 160)
+  const scale = Math.min(1.0, 160 / w);
+  const sw = Math.round(w * scale);
+  const sh = Math.round(h * scale);
+  
+  // Compute luminance
+  const lum = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      const srcX = Math.round(x / scale);
+      const srcY = Math.round(y / scale);
+      const idx = (Math.min(h - 1, srcY) * w + Math.min(w - 1, srcX)) * 4;
+      lum[y * sw + x] = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+    }
+  }
+
+  // Find angle that maximizes projection variance
+  let bestAngle = 0;
+  let maxVariance = -1;
+
+  for (let angleDeg = -8; angleDeg <= 8; angleDeg += 0.5) {
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+
+    const profile = new Float32Array(sh);
+    const counts = new Int32Array(sh);
+    const cx = sw / 2;
+    const cy = sh / 2;
+
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const rx = x - cx;
+        const ry = y - cy;
+        const rotY = Math.round(rx * sin + ry * cos + cy);
+        if (rotY >= 0 && rotY < sh) {
+          profile[rotY] += lum[y * sw + x];
+          counts[rotY]++;
+        }
+      }
+    }
+
+    let sum = 0;
+    let sumSq = 0;
+    let validRows = 0;
+    for (let i = 0; i < sh; i++) {
+      if (counts[i] > 0) {
+        const avg = profile[i] / counts[i];
+        sum += avg;
+        sumSq += avg * avg;
+        validRows++;
+      }
+    }
+
+    if (validRows > 0) {
+      const mean = sum / validRows;
+      const variance = (sumSq / validRows) - (mean * mean);
+      if (variance > maxVariance) {
+        maxVariance = variance;
+        bestAngle = angleDeg;
+      }
+    }
+  }
+
+  return bestAngle;
+}
+
 export const warpPerspective = (
   imageDataUrl: string,
   quad: QuadPoints,
@@ -291,6 +359,32 @@ export const warpPerspective = (
       }
 
       ctx.putImageData(destData, 0, 0);
+
+      // Detect and correct skew automatically
+      try {
+        const skewAngle = detectSkewAngle(destData.data, targetWidth, targetHeight);
+        if (Math.abs(skewAngle) > 0.3) {
+          const angleRad = (-skewAngle * Math.PI) / 180;
+          const rotCanvas = document.createElement('canvas');
+          rotCanvas.width = targetWidth;
+          rotCanvas.height = targetHeight;
+          const rotCtx = rotCanvas.getContext('2d');
+          if (rotCtx) {
+            rotCtx.fillStyle = '#ffffff';
+            rotCtx.fillRect(0, 0, targetWidth, targetHeight);
+            rotCtx.translate(targetWidth / 2, targetHeight / 2);
+            rotCtx.rotate(angleRad);
+            rotCtx.drawImage(canvas, -targetWidth / 2, -targetHeight / 2);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, targetWidth, targetHeight);
+            ctx.drawImage(rotCanvas, 0, 0);
+          }
+        }
+      } catch (e) {
+        console.warn('Automatic deskewing failed:', e);
+      }
+
       resolve({
         dataUrl: canvas.toDataURL('image/jpeg', 0.9),
         width: targetWidth,
