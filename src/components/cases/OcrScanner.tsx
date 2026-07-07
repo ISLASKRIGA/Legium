@@ -785,13 +785,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'preview-full' && originalImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between', touchAction: 'none', overscrollBehavior: 'none' }}>
-          <span style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between', touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}>
+          <span style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600, userSelect: 'none', WebkitUserSelect: 'none' }}>
             Ajusta los puntos en las esquinas para encuadrar la hoja
           </span>
 
           <div 
-            ref={previewContainerRef}
             onMouseMove={handleCornerMouseMove}
             onTouchMove={handleCornerTouchMove}
             style={{ 
@@ -804,15 +803,22 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
               background: '#121214',
               userSelect: 'none',
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
+              WebkitTapHighlightColor: 'transparent',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               touchAction: 'none'
             }}
           >
-            <img 
-              ref={previewImageRef}
-              src={originalImage} 
+            <div 
+              ref={previewContainerRef}
+              style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: '100%', maxHeight: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <img 
+                ref={previewImageRef}
+                src={originalImage} 
               alt="Scan Preview Full"
               draggable={false}
               style={{ 
@@ -934,10 +940,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   <div style={{ position: 'absolute', left: '50%', top: '50%', width: 9, height: 9, borderRadius: '50%', border: '2px solid #00ff80', background: '#fff', transform: 'translate(-50%, -50%)' }} />
                 </div>
               );
- 
-
-
-           })()}
+            })()}
+            </div>
           </div>
 
           {/* Bottom toolbar - matches CamScanner example */}

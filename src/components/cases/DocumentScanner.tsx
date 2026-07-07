@@ -571,13 +571,12 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       )}
 
       {step === 'preview-full' && originalImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between', touchAction: 'none', overscrollBehavior: 'none' }}>
-          <span style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between', touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}>
+          <span style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600, userSelect: 'none', WebkitUserSelect: 'none' }}>
             Ajusta los puntos en las esquinas para encuadrar la hoja
           </span>
 
           <div 
-            ref={previewContainerRef}
             onMouseMove={handleCornerMouseMove}
             onTouchMove={handleCornerTouchMove}
             style={{ 
@@ -590,23 +589,30 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
               background: '#121214',
               userSelect: 'none',
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
+              WebkitTapHighlightColor: 'transparent',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               touchAction: 'none'
             }}
           >
-            <img 
-              src={originalImage} 
-              alt="Scan Preview Full"
-              draggable={false}
-              style={{ 
-                maxWidth: '100%', 
-                maxHeight: '100%', 
-                objectFit: 'contain',
-                display: 'block'
-              }} 
-            />
+            <div 
+              ref={previewContainerRef}
+              style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: '100%', maxHeight: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <img 
+                src={originalImage} 
+                alt="Scan Preview Full"
+                draggable={false}
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '100%', 
+                  objectFit: 'contain',
+                  display: 'block'
+                }} 
+              />
             
             {/* Draggable Polygon Overlay */}
             <svg 
@@ -652,6 +658,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                 <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
               </g>
             </svg>
+            </div>
           </div>
 
           {/* Bottom toolbar */}
