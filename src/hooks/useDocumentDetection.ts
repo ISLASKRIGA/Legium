@@ -232,15 +232,29 @@ export function useDocumentDetection({
       }
     }
 
+    // ── 4c. Sobel gradient magnitude of blurred luminance ─────────────────────
+    const grad = new Float32Array(N);
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const idx = y * W + x;
+        const gx = lum[idx + 1] - lum[idx - 1];
+        const gy = lum[idx + W] - lum[idx - W];
+        grad[idx] = Math.abs(gx) + Math.abs(gy);
+      }
+    }
+
     // ── 5. BFS on achromatic-bright pixels → largest connected component ──────
     const visited = new Uint8Array(N);
     let bestComp: number[] = [];
     let bestScore = -1;
 
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
+    const globalThresh = Math.max(55, thresh - 15);
+
+    for (let y = 2; y < H - 2; y++) {
+      for (let x = 2; x < W - 2; x++) {
         const idx = y * W + x;
-        if (satArr[idx] >= SAT_THRESH || !isForeground[idx] || visited[idx]) continue;
+        // Seed must be achromatic, locally bright, globally bright, flat (not on edge), and unvisited
+        if (satArr[idx] >= SAT_THRESH || !isForeground[idx] || lum[idx] <= globalThresh || grad[idx] >= 4.8 || visited[idx]) continue;
 
         const comp: number[] = [];
         const queue: number[] = [idx];
@@ -253,10 +267,11 @@ export function useDocumentDetection({
           comp.push(cur);
           sumX += cx; sumY += cy;
 
-          if (cx > 0     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
-          if (cx < W - 1 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
-          if (cy > 0     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
-          if (cy < H - 1 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
+          // 4-connected neighbors restricted by local & global threshold and gradient barriers
+          if (cx > 1     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && lum[cur - 1] > globalThresh && grad[cur - 1] < 4.8 && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
+          if (cx < W - 2 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && lum[cur + 1] > globalThresh && grad[cur + 1] < 4.8 && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
+          if (cy > 1     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && lum[cur - W] > globalThresh && grad[cur - W] < 4.8 && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
+          if (cy < H - 2 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && lum[cur + W] > globalThresh && grad[cur + W] < 4.8 && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
         }
 
         const area = comp.length;
