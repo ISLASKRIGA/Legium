@@ -5,6 +5,7 @@ import { createSearchablePdf, warpPerspective, detectDocumentEdges, QuadPoints, 
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
+import { enhanceImage } from './OcrScanner';
 
 interface DocumentScannerProps {
   onScanComplete: (newDoc: DocumentItem, fileBlob: Blob) => void;
@@ -62,6 +63,25 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatus, setOcrStatus] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
+  const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  useEffect(() => {
+    if (capturedImage && step === 'beautify') {
+      setIsEnhancing(true);
+      enhanceImage(capturedImage, activeFilter)
+        .then((url) => {
+          setProcessedImage(url);
+          setIsEnhancing(false);
+        })
+        .catch((err) => {
+          console.error("Enhancement failed:", err);
+          setIsEnhancing(false);
+        });
+    } else {
+      setProcessedImage(null);
+    }
+  }, [capturedImage, activeFilter, step]);
 
   // Video Ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -270,40 +290,31 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   }, []);
 
   const handleFinalSave = async () => {
-    if (!capturedImage) return;
+    const finalImg = processedImage || capturedImage;
+    if (!finalImg) return;
 
     setStep('ocr');
     setOcrProgress(5);
     setOcrStatus('Preparando documento...');
 
     try {
-      // 1. Prepare filtered canvas
-      const canvas = document.createElement('canvas');
       const img = new Image();
       await new Promise<void>((resolve) => {
         img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.filter = getFilterStyle(activeFilter);
-            ctx.drawImage(img, 0, 0);
-          }
           resolve();
         };
-        img.src = capturedImage;
+        img.src = finalImg;
       });
 
-      const processedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
       const croppedImageResult = {
-        dataUrl: processedDataUrl,
-        width: canvas.width,
-        height: canvas.height
+        dataUrl: finalImg,
+        width: img.width,
+        height: img.height
       };
 
       // 2. OCR real with Tesseract.js
       setOcrStatus('Iniciando motor de OCR...');
-      const result = await Tesseract.recognize(processedDataUrl, 'spa', {
+      const result = await Tesseract.recognize(finalImg, 'spa', {
         logger: (m) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round(10 + m.progress * 85);
@@ -347,11 +358,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     }
   };
 
-  const getFilterStyle = (f: FilterType): string => {
-    if (f === 'magic') return 'contrast(1.4) brightness(1.08) saturate(1.1)';
-    if (f === 'bw') return 'contrast(1.7) brightness(1.05) grayscale(1)';
-    return 'none';
-  };
+
 
   const p1 = edgePoints.p1;
   const p2 = edgePoints.p2;
@@ -977,14 +984,14 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               }}
             >
               <img 
-                src={capturedImage} 
+                src={processedImage || capturedImage} 
                 alt="Enhanced Preview" 
                 style={{ 
                   maxWidth: '100%', 
                   maxHeight: '100%', 
                   display: 'block',
-                  filter: getFilterStyle(activeFilter),
-                  transition: 'all 0.3s ease'
+                  opacity: isEnhancing ? 0.5 : 1,
+                  transition: 'opacity 0.25s ease'
                 }} 
               />
             </div>

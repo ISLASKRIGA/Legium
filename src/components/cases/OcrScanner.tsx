@@ -15,56 +15,179 @@ interface OcrScannerProps {
 
 type FilterType = 'original' | 'lighten' | 'magic' | 'bw' | 'grayscale';
 
-/**
- * Applies a 3×3 unsharp-mask sharpening kernel to a canvas in-place.
- * Kernel: [0,-1,0,-1,5,-1,0,-1,0] — classic laplacian-boost sharpen.
- */
-function sharpenCanvas(canvas: HTMLCanvasElement): void {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  const { width: w, height: h } = canvas;
-  const src = ctx.getImageData(0, 0, w, h);
-  const data = src.data;
-  const out = new Uint8ClampedArray(data.length);
-  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let r = 0, g = 0, b = 0;
-      for (let ky = 0; ky < 3; ky++) {
-        for (let kx = 0; kx < 3; kx++) {
-          const py = Math.min(h - 1, Math.max(0, y + ky - 1));
-          const px = Math.min(w - 1, Math.max(0, x + kx - 1));
-          const idx = (py * w + px) * 4;
-          const k = kernel[ky * 3 + kx];
-          r += data[idx] * k;
-          g += data[idx + 1] * k;
-          b += data[idx + 2] * k;
+export const enhanceImage = (
+  imgSrc: string,
+  filter: 'original' | 'magic' | 'bw' | 'grayscale' | 'lighten',
+  brightness = 1.0,
+  contrast = 1.0
+): Promise<string> => {
+  return new Promise((resolve) => {
+    if (filter === 'original') {
+      resolve(imgSrc);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(imgSrc);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+      const w = canvas.width;
+      const h = canvas.height;
+      const N = w * h;
+
+      if (filter === 'grayscale' || filter === 'bw') {
+        for (let i = 0; i < N; i++) {
+          const r = data[i * 4];
+          const g = data[i * 4 + 1];
+          const b = data[i * 4 + 2];
+          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          data[i * 4] = gray;
+          data[i * 4 + 1] = gray;
+          data[i * 4 + 2] = gray;
         }
       }
-      const i = (y * w + x) * 4;
-      out[i]     = Math.min(255, Math.max(0, r));
-      out[i + 1] = Math.min(255, Math.max(0, g));
-      out[i + 2] = Math.min(255, Math.max(0, b));
-      out[i + 3] = data[i + 3];
-    }
-  }
-  ctx.putImageData(new ImageData(out, w, h), 0, 0);
-}
 
-const getFilterStyle = (filter: FilterType, brightness = 1.18, contrast = 1.35): string => {
-  switch (filter) {
-    case 'lighten':
-      return 'brightness(1.2) contrast(1.08) saturate(0.85)';
-    case 'magic':
-      // brightness+contrast clean the paper; SVG sharpen kernel boosts edge definition
-      return `brightness(${brightness}) contrast(${contrast}) saturate(0.72) url(#legium-sharpen)`;
-    case 'bw':
-      return 'grayscale(1) brightness(1.05) contrast(1.8)';
-    case 'grayscale':
-      return 'grayscale(1) brightness(1.02) contrast(1.1)';
-    default:
-      return 'none';
-  }
+      if (filter === 'bw') {
+        // High-contrast B&W thresholding
+        for (let i = 0; i < N; i++) {
+          const gray = data[i * 4];
+          const val = gray > 120 ? 255 : 0;
+          data[i * 4] = val;
+          data[i * 4 + 1] = val;
+          data[i * 4 + 2] = val;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        return;
+      }
+
+      if (filter === 'magic') {
+        // 1. Calculate luminance
+        const lum = new Float32Array(N);
+        for (let i = 0; i < N; i++) {
+          lum[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+        }
+
+        // 2. Compute integral image of luminance
+        const integral = new Uint32Array(N);
+        for (let y = 0; y < h; y++) {
+          let rowSum = 0;
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            rowSum += lum[idx];
+            integral[idx] = rowSum + (y > 0 ? integral[(y - 1) * w + x] : 0);
+          }
+        }
+
+        // 3. Local adaptive gain filter (Bradley-Roth style enhancement)
+        const S = Math.max(16, (w / 16) | 0);
+        const S2 = S >> 1;
+        const C = 10 * brightness; // Higher brightness -> cleans more background
+        const exponent = 2.0 * contrast; // Higher contrast -> makes text darker
+
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            const x1 = Math.max(0, x - S2);
+            const x2 = Math.min(w - 1, x + S2);
+            const y1 = Math.max(0, y - S2);
+            const y2 = Math.min(h - 1, y + S2);
+            const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+            const sum = integral[y2 * w + x2]
+                      - (x1 > 0 ? integral[y2 * w + (x1 - 1)] : 0)
+                      - (y1 > 0 ? integral[(y1 - 1) * w + x2] : 0)
+                      + (x1 > 0 && y1 > 0 ? integral[(y1 - 1) * w + (x1 - 1)] : 0);
+
+            const avg = sum / count;
+            const L = lum[idx];
+
+            let r = data[idx * 4];
+            let g = data[idx * 4 + 1];
+            let b = data[idx * 4 + 2];
+
+            if (L >= avg - C) {
+              // Whiten background
+              const diff = L - (avg - C);
+              const factor = Math.min(1.0, diff / 8);
+              r = r + (255 - r) * factor;
+              g = g + (255 - g) * factor;
+              b = b + (255 - b) * factor;
+            } else {
+              // Darken text to near-black
+              const ratio = L / Math.max(1, avg);
+              const enhancedRatio = Math.pow(ratio, exponent);
+              r = r * enhancedRatio;
+              g = g * enhancedRatio;
+              b = b * enhancedRatio;
+            }
+
+            data[idx * 4] = r;
+            data[idx * 4 + 1] = g;
+            data[idx * 4 + 2] = b;
+          }
+        }
+
+        // 4. Sharpening matrix on the canvas
+        const output = new Uint8ClampedArray(data.length);
+        const kernel = [0, -1.2, 0, -1.2, 5.8, -1.2, 0, -1.2, 0];
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            let rSum = 0, gSum = 0, bSum = 0;
+            for (let ky = 0; ky < 3; ky++) {
+              for (let kx = 0; kx < 3; kx++) {
+                const py = Math.min(h - 1, Math.max(0, y + ky - 1));
+                const px = Math.min(w - 1, Math.max(0, x + kx - 1));
+                const kidx = (py * w + px) * 4;
+                const k = kernel[ky * 3 + kx];
+                rSum += data[kidx] * k;
+                gSum += data[kidx + 1] * k;
+                bSum += data[kidx + 2] * k;
+              }
+            }
+            const oidx = (y * w + x) * 4;
+            output[oidx] = Math.min(255, Math.max(0, rSum));
+            output[oidx + 1] = Math.min(255, Math.max(0, gSum));
+            output[oidx + 2] = Math.min(255, Math.max(0, bSum));
+            output[oidx + 3] = data[oidx + 3];
+          }
+        }
+        ctx.putImageData(new ImageData(output, w, h), 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        return;
+      }
+
+      if (filter === 'lighten') {
+        // Boost brightness and contrast globally
+        const bFactor = 1.15 * brightness;
+        const cFactor = 1.1 * contrast;
+        for (let i = 0; i < N; i++) {
+          let r = data[i * 4] * bFactor;
+          let g = data[i * 4 + 1] * bFactor;
+          let b = data[i * 4 + 2] * bFactor;
+          r = (r - 128) * cFactor + 128;
+          g = (g - 128) * cFactor + 128;
+          b = (b - 128) * cFactor + 128;
+          data[i * 4] = Math.min(255, Math.max(0, r));
+          data[i * 4 + 1] = Math.min(255, Math.max(0, g));
+          data[i * 4 + 2] = Math.min(255, Math.max(0, b));
+        }
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.9));
+    };
+    img.src = imgSrc;
+  });
 };
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
@@ -92,6 +215,26 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
   const [magicBrightness, setMagicBrightness] = useState(1.18);
   const [magicContrast, setMagicContrast] = useState(1.35);
+  const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  useEffect(() => {
+    if (capturedImage) {
+      setIsEnhancing(true);
+      enhanceImage(capturedImage, activeFilter, magicBrightness, magicContrast)
+        .then((url) => {
+          setProcessedImage(url);
+          setIsEnhancing(false);
+        })
+        .catch((err) => {
+          console.error("Enhancement failed:", err);
+          setIsEnhancing(false);
+        });
+    } else {
+      setProcessedImage(null);
+    }
+  }, [capturedImage, activeFilter, magicBrightness, magicContrast]);
+
   // Multi-page: accumulated processed pages (filtered data URLs + dimensions)
   const [scannedPages, setScannedPages] = useState<CroppedImageResult[]>([]);
   const [finalPdfUrl, setFinalPdfUrl] = useState<string | null>(null);
@@ -1174,15 +1317,15 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             >
               {/* Show cropped image once ready, else show original */}
               <img
-                src={capturedImage || originalImage}
+                src={processedImage || capturedImage || originalImage}
                 alt="Documento recortado"
                 style={{
                   display: 'block',
                   maxWidth: '100%',
                   maxHeight: 'calc(100vh - 280px)',
                   objectFit: 'contain',
-                  filter: scanPhase === 'done' ? getFilterStyle(activeFilter, magicBrightness, magicContrast) : 'none',
-                  transition: 'filter 0.7s ease',
+                  opacity: isEnhancing ? 0.5 : 1,
+                  transition: 'opacity 0.25s ease',
                 }}
               />
 
@@ -1308,36 +1451,22 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
               {/* ✓ Palomita → pantalla decide */}
               <button
+                disabled={isEnhancing}
                 onClick={() => {
-                  if (!capturedImage) return;
-                  // Render with current filter and add to scannedPages
-                  const canvas = document.createElement('canvas');
+                  const finalImg = processedImage || capturedImage;
+                  if (!finalImg) return;
                   const img = new Image();
                   img.onload = () => {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      // Apply brightness/contrast/saturate via canvas filter
-                      ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast)
-                        .replace(/url\([^)]*\)/g, '').trim(); // strip SVG ref for canvas
-                      ctx.drawImage(img, 0, 0);
-                      // Apply pixel-level sharpening kernel for 'magic' filter
-                      if (activeFilter === 'magic') {
-                        ctx.filter = 'none';
-                        sharpenCanvas(canvas);
-                      }
-                    }
                     const rendered: CroppedImageResult = {
-                      dataUrl: canvas.toDataURL('image/jpeg', 0.9),
-                      width: canvas.width,
-                      height: canvas.height,
+                      dataUrl: finalImg,
+                      width: img.width,
+                      height: img.height,
                     };
                     setScannedPages(prev => [...prev, rendered]);
                     setScanPhase('idle');
                     setStep('decide');
                   };
-                  img.src = capturedImage;
+                  img.src = finalImg;
                 }}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#00e5a0', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}
               >
