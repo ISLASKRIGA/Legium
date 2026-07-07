@@ -21,9 +21,12 @@ const getFilterStyle = (filter: FilterType): string => {
       // Aclarar: levanta sombras suavemente sin quemar el papel
       return 'brightness(1.2) contrast(1.08) saturate(0.85)';
     case 'magic':
-      // Mejorar: papel más blanco + colores más vivos.
-      // brightness limpia el fondo, contrast da nitidez, saturate realza los colores del texto.
-      return 'brightness(1.08) contrast(1.4) saturate(1.5)';
+      // ANÁLISIS EXPERTO: el papel crema cálido (luz interior) → papel blanco neutro.
+      // brightness(1.18): empuja el crema a casi blanco puro.
+      // contrast(1.35): el texto oscurece contra el fondo claro.
+      // saturate(0.72): elimina el cast amarillo/cálido de la luz de habitación
+      //   sin desaturar completamente — el rojo sigue siendo rojo, el papel pierde el tono crema.
+      return 'brightness(1.18) contrast(1.35) saturate(0.72)';
     case 'bw':
       // B&N: escala de grises + contraste fuerte estilo fotocopia
       return 'grayscale(1) brightness(1.05) contrast(1.8)';
