@@ -785,7 +785,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'preview-full' && originalImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between', touchAction: 'none', overscrollBehavior: 'none' }}>
           <span style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600 }}>
             Ajusta los puntos en las esquinas para encuadrar la hoja
           </span>
@@ -806,7 +806,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               userSelect: 'none',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              touchAction: 'none'
             }}
           >
             <img 
@@ -830,7 +831,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 left: 0, 
                 width: '100%', 
                 height: '100%', 
-                zIndex: 10
+                zIndex: 10,
+                touchAction: 'none'
               }}
               viewBox="0 0 100 100"
               preserveAspectRatio="none"
@@ -846,10 +848,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               />
               
               {/* Corner Circular Handles (White with green border) */}
-              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={(e) => handleCornerTouchStart(e, 'p1')} />
-              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={(e) => handleCornerTouchStart(e, 'p2')} />
-              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={(e) => handleCornerTouchStart(e, 'p3')} />
-              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={(e) => handleCornerTouchStart(e, 'p4')} />
+              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={(e) => handleCornerTouchStart(e, 'p1')} />
+              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={(e) => handleCornerTouchStart(e, 'p2')} />
+              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={(e) => handleCornerTouchStart(e, 'p3')} />
+              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={(e) => handleCornerTouchStart(e, 'p4')} />
 
               {/* Edge Pill/Bar handles (White rects rotated along edges) */}
               <g transform={`translate(${mid1.mx}, ${mid1.my}) rotate(${mid1.angle})`}>

@@ -205,7 +205,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     setActiveCorner(corner);
   };
 
-  const handleCornerTouchStart = (corner: 'p1' | 'p2' | 'p3' | 'p4') => {
+  const handleCornerTouchStart = (e: React.TouchEvent, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
+    e.preventDefault();
+    e.stopPropagation();
     setActiveCorner(corner);
   };
 
@@ -225,6 +227,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
 
   const handleCornerTouchMove = (e: React.TouchEvent) => {
     if (!activeCorner || !previewContainerRef.current) return;
+    e.preventDefault();
     const touch = e.touches[0];
     const rect = previewContainerRef.current.getBoundingClientRect();
     const x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
@@ -568,7 +571,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       )}
 
       {step === 'preview-full' && originalImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flexGrow: 1, padding: '16px', background: '#1c1c1e', height: '100%', justifyContent: 'space-between', touchAction: 'none', overscrollBehavior: 'none' }}>
           <span style={{ textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '12px', fontWeight: 600 }}>
             Ajusta los puntos en las esquinas para encuadrar la hoja
           </span>
@@ -589,7 +592,8 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               userSelect: 'none',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              touchAction: 'none'
             }}
           >
             <img 
@@ -612,7 +616,8 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                 left: 0, 
                 width: '100%', 
                 height: '100%', 
-                zIndex: 10
+                zIndex: 10,
+                touchAction: 'none'
               }}
               viewBox="0 0 100 100"
               preserveAspectRatio="none"
@@ -628,10 +633,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               />
               
               {/* Corner Circular Handles */}
-              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={() => handleCornerTouchStart('p1')} />
-              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={() => handleCornerTouchStart('p2')} />
-              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={() => handleCornerTouchStart('p3')} />
-              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={() => handleCornerTouchStart('p4')} />
+              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={(e) => handleCornerTouchStart(e, 'p1')} />
+              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={(e) => handleCornerTouchStart(e, 'p2')} />
+              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={(e) => handleCornerTouchStart(e, 'p3')} />
+              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={(e) => handleCornerTouchStart(e, 'p4')} />
 
               {/* Edge mid-point pills */}
               <g transform={`translate(${mid1.mx}, ${mid1.my}) rotate(${mid1.angle})`}>
