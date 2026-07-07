@@ -19,7 +19,7 @@ const DEFAULT_QUAD: QuadPoints = {
 };
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
-function expandQuad(quad: QuadPoints, amount = 1.035): QuadPoints {
+function expandQuad(quad: QuadPoints, amount = 1.055): QuadPoints {
   const cx = (quad.p1.x + quad.p2.x + quad.p3.x + quad.p4.x) / 4;
   const cy = (quad.p1.y + quad.p2.y + quad.p3.y + quad.p4.y) / 4;
   const expand = (pt: { x: number; y: number }) => ({
@@ -277,9 +277,7 @@ export function useDocumentDetection({
         const area = comp.length;
         if (area < N * 0.03) continue;
 
-        const cxC = sumX / area, cyC = sumY / area;
-        const distToCenter = Math.hypot(cxC - W / 2, cyC - H / 2);
-        const score = area / (1 + distToCenter * 0.10);
+        const score = area;
         if (score > bestScore) { bestScore = score; bestComp = comp; }
       }
     }

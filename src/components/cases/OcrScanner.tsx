@@ -881,33 +881,44 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             </div>
 
             {/* Camera controls */}
-            <div className="scanner-controls" style={{ padding: '8px 36px 8px 36px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="scanner-controls" style={{
+              padding: '8px 36px 8px 36px',
+              width: '100%',
+              display: 'grid',
+              gridTemplateColumns: '1fr auto 1fr',
+              alignItems: 'center'
+            }}>
               {/* Left Placeholder */}
-              <div style={{ width: '24px' }} />
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ width: '24px' }} />
+              </div>
 
-              {hasCamera ? (
-                <button
-                  onClick={capturePhoto}
-                  style={{ 
-                    width: '68px', 
-                    height: '68px', 
-                    borderRadius: '50%', 
-                    border: '5px solid #00ff80', 
-                    background: 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    padding: 0,
-                    outline: 'none',
-                    boxShadow: '0 0 16px rgba(0,255,128,0.2)'
-                  }}
-                >
-                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#fff' }} />
-                </button>
-              ) : (
-                <div style={{ width: '68px', height: '68px' }} />
-              )}
+              {/* Center capture button */}
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                {hasCamera ? (
+                  <button
+                    onClick={capturePhoto}
+                    style={{ 
+                      width: '68px', 
+                      height: '68px', 
+                      borderRadius: '50%', 
+                      border: '5px solid #00ff80', 
+                      background: 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                      outline: 'none',
+                      boxShadow: '0 0 16px rgba(0,255,128,0.2)'
+                    }}
+                  >
+                    <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#fff' }} />
+                  </button>
+                ) : (
+                  <div style={{ width: '68px', height: '68px' }} />
+                )}
+              </div>
 
               <input
                 type="file"
@@ -918,17 +929,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               />
               
               {/* Import gallery button (Right) */}
-              <button
-                className="btn btn-icon"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none' }}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <path d="M20.4 14.5L16 10 4 20" />
-                </svg>
-              </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none' }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M20.4 14.5L16 10 4 20" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </>
