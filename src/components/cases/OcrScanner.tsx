@@ -824,8 +824,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               style={{ 
                 maxWidth: '100%', 
                 maxHeight: '100%', 
-                objectFit: 'contain',
-                display: 'block'
+                display: 'block',
+                width: 'auto',
+                height: 'auto'
               }} 
             />
             
