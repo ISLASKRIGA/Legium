@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 
 export interface QuadPoints {
   p1: { x: number; y: number }; // top-left
@@ -38,9 +38,6 @@ function expandQuad(quad: QuadPoints, amount = 1.035): QuadPoints {
 /**
  * Otsu binarisation on a pre-computed histogram with `totalN` samples.
  * Returns { threshold, separability }.
- * separability (η) = inter-class variance / total variance ∈ [0, 1].
- * η < 0.1  → no clear bimodal split (no paper visible).
- * η > 0.3  → clear paper / background separation.
  */
 function otsuOnHist(
   hist: Uint32Array,
@@ -66,7 +63,6 @@ function otsuOnHist(
     if (varB > maxVarB) { maxVarB = varB; threshold = t; }
   }
 
-  // Total variance σ²_T
   const mean = totalSum / totalN;
   let totalVar = 0;
   for (let i = 0; i < 256; i++) {
@@ -79,39 +75,18 @@ function otsuOnHist(
 
 /**
  * Real-time document detection from a video stream.
- *
- * KEY INSIGHT: white paper has near-zero color saturation (R ≈ G ≈ B).
- * Colored objects (posters, signs, tiles, wooden desks) have higher saturation.
- * By filtering for achromatic pixels FIRST we discard colored backgrounds before
- * applying any brightness threshold — this is what makes the detector robust.
- *
- * Pipeline (160 × 240 offscreen canvas, runs at ~15 fps):
- *
- * 1. Per-pixel:
- *    lum   = 0.299R + 0.587G + 0.114B   (luminance)
- *    sat   = max(R,G,B) − min(R,G,B)    (absolute chroma, 0-255)
- *
- * 2. Achromatic mask: sat < SAT_THRESH (45)
- *    → keeps white / gray pixels; rejects colored backgrounds & objects
- *
- * 3. 3×3 Gaussian blur on luminance (kills text noise)
- *
- * 4. Otsu threshold computed ONLY on achromatic pixels
- *    → adapts to scene brightness, never needs a hand-tuned constant
- *    → if η < 0.08 (nearly uniform) → no paper found, skip frame
- *
- * 5. BFS flood-fill on pixels that are achromatic AND above Otsu threshold
- *    → largest central bright-achromatic component = the white paper
- *
- * 6. Four perspective corners via diagonal-sum extremes:
- *    p1 (top-left)     = min(x + y)
- *    p2 (top-right)    = max(x − y)
- *    p3 (bottom-right) = max(x + y)
- *    p4 (bottom-left)  = min(x − y)
- *
- * 7. Sub-pixel Sobel corner snap (radius 5)
- *
- * 8. Validity + exponential smoothing
+ * 
+ * Pipeline:
+ * 1. Per-pixel luminance + absolute saturation
+ * 2. 5x5 separable box blur on luminance (wipes out text, shadows, micro-noise)
+ * 3. Otsu separability check on achromatic pixels (sat < 62) to see if a white surface exists
+ * 4. Bradley-Roth Local Adaptive Thresholding using an integral image of blurred luminance
+ *    - Window size S = 20, Constant offset C = 8
+ *    - Restricts flood-fill from crossing local boundaries/shadows (e.g. edge of paper on grey tile/floor)
+ * 5. BFS flood-fill on achromatic pixels that are bright relative to their local neighborhood
+ * 6. Four perspective corners via diagonal-sum extremes
+ * 7. Sub-pixel Sobel corner snap
+ * 8. Validity checks & exponential temporal smoothing
  */
 export function useDocumentDetection({
   videoRef,
@@ -130,7 +105,6 @@ export function useDocumentDetection({
       return;
     }
 
-    // ~15 fps: process every 4th frame to reduce noise input
     if (++frameCountRef.current % 4 !== 0) {
       animFrameRef.current = requestAnimationFrame(detect);
       return;
@@ -151,8 +125,8 @@ export function useDocumentDetection({
     const { data } = ctx.getImageData(0, 0, W, H);
 
     // ── 1. Per-pixel luminance + absolute saturation ───────────────────────────
-    const lumRaw = new Float32Array(N);  // raw luminance (before blur)
-    const satArr = new Uint8Array(N);    // max(R,G,B) − min(R,G,B)
+    const lumRaw = new Float32Array(N);
+    const satArr = new Uint8Array(N);
 
     for (let i = 0; i < N; i++) {
       const R = data[i * 4], G = data[i * 4 + 1], B = data[i * 4 + 2];
@@ -162,23 +136,42 @@ export function useDocumentDetection({
       satArr[i] = maxC - minC;
     }
 
-    // ── 2. 3×3 Gaussian blur on luminance ─────────────────────────────────────
-    const lum = lumRaw.slice(); // copy borders as-is
-    for (let y = 1; y < H - 1; y++) {
-      for (let x = 1; x < W - 1; x++) {
-        lum[y * W + x] = (
-          lumRaw[(y-1)*W+(x-1)] + 2*lumRaw[(y-1)*W+x] + lumRaw[(y-1)*W+(x+1)] +
-          2*lumRaw[y*W+(x-1)]   + 4*lumRaw[y*W+x]     + 2*lumRaw[y*W+(x+1)]   +
-          lumRaw[(y+1)*W+(x-1)] + 2*lumRaw[(y+1)*W+x] + lumRaw[(y+1)*W+(x+1)]
-        ) / 16;
+    // ── 2. 5x5 separable box blur on luminance (wipes out text/grout noise) ───
+    const temp = new Float32Array(N);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        let sum = 0;
+        let count = 0;
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = x + dx;
+          if (nx >= 0 && nx < W) {
+            sum += lumRaw[y * W + nx];
+            count++;
+          }
+        }
+        temp[idx] = sum / count;
+      }
+    }
+    const lum = new Float32Array(N);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        let sum = 0;
+        let count = 0;
+        for (let dy = -2; dy <= 2; dy++) {
+          const ny = y + dy;
+          if (ny >= 0 && ny < H) {
+            sum += temp[ny * W + x];
+            count++;
+          }
+        }
+        lum[idx] = sum / count;
       }
     }
 
     // ── 3. Achromatic mask + Otsu histogram ───────────────────────────────────
-    // White paper: sat ≈ 0.   Colorful objects: sat >> 45.
-    // This rejects: signs, posters, tiles with color, wooden desks, etc.
     const SAT_THRESH = 62;
-
     const hist = new Uint32Array(256);
     let numAchromatic = 0;
     for (let i = 0; i < N; i++) {
@@ -188,7 +181,6 @@ export function useDocumentDetection({
       }
     }
 
-    // Bail out if barely any achromatic pixels → no white surface in view
     if (numAchromatic < N * 0.05) {
       lastQuadRef.current = null;
       onDetection(DEFAULT_QUAD, 0);
@@ -199,12 +191,45 @@ export function useDocumentDetection({
     // ── 4. Otsu threshold on achromatic pixels ────────────────────────────────
     const { threshold: thresh, separability } = otsuOnHist(hist, numAchromatic);
 
-    // η < 0.08: scene too uniform, no clear paper edge
     if (separability < 0.055) {
       lastQuadRef.current = null;
       onDetection(DEFAULT_QUAD, 0);
       animFrameRef.current = requestAnimationFrame(detect);
       return;
+    }
+
+    // ── 4b. Integral Image + Bradley-Roth Local Adaptive Thresholding ─────────
+    const integral = new Uint32Array(N);
+    for (let y = 0; y < H; y++) {
+      let rowSum = 0;
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        rowSum += lum[idx];
+        integral[idx] = rowSum + (y > 0 ? integral[(y - 1) * W + x] : 0);
+      }
+    }
+
+    const S = 20;
+    const S2 = S >> 1;
+    const C = 8;
+    const isForeground = new Uint8Array(N);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        const x1 = Math.max(0, x - S2);
+        const x2 = Math.min(W - 1, x + S2);
+        const y1 = Math.max(0, y - S2);
+        const y2 = Math.min(H - 1, y + S2);
+        const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+        const sum = integral[y2 * W + x2]
+                  - (x1 > 0 ? integral[y2 * W + (x1 - 1)] : 0)
+                  - (y1 > 0 ? integral[(y1 - 1) * W + x2] : 0)
+                  + (x1 > 0 && y1 > 0 ? integral[(y1 - 1) * W + (x1 - 1)] : 0);
+
+        const avg = sum / count;
+        isForeground[idx] = lum[idx] >= (avg - C) ? 1 : 0;
+      }
     }
 
     // ── 5. BFS on achromatic-bright pixels → largest connected component ──────
@@ -215,8 +240,7 @@ export function useDocumentDetection({
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const idx = y * W + x;
-        // Seed: achromatic AND above Otsu threshold AND not yet visited
-        if (satArr[idx] >= SAT_THRESH || lum[idx] <= thresh || visited[idx]) continue;
+        if (satArr[idx] >= SAT_THRESH || !isForeground[idx] || visited[idx]) continue;
 
         const comp: number[] = [];
         const queue: number[] = [idx];
@@ -229,17 +253,15 @@ export function useDocumentDetection({
           comp.push(cur);
           sumX += cx; sumY += cy;
 
-          // 4-connected neighbours — explicit bounds to prevent row wrapping
-          if (cx > 0     && satArr[cur - 1] < SAT_THRESH && lum[cur - 1] > thresh && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
-          if (cx < W - 1 && satArr[cur + 1] < SAT_THRESH && lum[cur + 1] > thresh && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
-          if (cy > 0     && satArr[cur - W] < SAT_THRESH && lum[cur - W] > thresh && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
-          if (cy < H - 1 && satArr[cur + W] < SAT_THRESH && lum[cur + W] > thresh && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
+          if (cx > 0     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
+          if (cx < W - 1 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
+          if (cy > 0     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
+          if (cy < H - 1 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
         }
 
         const area = comp.length;
-        if (area < N * 0.03) continue; // discard tiny components
+        if (area < N * 0.03) continue;
 
-        // Prefer large, centrally-located components
         const cxC = sumX / area, cyC = sumY / area;
         const distToCenter = Math.hypot(cxC - W / 2, cyC - H / 2);
         const score = area / (1 + distToCenter * 0.10);
@@ -249,7 +271,6 @@ export function useDocumentDetection({
 
     const compArea = bestComp.length;
 
-    // Reject: component too small (no paper) or too large (whole scene is white)
     if (compArea < N * 0.045 || compArea > N * 0.96) {
       lastQuadRef.current = null;
       onDetection(DEFAULT_QUAD, 0);
@@ -284,7 +305,7 @@ export function useDocumentDetection({
               (lumRaw[(cy-1)*W+(cx-1)] + 2*lumRaw[cy*W+(cx-1)] + lumRaw[(cy+1)*W+(cx-1)]);
             const gy =
               (lumRaw[(cy+1)*W+(cx-1)] + 2*lumRaw[(cy+1)*W+cx] + lumRaw[(cy+1)*W+(cx+1)]) -
-              (lumRaw[(cy-1)*W+(cx-1)] + 2*lumRaw[(cy-1)*W+cx] + lumRaw[(cy-1)*W+(cx+1)]);
+              (lumRaw[(cy-1)*W+(cx-1)] + 2*lumRaw[(cy-1)*W+cx] + lumRaw[(cy-1)*W+(cx-1)]);
             const mag = gx * gx + gy * gy;
             if (mag > maxMag) { maxMag = mag; best = { x: cx, y: cy }; }
           }
@@ -304,7 +325,6 @@ export function useDocumentDetection({
     const bw   = bx2 - bx1, bh = by2 - by1;
     const aspect = bw / Math.max(1, bh);
 
-    // Confidence: based on Otsu quality + how much of the frame the paper covers
     const confidence = Math.min(1, (separability * 1.35 + compArea / N) / 1.25);
 
     const isValid =
@@ -331,12 +351,7 @@ export function useDocumentDetection({
 
     const raw: QuadPoints = expandQuad({ p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) });
 
-    // High smoothing factor: 0.82 retains 82% of the previous position each frame
-    // (was 0.55) — greatly reduces jitter while still tracking real movement.
     const k = 0.82;
-
-    // Dead-zone: only update if a corner moved more than 0.8% of the viewport.
-    // This suppresses micro-jitter from the detector without delaying real motion.
     const DEAD_ZONE = 0.8;
     const shouldUpdate = (prev: QuadPoints, next: QuadPoints) => {
       const keys = ['p1', 'p2', 'p3', 'p4'] as const;
@@ -347,7 +362,6 @@ export function useDocumentDetection({
     };
 
     if (lastQuadRef.current && !shouldUpdate(lastQuadRef.current, raw)) {
-      // Movement is within dead-zone — skip update, keep current stable quad
       onDetection(lastQuadRef.current, confidence);
       animFrameRef.current = requestAnimationFrame(detect);
       return;
