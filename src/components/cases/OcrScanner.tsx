@@ -37,6 +37,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
+  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'scanning' | 'enhancing'>('idle');
+  const capturedRawRef = useRef<string | null>(null);
   const [scannerMsg, setScannerMsg] = useState('Apunta la cámara al escrito judicial...');
   const [alignProgress, setAlignProgress] = useState(0);
 
@@ -128,32 +130,42 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     }
   });
 
-  // Alignment process
+  // Alignment process — drives scan animation phases then moves to beautify
   const processAlignment = async (imgDataUrl: string, quad: QuadPoints) => {
     setAlignProgress(15);
+    setScanPhase('scanning'); // laser sweep starts
     try {
       const warped = await warpPerspective(imgDataUrl, quad, 800, 1100);
       setAlignProgress(70);
 
-      // Play sweep animation
+      // After warp is ready, wait for laser animation to finish (1.4s total)
       setTimeout(() => {
+        setScanPhase('enhancing'); // white flash "magic enhance"
         setCapturedImage(warped.dataUrl);
-        setAlignProgress(100);
-        setStep('beautify');
-      }, 1200);
+        setTimeout(() => {
+          setAlignProgress(100);
+          setScanPhase('idle');
+          setStep('beautify');
+        }, 900); // enhancing flash lasts 0.9s
+      }, 1400);
     } catch (err) {
       console.error('Perspective warp failed:', err);
       setTimeout(() => {
+        setScanPhase('enhancing');
         setCapturedImage(imgDataUrl);
-        setStep('beautify');
-      }, 1200);
+        setTimeout(() => {
+          setScanPhase('idle');
+          setStep('beautify');
+        }, 900);
+      }, 1400);
     }
   };
 
-  // Capturing photo
+  // Capturing photo — grey flash → capture raw frame → start aligning animation
   const capturePhoto = () => {
+    // Trigger grey shutter flash
     setFlashActive(true);
-    setTimeout(() => setFlashActive(false), 200);
+    setTimeout(() => setFlashActive(false), 350);
 
     if (hasCamera && videoRef.current) {
       const canvas = document.createElement('canvas');
@@ -163,12 +175,16 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg');
+        capturedRawRef.current = dataUrl; // store raw immediately for display
         setOriginalImage(dataUrl);
         stopCamera();
-        
-        // Immediately start perspective warp and align transition!
-        setStep('aligning');
-        processAlignment(dataUrl, edgePoints);
+
+        // Short delay so grey flash is visible, then transition to aligning
+        setScanPhase('captured');
+        setTimeout(() => {
+          setStep('aligning');
+          processAlignment(dataUrl, edgePoints);
+        }, 300);
       }
     }
   };
@@ -880,88 +896,108 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'aligning' && originalImage && (
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          {/* Blurry Background */}
-          <img 
-            src={originalImage} 
-            alt="Scan aligning background"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(16px) brightness(0.35)', zIndex: 1 }} 
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#111', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          {/* Blurry ambient background */}
+          <img
+            src={originalImage}
+            alt="bg"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(24px) brightness(0.2) saturate(0.5)', zIndex: 1 }}
           />
-          
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '22px', zIndex: 2, width: '100%' }}>
-            <h4 style={{ fontWeight: '700', color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-              <RefreshCw size={18} className="spinning" style={{ color: '#00ff80' }} /> Alineando y Rectificando
-            </h4>
-            
-            <div 
-              style={{ 
-                position: 'relative', 
-                width: '78%', 
-                height: '52vh', 
-                borderRadius: '12px', 
-                overflow: 'hidden', 
-                boxShadow: '0 20px 45px rgba(0,0,0,0.65)',
-                background: '#121214'
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 2, width: '100%', padding: '0 24px' }}>
+            {/* Status label */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {scanPhase === 'scanning' && <RefreshCw size={16} className="spinning" style={{ color: '#00e5a0' }} />}
+              {scanPhase === 'enhancing' && <Sparkles size={16} style={{ color: '#ffe066' }} />}
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: '0.3px', textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+                {scanPhase === 'scanning' ? 'Escaneando documento...' : scanPhase === 'enhancing' ? '✨ Mejorando imagen...' : 'Procesando...'}
+              </span>
+            </div>
+
+            {/* Document card */}
+            <div
+              style={{
+                position: 'relative',
+                width: '72%',
+                maxHeight: '62vh',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+                background: '#fff',
+                animation: 'slideUpDoc 0.4s cubic-bezier(0.22,1,0.36,1) both',
               }}
             >
-              <img 
-                src={originalImage} 
-                alt="Scan aligning"
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'contain'
-                }} 
+              {/* The raw captured photo */}
+              <img
+                src={originalImage}
+                alt="Documento capturado"
+                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
               />
-              
-              {/* Outline overlay */}
-              <svg 
-                style={{ 
-                  position: 'absolute', 
-                  top: 0, 
-                  left: 0, 
-                  width: '100%', 
-                  height: '100%', 
-                  pointerEvents: 'none'
-                }}
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-              >
-                <polygon
-                  points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                  fill="rgba(0, 255, 128, 0.08)"
-                  stroke="#00ff80"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
+
+              {/* ── Green laser sweep (scanning phase) ── */}
+              {scanPhase === 'scanning' && (
+                <>
+                  {/* Laser beam line */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '3px',
+                      background: 'linear-gradient(to right, transparent 5%, #00e5a0 40%, #ffffff 50%, #00e5a0 60%, transparent 95%)',
+                      boxShadow: '0 0 14px 4px rgba(0,229,160,0.7), 0 0 3px rgba(255,255,255,0.9)',
+                      animation: 'sweepLaser 1.3s cubic-bezier(0.4,0,0.6,1) infinite',
+                      zIndex: 10,
+                    }}
+                  />
+                  {/* Soft glow trail below laser */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '80px',
+                      background: 'linear-gradient(to bottom, rgba(0,229,160,0.12) 0%, transparent 100%)',
+                      animation: 'sweepLaser 1.3s cubic-bezier(0.4,0,0.6,1) infinite',
+                      zIndex: 9,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </>
+              )}
+
+              {/* ── Magic enhance flash (enhancing phase) ── */}
+              {scanPhase === 'enhancing' && (
+                <div
                   style={{
-                    filter: 'drop-shadow(0 0 4px #00ff80)',
-                    animation: 'warpPulse 1.2s ease-in-out infinite'
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(135deg, #ffffff 0%, #f0fff8 50%, #ffffff 100%)',
+                    animation: 'magicReveal 0.85s ease-out forwards',
+                    zIndex: 15,
+                    pointerEvents: 'none',
                   }}
                 />
-              </svg>
-
-              {/* Sweep laser line */}
-              <div 
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '4px',
-                  background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
-                  boxShadow: '0 0 12px #00ff80, 0 0 4px #007aff',
-                  animation: 'sweepLaser 1.2s ease-in-out infinite',
-                  zIndex: 5
-                }}
-              />
+              )}
             </div>
-            
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', margin: 0, fontWeight: 500, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-              Procesando alineación y corrigiendo perspectiva...
-            </p>
+
+            {/* Progress dots */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  width: '5px', height: '5px', borderRadius: '50%',
+                  background: scanPhase === 'enhancing' ? '#ffe066' : '#00e5a0',
+                  opacity: 0.4 + i * 0.3,
+                  animation: `pulse ${0.8 + i * 0.2}s ease-in-out infinite alternate`,
+                }} />
+              ))}
+            </div>
           </div>
         </div>
       )}
+
 
       {step === 'beautify' && capturedImage && (
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#000', padding: 0, position: 'relative' }}>
