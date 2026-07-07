@@ -79,6 +79,44 @@ export const createSearchablePdf = (image: CroppedImageResult, ocrText: string):
   return pdf.output('blob');
 };
 
+/** Creates a multi-page PDF from an array of scanned page images.
+ *  OCR text is embedded as invisible white text on page 1 for searchability. */
+export const createMultiPagePdf = (pages: CroppedImageResult[], ocrText: string): Blob => {
+  if (pages.length === 0) throw new Error('No pages to render');
+
+  const first = pages[0];
+  const pdf = new jsPDF({
+    orientation: first.width > first.height ? 'landscape' : 'portrait',
+    unit: 'px',
+    format: [first.width, first.height]
+  });
+
+  pages.forEach((page, index) => {
+    if (index > 0) {
+      pdf.addPage(
+        [page.width, page.height],
+        page.width > page.height ? 'landscape' : 'portrait'
+      );
+    }
+
+    // Embed invisible OCR text on the first page only
+    if (index === 0) {
+      const text = ocrText.trim() || DEFAULT_SCANNED_OCR_TEXT;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(Math.max(8, Math.min(16, page.width / 55)));
+      pdf.setTextColor(255, 255, 255);
+      const margin = Math.max(18, page.width * 0.04);
+      const lines = pdf.splitTextToSize(text, Math.max(40, page.width - margin * 2));
+      pdf.text(lines, margin, margin + 10, { baseline: 'top', lineHeightFactor: 1.25 });
+    }
+
+    pdf.addImage(page.dataUrl, 'JPEG', 0, 0, page.width, page.height);
+  });
+
+  return pdf.output('blob');
+};
+
+
 export interface Point {
   x: number;
   y: number;

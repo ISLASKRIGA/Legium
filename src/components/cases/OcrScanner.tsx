@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw } from 'lucide-react';
+import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw, Eye, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { createSearchablePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT } from '../../utils/scannerPdf';
+import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
@@ -31,7 +31,7 @@ const getFilterStyle = (filter: FilterType, brightness = 1.18, contrast = 1.35):
 };
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
+  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -55,6 +55,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
   const [magicBrightness, setMagicBrightness] = useState(1.18);
   const [magicContrast, setMagicContrast] = useState(1.35);
+  // Multi-page: accumulated processed pages (filtered data URLs + dimensions)
+  const [scannedPages, setScannedPages] = useState<CroppedImageResult[]>([]);
+  const [finalPdfUrl, setFinalPdfUrl] = useState<string | null>(null);
 
   // Drag corners state
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
@@ -385,41 +388,22 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   };
 
   const startOcrProcessing = async () => {
-    if (!capturedImage) return;
+    const sourceImage = scannedPages.length > 0 ? scannedPages[0].dataUrl : capturedImage;
+    if (!sourceImage) return;
     try {
       setStep('ocr-processing');
       setOcrProgress(2);
       setOcrStatus('Preparando imagen...');
-      
-      // Prepare filtered canvas
-      const canvas = document.createElement('canvas');
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast);
-            ctx.drawImage(img, 0, 0);
-            resolve();
-          } else {
-            reject(new Error('Canvas error'));
-          }
-        };
-        img.onerror = () => reject(new Error('Image load error'));
-        img.src = capturedImage;
-      });
-
-      await runRealOcr(canvas.toDataURL('image/jpeg', 0.88));
+      // Pages are already filtered — use directly
+      await runRealOcr(sourceImage);
     } catch (err) {
       console.error('Error preparing image for OCR:', err);
-      await runRealOcr(capturedImage);
+      await runRealOcr(sourceImage);
     }
   };
 
   const handleFinalSubmit = async () => {
-    if (!capturedImage) return;
+    if (scannedPages.length === 0) return;
 
     const ocrText = [
       'Trabajador demandante: ' + workerName,
@@ -431,31 +415,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     ].join('\n');
 
     try {
-      // 1. Prepare filtered canvas
-      const canvas = document.createElement('canvas');
-      const img = new Image();
-      await new Promise<void>((resolve) => {
-        img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast);
-            ctx.drawImage(img, 0, 0);
-          }
-          resolve();
-        };
-        img.src = capturedImage;
-      });
-
-      const processedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
-      const croppedImage = {
-        dataUrl: processedDataUrl,
-        width: canvas.width,
-        height: canvas.height
-      };
-
-      const pdfBlob = createSearchablePdf(croppedImage, ocrText);
+      // Build multi-page PDF from all scanned pages
+      const pdfBlob = createMultiPagePdf(scannedPages, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
       const docId = 'doc-' + Date.now();
@@ -467,6 +428,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
       // 2. Upload to InsForge Storage
       const pdfUrl = await uploadPdfToSupabase(docId, pdfBlob, caseId);
+      if (pdfUrl) setFinalPdfUrl(pdfUrl);
 
       const newDoc: DocumentItem = {
         id: docId,
@@ -1058,9 +1020,32 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 Recortar
               </button>
 
-              {/* ✓ Confirmar */}
+              {/* ✓ Palomita → pantalla decide */}
               <button
-                onClick={() => { setScanPhase('idle'); setStep('beautify'); }}
+                onClick={() => {
+                  if (!capturedImage) return;
+                  // Render with current filter and add to scannedPages
+                  const canvas = document.createElement('canvas');
+                  const img = new Image();
+                  img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast);
+                      ctx.drawImage(img, 0, 0);
+                    }
+                    const rendered: CroppedImageResult = {
+                      dataUrl: canvas.toDataURL('image/jpeg', 0.88),
+                      width: canvas.width,
+                      height: canvas.height,
+                    };
+                    setScannedPages(prev => [...prev, rendered]);
+                    setScanPhase('idle');
+                    setStep('decide');
+                  };
+                  img.src = capturedImage;
+                }}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#00e5a0', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}
               >
                 <div style={{
@@ -1071,9 +1056,76 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 }}>
                   <Check size={26} strokeWidth={3} color="#000" />
                 </div>
-                Continuar
+                Listo
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          DECIDE: ¿Añadir página o Continuar?
+      ═══════════════════════════════════════════ */}
+      {step === 'decide' && scannedPages.length > 0 && (
+        <div style={{ position: 'absolute', inset: 0, background: '#0e0e10', display: 'flex', flexDirection: 'column', zIndex: 100 }}>
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.6)' }}>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}><X size={20} /></button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Files size={15} style={{ color: '#00e5a0' }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                {scannedPages.length} {scannedPages.length === 1 ? 'página' : 'páginas'} escaneadas
+              </span>
+            </div>
+            <div style={{ width: 20 }} />
+          </div>
+
+          {/* Page thumbnails */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+            {scannedPages.map((page, i) => (
+              <div key={i} style={{ position: 'relative', width: '78%', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.6)', background: '#fff', animation: 'slideUpDoc 0.35s ease both', animationDelay: `${i * 0.06}s` }}>
+                <img src={page.dataUrl} alt={`Página ${i + 1}`} style={{ width: '100%', display: 'block' }} />
+                {/* Page badge */}
+                <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', backdropFilter: 'blur(4px)' }}>
+                  Pág. {i + 1}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom action bar */}
+          <div style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.07)', padding: '16px 28px 28px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+
+            {/* Añadir otra página */}
+            <button
+              onClick={() => {
+                // Keep scannedPages, go back to capture for next page
+                setCapturedImage(null);
+                setOriginalImage(null);
+                setScanPhase('idle');
+                setStep('capture');
+                startCamera();
+              }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+            >
+              <div style={{ width: 52, height: 52, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)' }}>
+                <Plus size={24} />
+              </div>
+              Añadir página
+            </button>
+
+            {/* Continuar → OCR + PDF + subir */}
+            <button
+              onClick={handleFinalSubmit}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', color: '#00e5a0', cursor: 'pointer', fontSize: '11px', fontWeight: 700 }}
+            >
+              <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#00e5a0', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 24px rgba(0,229,160,0.5)' }}>
+                <Check size={30} strokeWidth={2.8} color="#000" />
+              </div>
+              Continuar
+            </button>
+
           </div>
         </div>
       )}
@@ -1350,8 +1402,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             </div>
             <h4 style={{ fontWeight: '700', color: '#fff', margin: 0 }}>Información Extraída del Escrito</h4>
             <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-              Revisa los campos autocompletados mediante OCR real antes de guardarlos.
+              {scannedPages.length > 1 ? `${scannedPages.length} páginas • ` : ''}Revisa los campos autocompletados mediante OCR real antes de guardarlos.
             </p>
+            {/* Eye button — view uploaded PDF */}
+            {finalPdfUrl && (
+              <a
+                href={finalPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '6px 16px', borderRadius: '20px', background: 'rgba(0,229,160,0.12)', color: '#00e5a0', fontSize: '12px', fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(0,229,160,0.25)' }}
+              >
+                <Eye size={14} /> Ver PDF subido
+              </a>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, marginBottom: '16px' }}>
