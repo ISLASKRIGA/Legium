@@ -15,12 +15,49 @@ interface OcrScannerProps {
 
 type FilterType = 'original' | 'lighten' | 'magic' | 'bw' | 'grayscale';
 
+/**
+ * Applies a 3×3 unsharp-mask sharpening kernel to a canvas in-place.
+ * Kernel: [0,-1,0,-1,5,-1,0,-1,0] — classic laplacian-boost sharpen.
+ */
+function sharpenCanvas(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { width: w, height: h } = canvas;
+  const src = ctx.getImageData(0, 0, w, h);
+  const data = src.data;
+  const out = new Uint8ClampedArray(data.length);
+  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r = 0, g = 0, b = 0;
+      for (let ky = 0; ky < 3; ky++) {
+        for (let kx = 0; kx < 3; kx++) {
+          const py = Math.min(h - 1, Math.max(0, y + ky - 1));
+          const px = Math.min(w - 1, Math.max(0, x + kx - 1));
+          const idx = (py * w + px) * 4;
+          const k = kernel[ky * 3 + kx];
+          r += data[idx] * k;
+          g += data[idx + 1] * k;
+          b += data[idx + 2] * k;
+        }
+      }
+      const i = (y * w + x) * 4;
+      out[i]     = Math.min(255, Math.max(0, r));
+      out[i + 1] = Math.min(255, Math.max(0, g));
+      out[i + 2] = Math.min(255, Math.max(0, b));
+      out[i + 3] = data[i + 3];
+    }
+  }
+  ctx.putImageData(new ImageData(out, w, h), 0, 0);
+}
+
 const getFilterStyle = (filter: FilterType, brightness = 1.18, contrast = 1.35): string => {
   switch (filter) {
     case 'lighten':
       return 'brightness(1.2) contrast(1.08) saturate(0.85)';
     case 'magic':
-      return `brightness(${brightness}) contrast(${contrast}) saturate(0.72)`;
+      // brightness+contrast clean the paper; SVG sharpen kernel boosts edge definition
+      return `brightness(${brightness}) contrast(${contrast}) saturate(0.72) url(#legium-sharpen)`;
     case 'bw':
       return 'grayscale(1) brightness(1.05) contrast(1.8)';
     case 'grayscale':
@@ -513,7 +550,23 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
   return (
     <div className="scanner-container" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', background: '#000', padding: 0, position: 'relative', overflow: 'hidden' }}>
-      
+
+      {/* Hidden SVG filter definitions — legium-sharpen used by 'magic' filter */}
+      <svg style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+        <defs>
+          <filter id="legium-sharpen" x="0" y="0" width="100%" height="100%" color-interpolation-filters="linearRGB">
+            {/* Unsharp mask: feConvolveMatrix with sharpening kernel 0,-1,0,-1,5,-1,0,-1,0 */}
+            <feConvolveMatrix
+              order="3"
+              kernelMatrix="0 -1 0 -1 5 -1 0 -1 0"
+              divisor="1"
+              bias="0"
+              preserveAlpha="true"
+            />
+          </filter>
+        </defs>
+      </svg>
+
       {/* Top Bar for camera */}
       {step === 'capture' && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', padding: '16px 20px', color: '#fff', alignItems: 'center', background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)', height: '54px', zIndex: 10 }}>
@@ -1032,11 +1085,18 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     canvas.height = img.height;
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
-                      ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast);
+                      // Apply brightness/contrast/saturate via canvas filter
+                      ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast)
+                        .replace(/url\([^)]*\)/g, '').trim(); // strip SVG ref for canvas
                       ctx.drawImage(img, 0, 0);
+                      // Apply pixel-level sharpening kernel for 'magic' filter
+                      if (activeFilter === 'magic') {
+                        ctx.filter = 'none';
+                        sharpenCanvas(canvas);
+                      }
                     }
                     const rendered: CroppedImageResult = {
-                      dataUrl: canvas.toDataURL('image/jpeg', 0.88),
+                      dataUrl: canvas.toDataURL('image/jpeg', 0.9),
                       width: canvas.width,
                       height: canvas.height,
                     };
