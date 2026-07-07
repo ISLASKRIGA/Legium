@@ -113,8 +113,8 @@ export function useDocumentDetection({
       return;
     }
 
-    // ~15 fps: process every other frame
-    if (++frameCountRef.current % 2 !== 0) {
+    // ~15 fps: process every 4th frame to reduce noise input
+    if (++frameCountRef.current % 4 !== 0) {
       animFrameRef.current = requestAnimationFrame(detect);
       return;
     }
@@ -313,7 +313,28 @@ export function useDocumentDetection({
     });
 
     const raw: QuadPoints = { p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) };
-    const k = 0.55;
+
+    // High smoothing factor: 0.82 retains 82% of the previous position each frame
+    // (was 0.55) — greatly reduces jitter while still tracking real movement.
+    const k = 0.82;
+
+    // Dead-zone: only update if a corner moved more than 0.8% of the viewport.
+    // This suppresses micro-jitter from the detector without delaying real motion.
+    const DEAD_ZONE = 0.8;
+    const shouldUpdate = (prev: QuadPoints, next: QuadPoints) => {
+      const keys = ['p1', 'p2', 'p3', 'p4'] as const;
+      return keys.some(p =>
+        Math.abs(prev[p].x - next[p].x) > DEAD_ZONE ||
+        Math.abs(prev[p].y - next[p].y) > DEAD_ZONE
+      );
+    };
+
+    if (lastQuadRef.current && !shouldUpdate(lastQuadRef.current, raw)) {
+      // Movement is within dead-zone — skip update, keep current stable quad
+      onDetection(lastQuadRef.current, confidence);
+      animFrameRef.current = requestAnimationFrame(detect);
+      return;
+    }
 
     const out: QuadPoints = lastQuadRef.current
       ? {

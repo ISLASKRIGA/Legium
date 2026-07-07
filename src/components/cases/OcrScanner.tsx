@@ -629,7 +629,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   strokeWidth="0.35"
                   strokeLinejoin="round"
                   filter="url(#ocr-glow)"
-                  style={{ transition: 'all 0.1s ease-out' }}
+                  style={{ transition: 'all 0.25s ease-out' }}
                 />
 
                 {/* Corner bracket — top-left */}
