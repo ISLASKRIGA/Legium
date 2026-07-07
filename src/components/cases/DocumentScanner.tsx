@@ -37,6 +37,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   // Drag corners state
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
+  const previewImageRef = useRef<HTMLImageElement | null>(null);
 
   // OCR states
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -212,10 +213,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   };
 
   const handleCornerMouseMove = (e: React.MouseEvent) => {
-    if (!activeCorner || !previewContainerRef.current) return;
+    if (!activeCorner || !previewImageRef.current) return;
     e.preventDefault();
 
-    const rect = previewContainerRef.current.getBoundingClientRect();
+    const rect = previewImageRef.current.getBoundingClientRect();
     const x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
     const y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
 
@@ -226,10 +227,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   };
 
   const handleCornerTouchMove = (e: React.TouchEvent) => {
-    if (!activeCorner || !previewContainerRef.current) return;
+    if (!activeCorner || !previewImageRef.current) return;
     e.preventDefault();
     const touch = e.touches[0];
-    const rect = previewContainerRef.current.getBoundingClientRect();
+    const rect = previewImageRef.current.getBoundingClientRect();
     const x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
     const y = Math.min(Math.max(0, ((touch.clientY - rect.top) / rect.height) * 100), 100);
 
@@ -600,9 +601,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           >
             <div 
               ref={previewContainerRef}
-              style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: '100%', maxHeight: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}
+              style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
               <img 
+                ref={previewImageRef}
                 src={originalImage} 
                 alt="Scan Preview Full"
                 draggable={false}

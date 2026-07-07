@@ -306,9 +306,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   };
 
   const updateCropPoint = (clientX: number, clientY: number, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
-    if (!previewContainerRef.current) return;
+    if (!previewImageRef.current) return;
 
-    const rect = previewContainerRef.current.getBoundingClientRect();
+    const rect = previewImageRef.current.getBoundingClientRect();
     const x = Math.min(Math.max(0, ((clientX - rect.left) / rect.width) * 100), 100);
     const y = Math.min(Math.max(0, ((clientY - rect.top) / rect.height) * 100), 100);
 
@@ -814,7 +814,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           >
             <div 
               ref={previewContainerRef}
-              style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', maxWidth: '100%', maxHeight: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}
+              style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
               <img 
                 ref={previewImageRef}
