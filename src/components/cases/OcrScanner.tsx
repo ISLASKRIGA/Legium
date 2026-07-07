@@ -624,9 +624,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 {/* Translucent fill */}
                 <polygon
                   points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                  fill="rgba(0,212,170,0.10)"
+                  fill="rgba(0,212,170,0.08)"
                   stroke="#00d4aa"
-                  strokeWidth="0.9"
+                  strokeWidth="0.35"
                   strokeLinejoin="round"
                   filter="url(#ocr-glow)"
                   style={{ transition: 'all 0.1s ease-out' }}
@@ -635,22 +635,22 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 {/* Corner bracket — top-left */}
                 <polyline
                   points={`${p1.x + 5},${p1.y}  ${p1.x},${p1.y}  ${p1.x},${p1.y + 5}`}
-                  fill="none" stroke="#00d4aa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                  fill="none" stroke="#00d4aa" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"
                 />
                 {/* Corner bracket — top-right */}
                 <polyline
                   points={`${p2.x - 5},${p2.y}  ${p2.x},${p2.y}  ${p2.x},${p2.y + 5}`}
-                  fill="none" stroke="#00d4aa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                  fill="none" stroke="#00d4aa" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"
                 />
                 {/* Corner bracket — bottom-right */}
                 <polyline
                   points={`${p3.x},${p3.y - 5}  ${p3.x},${p3.y}  ${p3.x - 5},${p3.y}`}
-                  fill="none" stroke="#00d4aa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                  fill="none" stroke="#00d4aa" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"
                 />
                 {/* Corner bracket — bottom-left */}
                 <polyline
                   points={`${p4.x},${p4.y - 5}  ${p4.x},${p4.y}  ${p4.x + 5},${p4.y}`}
-                  fill="none" stroke="#00d4aa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                  fill="none" stroke="#00d4aa" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"
                 />
               </svg>
             )}
