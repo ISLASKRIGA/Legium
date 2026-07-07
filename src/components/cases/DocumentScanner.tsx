@@ -217,8 +217,23 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     e.preventDefault();
 
     const rect = previewImageRef.current.getBoundingClientRect();
-    const x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
-    const y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
+    let x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
+    let y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
+
+    const SNAP_THRESHOLD = 2.0;
+    if (activeCorner === 'p1') {
+      if (Math.abs(y - edgePoints.p2.y) < SNAP_THRESHOLD) y = edgePoints.p2.y;
+      if (Math.abs(x - edgePoints.p4.x) < SNAP_THRESHOLD) x = edgePoints.p4.x;
+    } else if (activeCorner === 'p2') {
+      if (Math.abs(y - edgePoints.p1.y) < SNAP_THRESHOLD) y = edgePoints.p1.y;
+      if (Math.abs(x - edgePoints.p3.x) < SNAP_THRESHOLD) x = edgePoints.p3.x;
+    } else if (activeCorner === 'p3') {
+      if (Math.abs(y - edgePoints.p4.y) < SNAP_THRESHOLD) y = edgePoints.p4.y;
+      if (Math.abs(x - edgePoints.p2.x) < SNAP_THRESHOLD) x = edgePoints.p2.x;
+    } else if (activeCorner === 'p4') {
+      if (Math.abs(y - edgePoints.p3.y) < SNAP_THRESHOLD) y = edgePoints.p3.y;
+      if (Math.abs(x - edgePoints.p1.x) < SNAP_THRESHOLD) x = edgePoints.p1.x;
+    }
 
     setEdgePoints((prev) => ({
       ...prev,
@@ -231,8 +246,23 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     e.preventDefault();
     const touch = e.touches[0];
     const rect = previewImageRef.current.getBoundingClientRect();
-    const x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
-    const y = Math.min(Math.max(0, ((touch.clientY - rect.top) / rect.height) * 100), 100);
+    let x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
+    let y = Math.min(Math.max(0, ((touch.clientY - rect.top) / rect.height) * 100), 100);
+
+    const SNAP_THRESHOLD = 2.0;
+    if (activeCorner === 'p1') {
+      if (Math.abs(y - edgePoints.p2.y) < SNAP_THRESHOLD) y = edgePoints.p2.y;
+      if (Math.abs(x - edgePoints.p4.x) < SNAP_THRESHOLD) x = edgePoints.p4.x;
+    } else if (activeCorner === 'p2') {
+      if (Math.abs(y - edgePoints.p1.y) < SNAP_THRESHOLD) y = edgePoints.p1.y;
+      if (Math.abs(x - edgePoints.p3.x) < SNAP_THRESHOLD) x = edgePoints.p3.x;
+    } else if (activeCorner === 'p3') {
+      if (Math.abs(y - edgePoints.p4.y) < SNAP_THRESHOLD) y = edgePoints.p4.y;
+      if (Math.abs(x - edgePoints.p2.x) < SNAP_THRESHOLD) x = edgePoints.p2.x;
+    } else if (activeCorner === 'p4') {
+      if (Math.abs(y - edgePoints.p3.y) < SNAP_THRESHOLD) y = edgePoints.p3.y;
+      if (Math.abs(x - edgePoints.p1.x) < SNAP_THRESHOLD) x = edgePoints.p1.x;
+    }
 
     setEdgePoints((prev) => ({
       ...prev,
@@ -672,6 +702,27 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
             >
               <span style={{ fontSize: '18px' }}>🔳</span>
               All
+            </button>
+
+            <button 
+              onClick={() => {
+                setEdgePoints((prev) => {
+                  const left = (prev.p1.x + prev.p4.x) / 2;
+                  const right = (prev.p2.x + prev.p3.x) / 2;
+                  const top = (prev.p1.y + prev.p2.y) / 2;
+                  const bottom = (prev.p3.y + prev.p4.y) / 2;
+                  return {
+                    p1: { x: left, y: top },
+                    p2: { x: right, y: top },
+                    p3: { x: right, y: bottom },
+                    p4: { x: left, y: bottom }
+                  };
+                });
+              }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
+            >
+              <span style={{ fontSize: '18px' }}>📐</span>
+              Rectificar
             </button>
 
             <button 
