@@ -15,23 +15,15 @@ interface OcrScannerProps {
 
 type FilterType = 'original' | 'lighten' | 'magic' | 'bw' | 'grayscale';
 
-const getFilterStyle = (filter: FilterType): string => {
+const getFilterStyle = (filter: FilterType, brightness = 1.18, contrast = 1.35): string => {
   switch (filter) {
     case 'lighten':
-      // Aclarar: levanta sombras suavemente sin quemar el papel
       return 'brightness(1.2) contrast(1.08) saturate(0.85)';
     case 'magic':
-      // ANÁLISIS EXPERTO: el papel crema cálido (luz interior) → papel blanco neutro.
-      // brightness(1.18): empuja el crema a casi blanco puro.
-      // contrast(1.35): el texto oscurece contra el fondo claro.
-      // saturate(0.72): elimina el cast amarillo/cálido de la luz de habitación
-      //   sin desaturar completamente — el rojo sigue siendo rojo, el papel pierde el tono crema.
-      return 'brightness(1.18) contrast(1.35) saturate(0.72)';
+      return `brightness(${brightness}) contrast(${contrast}) saturate(0.72)`;
     case 'bw':
-      // B&N: escala de grises + contraste fuerte estilo fotocopia
       return 'grayscale(1) brightness(1.05) contrast(1.8)';
     case 'grayscale':
-      // Eco: grises suaves, texto legible, sin colores
       return 'grayscale(1) brightness(1.02) contrast(1.1)';
     default:
       return 'none';
@@ -61,6 +53,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [detectionConfidence, setDetectionConfidence] = useState(0);
 
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
+  const [magicBrightness, setMagicBrightness] = useState(1.18);
+  const [magicContrast, setMagicContrast] = useState(1.35);
 
   // Drag corners state
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
@@ -406,7 +400,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           canvas.height = img.height;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.filter = getFilterStyle(activeFilter);
+            ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast);
             ctx.drawImage(img, 0, 0);
             resolve();
           } else {
@@ -446,7 +440,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           canvas.height = img.height;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.filter = getFilterStyle(activeFilter);
+            ctx.filter = getFilterStyle(activeFilter, magicBrightness, magicContrast);
             ctx.drawImage(img, 0, 0);
           }
           resolve();
@@ -939,7 +933,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   maxWidth: '100%',
                   maxHeight: 'calc(100vh - 280px)',
                   objectFit: 'contain',
-                  filter: scanPhase === 'done' ? getFilterStyle(activeFilter) : 'none',
+                  filter: scanPhase === 'done' ? getFilterStyle(activeFilter, magicBrightness, magicContrast) : 'none',
                   transition: 'filter 0.7s ease',
                 }}
               />
@@ -979,7 +973,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             }}
           >
             {/* Filter chips row */}
-            <div style={{ overflowX: 'auto', display: 'flex', gap: '8px', padding: '12px 16px 8px', scrollbarWidth: 'none' }}>
+            <div style={{ overflowX: 'auto', display: 'flex', gap: '8px', padding: '12px 16px 6px', scrollbarWidth: 'none' }}>
               {([['original', 'Sin filtro'], ['magic', 'Mejorar'], ['lighten', 'Aclarar'], ['bw', 'B&N'], ['grayscale', 'Eco']] as [FilterType, string][]).map(([id, label]) => (
                 <button
                   key={id}
@@ -998,6 +992,43 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   }}
                 >{label}</button>
               ))}
+            </div>
+
+            {/* ── Sliders de ajuste — solo cuando 'Mejorar' está activo ── */}
+            <div style={{
+              overflow: 'hidden',
+              maxHeight: activeFilter === 'magic' ? '100px' : '0px',
+              transition: 'max-height 0.3s ease',
+              padding: activeFilter === 'magic' ? '4px 20px 6px' : '0 20px',
+            }}>
+              {/* Brillo */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, width: '52px', flexShrink: 0 }}>Brillo</span>
+                <input
+                  type="range"
+                  min="0.8" max="1.6" step="0.01"
+                  value={magicBrightness}
+                  onChange={e => setMagicBrightness(parseFloat(e.target.value))}
+                  style={{ flex: 1, accentColor: '#00e5a0', height: '3px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '10px', color: '#00e5a0', fontWeight: 700, width: '32px', textAlign: 'right' }}>
+                  {Math.round((magicBrightness - 1) * 100)}%
+                </span>
+              </div>
+              {/* Contraste */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, width: '52px', flexShrink: 0 }}>Contraste</span>
+                <input
+                  type="range"
+                  min="0.8" max="2.2" step="0.01"
+                  value={magicContrast}
+                  onChange={e => setMagicContrast(parseFloat(e.target.value))}
+                  style={{ flex: 1, accentColor: '#00e5a0', height: '3px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '10px', color: '#00e5a0', fontWeight: 700, width: '32px', textAlign: 'right' }}>
+                  {Math.round((magicContrast - 1) * 100)}%
+                </span>
+              </div>
             </div>
 
             {/* Action bar */}
@@ -1088,7 +1119,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   maxWidth: '100%', 
                   maxHeight: '52vh', 
                   display: 'block',
-                  filter: getFilterStyle(activeFilter),
+                  filter: getFilterStyle(activeFilter, magicBrightness, magicContrast),
                   transition: 'all 0.25s ease'
                 }} 
               />
