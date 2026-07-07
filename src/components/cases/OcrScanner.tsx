@@ -839,22 +839,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               </svg>
             )}
 
-            {/* Status badge */}
-            <div
-              style={{
-                position: 'absolute', bottom: '150px', left: '50%',
-                transform: 'translateX(-50%)',
-                background: sheetDetected ? 'rgba(0, 255, 128, 0.9)' : 'rgba(0, 0, 0, 0.55)',
-                color: '#fff', fontSize: '11px', padding: '6px 14px',
-                borderRadius: '99px', fontWeight: 600,
-                backdropFilter: 'blur(10px)', zIndex: 5,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                transition: 'all 0.3s ease', whiteSpace: 'nowrap'
-              }}
-            >
-              {scannerMsg}
-            </div>
-
             <div className={`flash-overlay ${flashActive ? 'flash-active' : ''}`} />
           </div>
 
@@ -898,23 +882,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
             {/* Camera controls */}
             <div className="scanner-controls" style={{ padding: '8px 36px 8px 36px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {/* Grid button (Left) */}
-              <button
-                onClick={() => {}}
-                style={{ background: 'transparent', color: '#fff', border: 'none', cursor: 'pointer', outline: 'none', opacity: 0.9 }}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="5" height="5" />
-                  <rect x="10" y="3" width="5" height="5" />
-                  <rect x="17" y="3" width="5" height="5" />
-                  <rect x="3" y="10" width="5" height="5" />
-                  <rect x="10" y="10" width="5" height="5" />
-                  <rect x="17" y="10" width="5" height="5" />
-                  <rect x="3" y="17" width="5" height="5" />
-                  <rect x="10" y="17" width="5" height="5" />
-                  <rect x="17" y="17" width="5" height="5" />
-                </svg>
-              </button>
+              {/* Left Placeholder */}
+              <div style={{ width: '24px' }} />
 
               {hasCamera ? (
                 <button
