@@ -18,18 +18,19 @@ type FilterType = 'original' | 'lighten' | 'magic' | 'bw' | 'grayscale';
 const getFilterStyle = (filter: FilterType): string => {
   switch (filter) {
     case 'lighten':
-      // Aclarar: suaviza sombras, ilumina el papel sin alterar colores
-      return 'brightness(1.35) contrast(1.12) saturate(0.9)';
+      // Aclarar: levanta sombras suavemente sin quemar el papel
+      return 'brightness(1.2) contrast(1.08) saturate(0.85)';
     case 'magic':
-      // Mejorar (CamScanner-style): papel muy blanco, texto muy oscuro, sin manchas de color
-      // Alto contraste + alta luminosidad + desaturación eliminan el tono amarillo del papel
-      return 'contrast(2.1) brightness(1.55) saturate(0.15)';
+      // Mejorar (CamScanner-style): orden crítico → brightness primero levanta el papel,
+      // contrast luego empuja el texto a oscuro y el papel a blanco, saturate quita el amarillo.
+      // Valores calibrados para no quemar (brightness jamás > 1.15 con contrast > 1.5)
+      return 'brightness(1.08) contrast(1.7) saturate(0.15)';
     case 'bw':
-      // Blanco y Negro: umbral fuerte para máxima legibilidad, como fotocopia limpia
-      return 'grayscale(1) contrast(2.4) brightness(1.45)';
+      // B&N: escala de grises + contraste fuerte estilo fotocopia
+      return 'grayscale(1) brightness(1.05) contrast(1.8)';
     case 'grayscale':
-      // Escala de grises suave: mantiene tonos, sin colores
-      return 'grayscale(1) contrast(1.15) brightness(1.05)';
+      // Eco: grises suaves, texto legible, sin colores
+      return 'grayscale(1) brightness(1.02) contrast(1.1)';
     default:
       return 'none';
   }
