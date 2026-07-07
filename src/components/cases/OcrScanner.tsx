@@ -21,10 +21,10 @@ const getFilterStyle = (filter: FilterType): string => {
       // Aclarar: levanta sombras suavemente sin quemar el papel
       return 'brightness(1.2) contrast(1.08) saturate(0.85)';
     case 'magic':
-      // Mejorar (CamScanner-style): orden crítico → brightness primero levanta el papel,
-      // contrast luego empuja el texto a oscuro y el papel a blanco, saturate quita el amarillo.
-      // Valores calibrados para no quemar (brightness jamás > 1.15 con contrast > 1.5)
-      return 'brightness(1.08) contrast(1.7) saturate(0.15)';
+      // Mejorar: calibrado con imagen de referencia.
+      // Papel ligeramente más blanco, tono cálido/amarillo eliminado, texto más nítido.
+      // La mejora es sutil — NOT drástica. Contraste bajo, desaturación alta.
+      return 'brightness(1.06) contrast(1.35) saturate(0.35)';
     case 'bw':
       // B&N: escala de grises + contraste fuerte estilo fotocopia
       return 'grayscale(1) brightness(1.05) contrast(1.8)';
