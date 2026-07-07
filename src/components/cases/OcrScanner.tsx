@@ -99,6 +99,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   // Drag corners state
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
+  const previewImageRef = useRef<HTMLImageElement | null>(null);
+  const [magnifier, setMagnifier] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // OCR processing states
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -303,51 +305,61 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     img.src = originalImage;
   };
 
+  const updateCropPoint = (clientX: number, clientY: number, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
+    if (!previewContainerRef.current) return;
+
+    const rect = previewContainerRef.current.getBoundingClientRect();
+    const x = Math.min(Math.max(0, ((clientX - rect.left) / rect.width) * 100), 100);
+    const y = Math.min(Math.max(0, ((clientY - rect.top) / rect.height) * 100), 100);
+
+    setMagnifier({ x, y, width: rect.width, height: rect.height });
+    setEdgePoints((prev) => ({
+      ...prev,
+      [corner]: { x, y }
+    }));
+  };
+
   // Drag Corners event handlers
   const handleCornerMouseDown = (e: React.MouseEvent, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
     e.preventDefault();
     e.stopPropagation();
     setActiveCorner(corner);
+    updateCropPoint(e.clientX, e.clientY, corner);
   };
 
-  const handleCornerTouchStart = (corner: 'p1' | 'p2' | 'p3' | 'p4') => {
+  const handleCornerTouchStart = (e: React.TouchEvent, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = e.touches[0];
     setActiveCorner(corner);
+    if (touch) updateCropPoint(touch.clientX, touch.clientY, corner);
   };
 
   const handleCornerMouseMove = (e: React.MouseEvent) => {
-    if (!activeCorner || !previewContainerRef.current) return;
+    if (!activeCorner) return;
     e.preventDefault();
-
-    const rect = previewContainerRef.current.getBoundingClientRect();
-    const x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
-    const y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
-
-    setEdgePoints((prev) => ({
-      ...prev,
-      [activeCorner]: { x, y }
-    }));
+    updateCropPoint(e.clientX, e.clientY, activeCorner);
   };
 
   const handleCornerTouchMove = (e: React.TouchEvent) => {
-    if (!activeCorner || !previewContainerRef.current) return;
+    if (!activeCorner) return;
     const touch = e.touches[0];
-    const rect = previewContainerRef.current.getBoundingClientRect();
-    const x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
-    const y = Math.min(Math.max(0, ((touch.clientY - rect.top) / rect.height) * 100), 100);
-
-    setEdgePoints((prev) => ({
-      ...prev,
-      [activeCorner]: { x, y }
-    }));
+    if (!touch) return;
+    e.preventDefault();
+    updateCropPoint(touch.clientX, touch.clientY, activeCorner);
   };
-
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       setActiveCorner(null);
+      setMagnifier(null);
     };
     window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('touchend', handleGlobalMouseUp);
+    window.addEventListener('touchcancel', handleGlobalMouseUp);
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('touchend', handleGlobalMouseUp);
+      window.removeEventListener('touchcancel', handleGlobalMouseUp);
     };
   }, []);
 
@@ -798,6 +810,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             }}
           >
             <img 
+              ref={previewImageRef}
               src={originalImage} 
               alt="Scan Preview Full"
               draggable={false}
@@ -833,10 +846,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               />
               
               {/* Corner Circular Handles (White with green border) */}
-              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={() => handleCornerTouchStart('p1')} />
-              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={() => handleCornerTouchStart('p2')} />
-              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={() => handleCornerTouchStart('p3')} />
-              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={() => handleCornerTouchStart('p4')} />
+              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={(e) => handleCornerTouchStart(e, 'p1')} />
+              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={(e) => handleCornerTouchStart(e, 'p2')} />
+              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={(e) => handleCornerTouchStart(e, 'p3')} />
+              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={(e) => handleCornerTouchStart(e, 'p4')} />
 
               {/* Edge Pill/Bar handles (White rects rotated along edges) */}
               <g transform={`translate(${mid1.mx}, ${mid1.my}) rotate(${mid1.angle})`}>
@@ -852,6 +865,77 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
               </g>
             </svg>
+            {magnifier && originalImage && (() => {
+              const lensSize = 132;
+              const zoom = 2.7;
+              const pointX = (magnifier.x / 100) * magnifier.width;
+              const pointY = (magnifier.y / 100) * magnifier.height;
+              const left = Math.min(Math.max(8, pointX + (magnifier.x < 50 ? 32 : -lensSize - 32)), magnifier.width - lensSize - 8);
+              const top = Math.min(Math.max(8, pointY - lensSize - 24), magnifier.height - lensSize - 8);
+
+              return (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left,
+                    top,
+                    width: lensSize,
+                    height: lensSize,
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    border: '3px solid #fff',
+                    boxShadow: '0 10px 32px rgba(0,0,0,0.45), 0 0 0 2px #00ff80',
+                    background: '#111',
+                    pointerEvents: 'none',
+                    zIndex: 20
+                  }}
+ 
+
+
+
+               >
+                  <img
+                    src={originalImage}
+                    alt="Lupa de recorte"
+                    draggable={false}
+                    style={{
+                      position: 'absolute',
+                      width: magnifier.width * zoom,
+                      height: magnifier.height
+
+
+
+
+
+
+
+ * zoom,
+                      left: lensSize / 2 - pointX * zoom,
+                      top: lensSize / 2 - pointY * zoom,
+                      objectFit: 'contain',
+                      transform: 'translateZ(0)',
+                      userSelect: 'none'
+ 
+
+
+
+
+
+                   }}
+                  />
+                  <div style={{ position: 'absolute', left: '50%', top: 10, bottom: 10, width: 1, background: 'rgba(0,255,128,0.75)', transform: 'translateX(-50%)' }} />
+                  <div style={{ position: 'absolute', top: '50%', left: 10, right: 10, height: 1, background: 'rgba(0,255,128,0.75)', transform: 'translateY(-50%)' }} />
+
+
+
+
+                  <div style={{ position: 'absolute', left: '50%', top: '50%', width: 9, height: 9, borderRadius: '50%', border: '2px solid #00ff80', background: '#fff', transform: 'translate(-50%, -50%)' }} />
+                </div>
+              );
+ 
+
+
+           })()}
           </div>
 
           {/* Bottom toolbar - matches CamScanner example */}
