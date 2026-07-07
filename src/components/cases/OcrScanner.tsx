@@ -18,13 +18,18 @@ type FilterType = 'original' | 'lighten' | 'magic' | 'bw' | 'grayscale';
 const getFilterStyle = (filter: FilterType): string => {
   switch (filter) {
     case 'lighten':
-      return 'brightness(1.15) contrast(1.1)';
+      // Aclarar: suaviza sombras, ilumina el papel sin alterar colores
+      return 'brightness(1.35) contrast(1.12) saturate(0.9)';
     case 'magic':
-      return 'contrast(1.22) brightness(1.08) saturate(1.1)';
+      // Mejorar (CamScanner-style): papel muy blanco, texto muy oscuro, sin manchas de color
+      // Alto contraste + alta luminosidad + desaturación eliminan el tono amarillo del papel
+      return 'contrast(2.1) brightness(1.55) saturate(0.15)';
     case 'bw':
-      return 'grayscale(1) contrast(1.4) brightness(1.1)';
+      // Blanco y Negro: umbral fuerte para máxima legibilidad, como fotocopia limpia
+      return 'grayscale(1) contrast(2.4) brightness(1.45)';
     case 'grayscale':
-      return 'grayscale(1)';
+      // Escala de grises suave: mantiene tonos, sin colores
+      return 'grayscale(1) contrast(1.15) brightness(1.05)';
     default:
       return 'none';
   }
@@ -931,8 +936,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   maxWidth: '100%',
                   maxHeight: 'calc(100vh - 280px)',
                   objectFit: 'contain',
-                  filter: scanPhase === 'done' ? 'contrast(1.18) brightness(1.06)' : 'none',
-                  transition: 'filter 0.6s ease',
+                  filter: scanPhase === 'done' ? getFilterStyle(activeFilter) : 'none',
+                  transition: 'filter 0.7s ease',
                 }}
               />
 
