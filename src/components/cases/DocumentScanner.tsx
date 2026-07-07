@@ -811,52 +811,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           </div>
 
           {/* Bottom toolbar */}
-          <div style={{ background: '#000', padding: '16px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '12px' }}>
-            <button 
-              onClick={() => setEdgePoints({ p1: { x: 5, y: 5 }, p2: { x: 95, y: 5 }, p3: { x: 95, y: 95 }, p4: { x: 5, y: 95 } })}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
-            >
-              <span style={{ fontSize: '18px' }}>🔳</span>
-              All
-            </button>
-
-            <button 
-              onClick={() => {
-                setEdgePoints((prev) => {
-                  const left = (prev.p1.x + prev.p4.x) / 2;
-                  const right = (prev.p2.x + prev.p3.x) / 2;
-                  const top = (prev.p1.y + prev.p2.y) / 2;
-                  const bottom = (prev.p3.y + prev.p4.y) / 2;
-                  return {
-                    p1: { x: left, y: top },
-                    p2: { x: right, y: top },
-                    p3: { x: right, y: bottom },
-                    p4: { x: left, y: bottom }
-                  };
-                });
-              }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
-            >
-              <span style={{ fontSize: '18px' }}>📐</span>
-              Rectificar
-            </button>
-
-            <button 
-              onClick={() => rotateImage('left')}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
-            >
-              <span style={{ fontSize: '18px' }}>↩️</span>
-              Left
-            </button>
-
-            <button 
-              onClick={() => rotateImage('right')}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '11px', opacity: 0.9 }}
-            >
-              <span style={{ fontSize: '18px' }}>↪️</span>
-              Right
-            </button>
-
+          <div style={{ background: '#000', padding: '16px 28px', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: '12px' }}>
             <button 
               onClick={() => {
                 setStep('aligning');
@@ -878,7 +833,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                 outline: 'none'
               }}
             >
-              <ChevronRight size={24} style={{ strokeWidth: 3 }} />
+              <Check size={24} style={{ strokeWidth: 3 }} />
             </button>
           </div>
         </div>
