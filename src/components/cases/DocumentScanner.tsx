@@ -217,23 +217,8 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     e.preventDefault();
 
     const rect = previewImageRef.current.getBoundingClientRect();
-    let x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
-    let y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
-
-    const SNAP_THRESHOLD = 2.0;
-    if (activeCorner === 'p1') {
-      if (Math.abs(y - edgePoints.p2.y) < SNAP_THRESHOLD) y = edgePoints.p2.y;
-      if (Math.abs(x - edgePoints.p4.x) < SNAP_THRESHOLD) x = edgePoints.p4.x;
-    } else if (activeCorner === 'p2') {
-      if (Math.abs(y - edgePoints.p1.y) < SNAP_THRESHOLD) y = edgePoints.p1.y;
-      if (Math.abs(x - edgePoints.p3.x) < SNAP_THRESHOLD) x = edgePoints.p3.x;
-    } else if (activeCorner === 'p3') {
-      if (Math.abs(y - edgePoints.p4.y) < SNAP_THRESHOLD) y = edgePoints.p4.y;
-      if (Math.abs(x - edgePoints.p2.x) < SNAP_THRESHOLD) x = edgePoints.p2.x;
-    } else if (activeCorner === 'p4') {
-      if (Math.abs(y - edgePoints.p3.y) < SNAP_THRESHOLD) y = edgePoints.p3.y;
-      if (Math.abs(x - edgePoints.p1.x) < SNAP_THRESHOLD) x = edgePoints.p1.x;
-    }
+    const x = Math.min(Math.max(0, ((e.clientX - rect.left) / rect.width) * 100), 100);
+    const y = Math.min(Math.max(0, ((e.clientY - rect.top) / rect.height) * 100), 100);
 
     setEdgePoints((prev) => ({
       ...prev,
@@ -246,23 +231,8 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     e.preventDefault();
     const touch = e.touches[0];
     const rect = previewImageRef.current.getBoundingClientRect();
-    let x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
-    let y = Math.min(Math.max(0, ((touch.clientY - rect.top) / rect.height) * 100), 100);
-
-    const SNAP_THRESHOLD = 2.0;
-    if (activeCorner === 'p1') {
-      if (Math.abs(y - edgePoints.p2.y) < SNAP_THRESHOLD) y = edgePoints.p2.y;
-      if (Math.abs(x - edgePoints.p4.x) < SNAP_THRESHOLD) x = edgePoints.p4.x;
-    } else if (activeCorner === 'p2') {
-      if (Math.abs(y - edgePoints.p1.y) < SNAP_THRESHOLD) y = edgePoints.p1.y;
-      if (Math.abs(x - edgePoints.p3.x) < SNAP_THRESHOLD) x = edgePoints.p3.x;
-    } else if (activeCorner === 'p3') {
-      if (Math.abs(y - edgePoints.p4.y) < SNAP_THRESHOLD) y = edgePoints.p4.y;
-      if (Math.abs(x - edgePoints.p2.x) < SNAP_THRESHOLD) x = edgePoints.p2.x;
-    } else if (activeCorner === 'p4') {
-      if (Math.abs(y - edgePoints.p3.y) < SNAP_THRESHOLD) y = edgePoints.p3.y;
-      if (Math.abs(x - edgePoints.p1.x) < SNAP_THRESHOLD) x = edgePoints.p1.x;
-    }
+    const x = Math.min(Math.max(0, ((touch.clientX - rect.left) / rect.width) * 100), 100);
+    const y = Math.min(Math.max(0, ((touch.clientY - rect.top) / rect.height) * 100), 100);
 
     setEdgePoints((prev) => ({
       ...prev,
@@ -671,26 +641,172 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                 }}
               />
               
-              {/* Corner Circular Handles */}
-              <circle cx={p1.x} cy={p1.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p1')} onTouchStart={(e) => handleCornerTouchStart(e, 'p1')} />
-              <circle cx={p2.x} cy={p2.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p2')} onTouchStart={(e) => handleCornerTouchStart(e, 'p2')} />
-              <circle cx={p3.x} cy={p3.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p3')} onTouchStart={(e) => handleCornerTouchStart(e, 'p3')} />
-              <circle cx={p4.x} cy={p4.y} r="2.8" fill="#fff" stroke="#00ff80" strokeWidth="0.8" style={{ cursor: 'move', touchAction: 'none' }} onMouseDown={(e) => handleCornerMouseDown(e, 'p4')} onTouchStart={(e) => handleCornerTouchStart(e, 'p4')} />
-
-              {/* Edge mid-point pills */}
-              <g transform={`translate(${mid1.mx}, ${mid1.my}) rotate(${mid1.angle})`}>
-                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
-              </g>
-              <g transform={`translate(${mid2.mx}, ${mid2.my}) rotate(${mid2.angle})`}>
-                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
-              </g>
-              <g transform={`translate(${mid3.mx}, ${mid3.my}) rotate(${mid3.angle})`}>
-                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
-              </g>
-              <g transform={`translate(${mid4.mx}, ${mid4.my}) rotate(${mid4.angle})`}>
-                <rect x="-4" y="-1.1" width="8" height="2.2" rx="1.1" fill="#fff" stroke="#00ff80" strokeWidth="0.3" />
-              </g>
+              
+              {/* Corner handles are rendered outside SVG to prevent vertical oval distortion */}
             </svg>
+
+            {/* HTML Corner Circular Handles (White with green border, larger touch area) */}
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${p1.x}%`,
+                top: `${p1.y}%`,
+                width: '40px',
+                height: '40px',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'move',
+                zIndex: 25,
+                touchAction: 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              onMouseDown={(e) => handleCornerMouseDown(e, 'p1')}
+              onTouchStart={(e) => handleCornerTouchStart(e, 'p1')}
+            >
+              <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#fff', border: '2px solid #00ff80', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }} />
+            </div>
+            
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${p2.x}%`,
+                top: `${p2.y}%`,
+                width: '40px',
+                height: '40px',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'move',
+                zIndex: 25,
+                touchAction: 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              onMouseDown={(e) => handleCornerMouseDown(e, 'p2')}
+              onTouchStart={(e) => handleCornerTouchStart(e, 'p2')}
+            >
+              <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#fff', border: '2px solid #00ff80', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }} />
+            </div>
+
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${p3.x}%`,
+                top: `${p3.y}%`,
+                width: '40px',
+                height: '40px',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'move',
+                zIndex: 25,
+                touchAction: 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              onMouseDown={(e) => handleCornerMouseDown(e, 'p3')}
+              onTouchStart={(e) => handleCornerTouchStart(e, 'p3')}
+            >
+              <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#fff', border: '2px solid #00ff80', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }} />
+            </div>
+
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${p4.x}%`,
+                top: `${p4.y}%`,
+                width: '40px',
+                height: '40px',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'move',
+                zIndex: 25,
+                touchAction: 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              onMouseDown={(e) => handleCornerMouseDown(e, 'p4')}
+              onTouchStart={(e) => handleCornerTouchStart(e, 'p4')}
+            >
+              <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#fff', border: '2px solid #00ff80', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }} />
+            </div>
+
+            {/* Edge Pill/Bar handles (White rects rotated along edges, drawn as HTML to prevent oval scaling) */}
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${mid1.mx}%`,
+                top: `${mid1.my}%`,
+                width: '16px',
+                height: '6px',
+                background: '#fff',
+                border: '1.2px solid #00ff80',
+                borderRadius: '3px',
+                transform: `translate(-50%, -50%) rotate(${mid1.angle}deg)`,
+                zIndex: 20,
+                pointerEvents: 'none'
+              }}
+            />
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${mid2.mx}%`,
+                top: `${mid2.my}%`,
+                width: '16px',
+                height: '6px',
+                background: '#fff',
+                border: '1.2px solid #00ff80',
+                borderRadius: '3px',
+                transform: `translate(-50%, -50%) rotate(${mid2.angle}deg)`,
+                zIndex: 20,
+                pointerEvents: 'none'
+              }}
+            />
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${mid3.mx}%`,
+                top: `${mid3.my}%`,
+                width: '16px',
+                height: '6px',
+                background: '#fff',
+                border: '1.2px solid #00ff80',
+                borderRadius: '3px',
+                transform: `translate(-50%, -50%) rotate(${mid3.angle}deg)`,
+                zIndex: 20,
+                pointerEvents: 'none'
+              }}
+            />
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${mid4.mx}%`,
+                top: `${mid4.my}%`,
+                width: '16px',
+                height: '6px',
+                background: '#fff',
+                border: '1.2px solid #00ff80',
+                borderRadius: '3px',
+                transform: `translate(-50%, -50%) rotate(${mid4.angle}deg)`,
+                zIndex: 20,
+                pointerEvents: 'none'
+              }}
+            />
             </div>
           </div>
 
