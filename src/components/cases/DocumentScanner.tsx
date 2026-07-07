@@ -38,6 +38,25 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
   const previewImageRef = useRef<HTMLImageElement | null>(null);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+
+  const updateImageSize = useCallback(() => {
+    if (previewImageRef.current) {
+      const rect = previewImageRef.current.getBoundingClientRect();
+      setImageSize({ width: rect.width, height: rect.height });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (step === 'preview-full' && originalImage) {
+      const timer = setTimeout(updateImageSize, 100);
+      window.addEventListener('resize', updateImageSize);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('resize', updateImageSize);
+      };
+    }
+  }, [step, originalImage, updateImageSize]);
 
   // OCR states
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -601,13 +620,25 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           >
             <div 
               ref={previewContainerRef}
-              style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent' }}
+              style={{ 
+                position: 'relative', 
+                display: 'inline-block', 
+                width: imageSize ? `${imageSize.width}px` : 'auto',
+                height: imageSize ? `${imageSize.height}px` : 'auto',
+                maxWidth: '100%', 
+                maxHeight: '100%', 
+                userSelect: 'none', 
+                WebkitUserSelect: 'none', 
+                WebkitTouchCallout: 'none', 
+                WebkitTapHighlightColor: 'transparent' 
+              }}
             >
               <img 
                 ref={previewImageRef}
                 src={originalImage} 
                 alt="Scan Preview Full"
                 draggable={false}
+                onLoad={updateImageSize}
                 style={{ 
                   maxWidth: '100%', 
                   maxHeight: '100%', 
