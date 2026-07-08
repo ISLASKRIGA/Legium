@@ -91,8 +91,8 @@ export const enhanceImage = (
         // 3. Local adaptive gain filter (Bradley-Roth style enhancement)
         const S = Math.max(16, (w / 16) | 0);
         const S2 = S >> 1;
-        const C = 10 * brightness; // Higher brightness -> cleans more background
-        const exponent = 2.0 * contrast; // Higher contrast -> makes text darker
+        const C = 12 * brightness; // Slightly increased for better cleaning
+        const exponent = 2.4 * contrast; // Steeper contrast for crisper text
 
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
@@ -118,37 +118,39 @@ export const enhanceImage = (
             const maxVal = Math.max(r, g, b);
             const minVal = Math.min(r, g, b);
             const chroma = maxVal - minVal;
-            const isColor = chroma > 24; // Protect colored inks and highlighters from bleaching
 
-            if (L >= avg - C && !isColor) {
-              // Whiten background (only if not a colored stroke)
+            // Detect warm/yellow white-balance cast on paper
+            const isWarmCast = chroma < 65 && r > b && g > b;
+            // Classify as color only if it has high chroma and is NOT just paper yellowing
+            const isColor = chroma > 30 && !isWarmCast;
+
+            // Aggressive whitening of background (especially if L is bright or it is warm cast paper)
+            if (L >= avg - C && (!isColor || L > 200)) {
+              // Whitening factor increases with brightness and warm cast detection
               const diff = L - (avg - C);
-              const factor = Math.min(1.0, diff / 4);
-              r = r + (255 - r) * factor;
-              g = g + (255 - g) * factor;
-              b = b + (255 - b) * factor;
+              const factor = L > 200 || isWarmCast ? 1.0 : Math.min(1.0, diff / 5);
+              r = Math.round(r + (255 - r) * factor);
+              g = Math.round(g + (255 - g) * factor);
+              b = Math.round(b + (255 - b) * factor);
             } else {
               // Enhance color and contrast (Magic Color)
-              // 1. Normalize color by local average (illumination correction)
               const normFactor = 255 / Math.max(1, avg);
               const r_norm = Math.min(255, r * normFactor);
               const g_norm = Math.min(255, g * normFactor);
               const b_norm = Math.min(255, b * normFactor);
 
-              // 2. Calculate normalized luminance
               const L_norm = 0.299 * r_norm + 0.587 * g_norm + 0.114 * b_norm;
 
-              // 3. Boost color saturation
-              const satFactor = 2.0;
+              // Boost saturation of real colors
+              const satFactor = isColor ? 2.2 : 1.0;
               const r_sat = L_norm + (r_norm - L_norm) * satFactor;
               const g_sat = L_norm + (g_norm - L_norm) * satFactor;
               const b_sat = L_norm + (b_norm - L_norm) * satFactor;
 
-              // 4. Boost contrast (darken the text component)
+              // Darken text component
               const ratio = L / Math.max(1, avg);
               const enhancedRatio = Math.pow(ratio, exponent);
 
-              // Protect bright colors (like yellow highlighter) from being darkened to black
               const colorWeight = isColor ? (maxVal / 255) : 0;
               const finalRatio = enhancedRatio * (1 - colorWeight) + colorWeight;
 
@@ -163,9 +165,13 @@ export const enhanceImage = (
           }
         }
 
-        // 4. Sharpening matrix on the canvas
+        // 4. Smooth Sharpening (9-point kernel to avoid jagged text edges)
         const output = new Uint8ClampedArray(data.length);
-        const kernel = [0, -1.2, 0, -1.2, 5.8, -1.2, 0, -1.2, 0];
+        const kernel = [
+          -0.1, -0.2, -0.1,
+          -0.2,  2.2, -0.2,
+          -0.1, -0.2, -0.1
+        ];
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
             let rSum = 0, gSum = 0, bSum = 0;
