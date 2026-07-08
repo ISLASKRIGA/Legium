@@ -40,8 +40,8 @@ export const enhanceImage = (
       const N = w * h;
 
       if (filter === 'original') {
-        // Apply a gentle white-balance shift to neutralize the warm/yellowish color cast 
-        // captured from camera sensors under warm lighting, making it match the live preview.
+        // Apply an effective white-balance shift to neutralize the warm/yellowish color cast 
+        // captured from camera sensors under warm lighting, matching the user's perception of a white page.
         let rSum = 0, gSum = 0, bSum = 0;
         const sampleStep = Math.max(1, (N / 500) | 0);
         let samples = 0;
@@ -55,15 +55,15 @@ export const enhanceImage = (
         const gAvg = gSum / samples;
         const bAvg = bSum / samples;
 
-        // If there is a clear warm/yellowish cast (R and G are higher than B)
-        if (rAvg > bAvg + 12 && gAvg > bAvg + 8) {
+        // If there is any warm/yellowish cast (R and G are higher than B)
+        if (rAvg > bAvg + 4 && gAvg > bAvg + 2) {
           const avgL = (rAvg + gAvg + bAvg) / 3;
           const rCorr = avgL / rAvg;
           const gCorr = avgL / gAvg;
           const bCorr = avgL / bAvg;
 
-          // Blend 40% of the correction to keep some natural warmth but neutralize heavy yellowing
-          const blend = 0.4;
+          // Blend 92% of the correction to completely neutralize the yellow paper background
+          const blend = 0.92;
           const rScale = 1.0 + (rCorr - 1.0) * blend;
           const gScale = 1.0 + (gCorr - 1.0) * blend;
           const bScale = 1.0 + (bCorr - 1.0) * blend;
