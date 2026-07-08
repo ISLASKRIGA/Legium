@@ -403,35 +403,52 @@ export const warpPerspective = (
           profR_zero[y] = profR_sm[y] - meanR;
         }
 
-        // 3. Find vertical shift for Middle column using ZNCC in [-30, 30] range (up to 120px curl correction)
+        // Calculate Left profile norm for normalization
+        let normLSq = 0;
+        for (let y = 30; y < sh_small - 30; y++) {
+          normLSq += profL_zero[y] * profL_zero[y];
+        }
+        const normL = Math.sqrt(normLSq);
+
+        // 3. Find vertical shift for Middle column using Normalized ZNCC (Pearson correlation)
         let bestShiftM = 0;
-        let maxScoreM = -Infinity;
+        let maxR_M = -1;
         for (let shift = -30; shift <= 30; shift++) {
           let score = 0;
+          let normMSq = 0;
           for (let y = 30; y < sh_small - 30; y++) {
             score += profL_zero[y] * profM_zero[y + shift];
+            normMSq += profM_zero[y + shift] * profM_zero[y + shift];
           }
-          if (score > maxScoreM) {
-            maxScoreM = score;
+          const normM = Math.sqrt(normMSq);
+          const r = normL > 0 && normM > 0 ? score / (normL * normM) : 0;
+          if (r > maxR_M) {
+            maxR_M = r;
             bestShiftM = shift;
           }
         }
-        const dyMiddle = bestShiftM * 4;
+        // Only trust the shift if there's high correlation confidence (>= 0.48)
+        const dyMiddle = maxR_M >= 0.48 ? bestShiftM * 4 : 0;
 
-        // 4. Find vertical shift for Right column using ZNCC in [-30, 30] range
+        // 4. Find vertical shift for Right column using Normalized ZNCC
         let bestShiftR = 0;
-        let maxScoreR = -Infinity;
+        let maxR_R = -1;
         for (let shift = -30; shift <= 30; shift++) {
           let score = 0;
+          let normRSq = 0;
           for (let y = 30; y < sh_small - 30; y++) {
             score += profL_zero[y] * profR_zero[y + shift];
+            normRSq += profR_zero[y + shift] * profR_zero[y + shift];
           }
-          if (score > maxScoreR) {
-            maxScoreR = score;
+          const normR = Math.sqrt(normRSq);
+          const r = normL > 0 && normR > 0 ? score / (normL * normR) : 0;
+          if (r > maxR_R) {
+            maxR_R = r;
             bestShiftR = shift;
           }
         }
-        const dyRight = bestShiftR * 4;
+        // Only trust the shift if there's high correlation confidence (>= 0.48)
+        const dyRight = maxR_R >= 0.48 ? bestShiftR * 4 : 0;
 
         // Only dewarp if the detected curvature shift is significant (e.g. > 4 pixels) to avoid noise adjustments
         if (Math.abs(dyMiddle) > 4 || Math.abs(dyRight) > 4) {
