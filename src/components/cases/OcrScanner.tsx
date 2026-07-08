@@ -22,11 +22,6 @@ export const enhanceImage = (
   contrast = 1.0
 ): Promise<string> => {
   return new Promise((resolve) => {
-    if (filter === 'original') {
-      resolve(imgSrc);
-      return;
-    }
-
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -43,6 +38,50 @@ export const enhanceImage = (
       const w = canvas.width;
       const h = canvas.height;
       const N = w * h;
+
+      if (filter === 'original') {
+        // Apply a gentle white-balance shift to neutralize the warm/yellowish color cast 
+        // captured from camera sensors under warm lighting, making it match the live preview.
+        let rSum = 0, gSum = 0, bSum = 0;
+        const sampleStep = Math.max(1, (N / 500) | 0);
+        let samples = 0;
+        for (let i = 0; i < N; i += sampleStep) {
+          rSum += data[i * 4];
+          gSum += data[i * 4 + 1];
+          bSum += data[i * 4 + 2];
+          samples++;
+        }
+        const rAvg = rSum / samples;
+        const gAvg = gSum / samples;
+        const bAvg = bSum / samples;
+
+        // If there is a clear warm/yellowish cast (R and G are higher than B)
+        if (rAvg > bAvg + 12 && gAvg > bAvg + 8) {
+          const avgL = (rAvg + gAvg + bAvg) / 3;
+          const rCorr = avgL / rAvg;
+          const gCorr = avgL / gAvg;
+          const bCorr = avgL / bAvg;
+
+          // Blend 40% of the correction to keep some natural warmth but neutralize heavy yellowing
+          const blend = 0.4;
+          const rScale = 1.0 + (rCorr - 1.0) * blend;
+          const gScale = 1.0 + (gCorr - 1.0) * blend;
+          const bScale = 1.0 + (bCorr - 1.0) * blend;
+
+          for (let i = 0; i < N; i++) {
+            data[i * 4] = Math.min(255, data[i * 4] * rScale);
+            data[i * 4 + 1] = Math.min(255, data[i * 4 + 1] * gScale);
+            data[i * 4 + 2] = Math.min(255, data[i * 4 + 2] * bScale);
+          }
+          ctx.putImageData(imgData, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.95));
+          return;
+        }
+
+        resolve(imgSrc);
+        return;
+      }
+
 
       if (filter === 'grayscale') {
         for (let i = 0; i < N; i++) {
