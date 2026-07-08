@@ -383,13 +383,33 @@ export const warpPerspective = (
           profR_sm[y] = sumR / 4;
         }
 
-        // 3. Find vertical shift for Middle column using cross-correlation in [-15, 15] range
+        // Subtract mean to perform Zero-Mean Cross-Correlation (ZNCC) for extreme robustness
+        let sumL_sm = 0, sumM_sm = 0, sumR_sm = 0;
+        for (let y = 0; y < sh_small; y++) {
+          sumL_sm += profL_sm[y];
+          sumM_sm += profM_sm[y];
+          sumR_sm += profR_sm[y];
+        }
+        const meanL = sumL_sm / sh_small;
+        const meanM = sumM_sm / sh_small;
+        const meanR = sumR_sm / sh_small;
+
+        const profL_zero = new Float32Array(sh_small);
+        const profM_zero = new Float32Array(sh_small);
+        const profR_zero = new Float32Array(sh_small);
+        for (let y = 0; y < sh_small; y++) {
+          profL_zero[y] = profL_sm[y] - meanL;
+          profM_zero[y] = profM_sm[y] - meanM;
+          profR_zero[y] = profR_sm[y] - meanR;
+        }
+
+        // 3. Find vertical shift for Middle column using ZNCC in [-30, 30] range (up to 120px curl correction)
         let bestShiftM = 0;
         let maxScoreM = -Infinity;
-        for (let shift = -15; shift <= 15; shift++) {
+        for (let shift = -30; shift <= 30; shift++) {
           let score = 0;
-          for (let y = 15; y < sh_small - 15; y++) {
-            score += profL_sm[y] * profM_sm[y + shift];
+          for (let y = 30; y < sh_small - 30; y++) {
+            score += profL_zero[y] * profM_zero[y + shift];
           }
           if (score > maxScoreM) {
             maxScoreM = score;
@@ -398,13 +418,13 @@ export const warpPerspective = (
         }
         const dyMiddle = bestShiftM * 4;
 
-        // 4. Find vertical shift for Right column using cross-correlation in [-15, 15] range
+        // 4. Find vertical shift for Right column using ZNCC in [-30, 30] range
         let bestShiftR = 0;
         let maxScoreR = -Infinity;
-        for (let shift = -15; shift <= 15; shift++) {
+        for (let shift = -30; shift <= 30; shift++) {
           let score = 0;
-          for (let y = 15; y < sh_small - 15; y++) {
-            score += profL_sm[y] * profR_sm[y + shift];
+          for (let y = 30; y < sh_small - 30; y++) {
+            score += profL_zero[y] * profR_zero[y + shift];
           }
           if (score > maxScoreR) {
             maxScoreR = score;
@@ -425,8 +445,9 @@ export const warpPerspective = (
 
             for (let x = 0; x < w; x++) {
               const progress = x / w;
-              // Combined sine wave (cylindrical page curl) and linear slant model
-              const shiftY = dyMiddle * Math.sin(Math.PI * progress) + dyRight * progress;
+              // Combined sine wave (cylindrical page curl) and linear slant model.
+              // Math adjustment dyMiddle - dyRight/2 ensures the center shifts exactly by dyMiddle.
+              const shiftY = (dyMiddle - dyRight / 2) * Math.sin(Math.PI * progress) + dyRight * progress;
 
               dewarpCtx.drawImage(
                 canvas,
