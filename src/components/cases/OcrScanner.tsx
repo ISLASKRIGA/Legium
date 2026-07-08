@@ -115,20 +115,46 @@ export const enhanceImage = (
             let g = data[idx * 4 + 1];
             let b = data[idx * 4 + 2];
 
-            if (L >= avg - C) {
-              // Whiten background
+            const maxVal = Math.max(r, g, b);
+            const minVal = Math.min(r, g, b);
+            const chroma = maxVal - minVal;
+            const isColor = chroma > 24; // Protect colored inks and highlighters from bleaching
+
+            if (L >= avg - C && !isColor) {
+              // Whiten background (only if not a colored stroke)
               const diff = L - (avg - C);
-              const factor = Math.min(1.0, diff / 8);
+              const factor = Math.min(1.0, diff / 4);
               r = r + (255 - r) * factor;
               g = g + (255 - g) * factor;
               b = b + (255 - b) * factor;
             } else {
-              // Darken text to near-black
+              // Enhance color and contrast (Magic Color)
+              // 1. Normalize color by local average (illumination correction)
+              const normFactor = 255 / Math.max(1, avg);
+              const r_norm = Math.min(255, r * normFactor);
+              const g_norm = Math.min(255, g * normFactor);
+              const b_norm = Math.min(255, b * normFactor);
+
+              // 2. Calculate normalized luminance
+              const L_norm = 0.299 * r_norm + 0.587 * g_norm + 0.114 * b_norm;
+
+              // 3. Boost color saturation
+              const satFactor = 2.0;
+              const r_sat = L_norm + (r_norm - L_norm) * satFactor;
+              const g_sat = L_norm + (g_norm - L_norm) * satFactor;
+              const b_sat = L_norm + (b_norm - L_norm) * satFactor;
+
+              // 4. Boost contrast (darken the text component)
               const ratio = L / Math.max(1, avg);
               const enhancedRatio = Math.pow(ratio, exponent);
-              r = r * enhancedRatio;
-              g = g * enhancedRatio;
-              b = b * enhancedRatio;
+
+              // Protect bright colors (like yellow highlighter) from being darkened to black
+              const colorWeight = isColor ? (maxVal / 255) : 0;
+              const finalRatio = enhancedRatio * (1 - colorWeight) + colorWeight;
+
+              r = Math.min(255, Math.max(0, r_sat * finalRatio));
+              g = Math.min(255, Math.max(0, g_sat * finalRatio));
+              b = Math.min(255, Math.max(0, b_sat * finalRatio));
             }
 
             data[idx * 4] = r;
