@@ -398,6 +398,121 @@ export const warpPerspective = (
         }
       }
 
+      // ── Auto-dewarp page curvature (page curl) ──
+      try {
+        const w = targetWidth;
+        const h = targetHeight;
+        const ddata = destData.data;
+
+        // 1. Calculate luminance profile for 3 vertical columns
+        // Left column: x = [80, 200], Middle column: x = [340, 460], Right column: x = [600, 720]
+        const profileLeft = new Float32Array(h);
+        const profileMiddle = new Float32Array(h);
+        const profileRight = new Float32Array(h);
+
+        for (let y = 0; y < h; y++) {
+          let sumL = 0, sumM = 0, sumR = 0;
+          for (let dx = 0; dx < 120; dx++) {
+            const lx = 80 + dx;
+            const mx = 340 + dx;
+            const rx = 600 + dx;
+
+            const lidx = (y * w + lx) * 4;
+            const midx = (y * w + mx) * 4;
+            const ridx = (y * w + rx) * 4;
+
+            // Invert luminance: dark text has high values, white background has 0
+            sumL += 255 - (0.299 * ddata[lidx] + 0.587 * ddata[lidx + 1] + 0.114 * ddata[lidx + 2]);
+            sumM += 255 - (0.299 * ddata[midx] + 0.587 * ddata[midx + 1] + 0.114 * ddata[midx + 2]);
+            sumR += 255 - (0.299 * ddata[ridx] + 0.587 * ddata[ridx + 1] + 0.114 * ddata[ridx + 2]);
+          }
+          profileLeft[y] = sumL / 120;
+          profileMiddle[y] = sumM / 120;
+          profileRight[y] = sumR / 120;
+        }
+
+        // 2. Downsample profiles vertically to 275 rows for fast cross-correlation
+        const sh_small = 275;
+        const profL_sm = new Float32Array(sh_small);
+        const profM_sm = new Float32Array(sh_small);
+        const profR_sm = new Float32Array(sh_small);
+
+        for (let y = 0; y < sh_small; y++) {
+          let sumL = 0, sumM = 0, sumR = 0;
+          for (let k = 0; k < 4; k++) {
+            const idx = y * 4 + k;
+            sumL += profileLeft[idx];
+            sumM += profileMiddle[idx];
+            sumR += profileRight[idx];
+          }
+          profL_sm[y] = sumL / 4;
+          profM_sm[y] = sumM / 4;
+          profR_sm[y] = sumR / 4;
+        }
+
+        // 3. Find vertical shift for Middle column using cross-correlation in [-15, 15] range
+        let bestShiftM = 0;
+        let maxScoreM = -Infinity;
+        for (let shift = -15; shift <= 15; shift++) {
+          let score = 0;
+          for (let y = 15; y < sh_small - 15; y++) {
+            score += profL_sm[y] * profM_sm[y + shift];
+          }
+          if (score > maxScoreM) {
+            maxScoreM = score;
+            bestShiftM = shift;
+          }
+        }
+        const dyMiddle = bestShiftM * 4;
+
+        // 4. Find vertical shift for Right column using cross-correlation in [-15, 15] range
+        let bestShiftR = 0;
+        let maxScoreR = -Infinity;
+        for (let shift = -15; shift <= 15; shift++) {
+          let score = 0;
+          for (let y = 15; y < sh_small - 15; y++) {
+            score += profL_sm[y] * profR_sm[y + shift];
+          }
+          if (score > maxScoreR) {
+            maxScoreR = score;
+            bestShiftR = shift;
+          }
+        }
+        const dyRight = bestShiftR * 4;
+
+        // Only dewarp if the detected curvature shift is significant (e.g. > 4 pixels) to avoid noise adjustments
+        if (Math.abs(dyMiddle) > 4 || Math.abs(dyRight) > 4) {
+          const dewarpCanvas = document.createElement('canvas');
+          dewarpCanvas.width = w;
+          dewarpCanvas.height = h;
+          const dewarpCtx = dewarpCanvas.getContext('2d');
+          if (dewarpCtx) {
+            dewarpCtx.fillStyle = '#ffffff';
+            dewarpCtx.fillRect(0, 0, w, h);
+
+            for (let x = 0; x < w; x++) {
+              const progress = x / w;
+              // Combined sine wave (cylindrical page curl) and linear slant model
+              const shiftY = dyMiddle * Math.sin(Math.PI * progress) + dyRight * progress;
+
+              dewarpCtx.drawImage(
+                canvas,
+                x, 0, 1, h, // source slice (1px wide)
+                x, -shiftY, 1, h // destination slice shifted vertically
+              );
+            }
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(dewarpCanvas, 0, 0);
+
+            destData = ctx.getImageData(0, 0, w, h);
+          }
+        }
+      } catch (err) {
+        console.warn('Auto dewarping check failed:', err);
+      }
+
       // Detect and correct skew automatically
       try {
         const skewAngle = detectSkewAngle(destData.data, targetWidth, targetHeight);
