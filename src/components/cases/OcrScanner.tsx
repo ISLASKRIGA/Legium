@@ -434,7 +434,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         const rotatedUrl = canvas.toDataURL('image/jpeg');
         setOriginalImage(rotatedUrl);
 
-        if (step === 'beautify' && capturedImage) {
+        if ((step === 'beautify' || step === 'aligning') && capturedImage) {
           const croppedImg = new Image();
           croppedImg.onload = () => {
             const cropCanvas = document.createElement('canvas');
@@ -1413,6 +1413,17 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   </svg>
                 </div>
                 Recortar
+              </button>
+
+              {/* Rotar */}
+              <button
+                onClick={() => rotateImage('left')}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 600, opacity: 0.85 }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RotateCcw size={18} />
+                </div>
+                Rotar
               </button>
 
               {/* ✓ Palomita → pantalla decide o directamente procesa */}
