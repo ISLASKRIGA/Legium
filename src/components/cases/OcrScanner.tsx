@@ -44,7 +44,7 @@ export const enhanceImage = (
       const h = canvas.height;
       const N = w * h;
 
-      if (filter === 'grayscale' || filter === 'bw') {
+      if (filter === 'grayscale') {
         for (let i = 0; i < N; i++) {
           const r = data[i * 4];
           const g = data[i * 4 + 1];
@@ -57,13 +57,50 @@ export const enhanceImage = (
       }
 
       if (filter === 'bw') {
-        // High-contrast B&W thresholding
+        // 1. Calculate luminance
+        const lum = new Float32Array(N);
         for (let i = 0; i < N; i++) {
-          const gray = data[i * 4];
-          const val = gray > 120 ? 255 : 0;
-          data[i * 4] = val;
-          data[i * 4 + 1] = val;
-          data[i * 4 + 2] = val;
+          lum[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+        }
+
+        // 2. Compute integral image of luminance
+        const integral = new Uint32Array(N);
+        for (let y = 0; y < h; y++) {
+          let rowSum = 0;
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            rowSum += lum[idx];
+            integral[idx] = rowSum + (y > 0 ? integral[(y - 1) * w + x] : 0);
+          }
+        }
+
+        // 3. Local adaptive thresholding (B&W Bradley-Roth)
+        const S = Math.max(16, (w / 16) | 0);
+        const S2 = S >> 1;
+        const T = 0.85; 
+
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            const x1 = Math.max(0, x - S2);
+            const x2 = Math.min(w - 1, x + S2);
+            const y1 = Math.max(0, y - S2);
+            const y2 = Math.min(h - 1, y + S2);
+            const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+            const sum = integral[y2 * w + x2]
+                      - (x1 > 0 ? integral[y2 * w + (x1 - 1)] : 0)
+                      - (y1 > 0 ? integral[(y1 - 1) * w + x2] : 0)
+                      + (x1 > 0 && y1 > 0 ? integral[(y1 - 1) * w + (x1 - 1)] : 0);
+
+            const avg = sum / count;
+            const L = lum[idx];
+
+            const val = L < avg * T ? 0 : 255;
+            data[idx * 4] = val;
+            data[idx * 4 + 1] = val;
+            data[idx * 4 + 2] = val;
+          }
         }
         ctx.putImageData(imgData, 0, 0);
         resolve(canvas.toDataURL('image/jpeg', 0.9));
@@ -199,19 +236,73 @@ export const enhanceImage = (
       }
 
       if (filter === 'lighten') {
-        // Boost brightness and contrast globally
-        const bFactor = 1.15 * brightness;
-        const cFactor = 1.1 * contrast;
+        // 1. Calculate luminance
+        const lum = new Float32Array(N);
         for (let i = 0; i < N; i++) {
-          let r = data[i * 4] * bFactor;
-          let g = data[i * 4 + 1] * bFactor;
-          let b = data[i * 4 + 2] * bFactor;
-          r = (r - 128) * cFactor + 128;
-          g = (g - 128) * cFactor + 128;
-          b = (b - 128) * cFactor + 128;
-          data[i * 4] = Math.min(255, Math.max(0, r));
-          data[i * 4 + 1] = Math.min(255, Math.max(0, g));
-          data[i * 4 + 2] = Math.min(255, Math.max(0, b));
+          lum[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+        }
+
+        // 2. Compute integral image of luminance
+        const integral = new Uint32Array(N);
+        for (let y = 0; y < h; y++) {
+          let rowSum = 0;
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            rowSum += lum[idx];
+            integral[idx] = rowSum + (y > 0 ? integral[(y - 1) * w + x] : 0);
+          }
+        }
+
+        // 3. Adaptive background whitening with color preservation
+        const S = Math.max(16, (w / 16) | 0);
+        const S2 = S >> 1;
+        const C = 15 * brightness; // Higher margin for aggressive background whitening
+
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            const x1 = Math.max(0, x - S2);
+            const x2 = Math.min(w - 1, x + S2);
+            const y1 = Math.max(0, y - S2);
+            const y2 = Math.min(h - 1, y + S2);
+            const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+            const sum = integral[y2 * w + x2]
+                      - (x1 > 0 ? integral[y2 * w + (x1 - 1)] : 0)
+                      - (y1 > 0 ? integral[(y1 - 1) * w + x2] : 0)
+                      + (x1 > 0 && y1 > 0 ? integral[(y1 - 1) * w + (x1 - 1)] : 0);
+
+            const avg = sum / count;
+            const L = lum[idx];
+
+            let r = data[idx * 4];
+            let g = data[idx * 4 + 1];
+            let b = data[idx * 4 + 2];
+
+            const maxVal = Math.max(r, g, b);
+            const minVal = Math.min(r, g, b);
+            const chroma = maxVal - minVal;
+            const isWarmCast = chroma < 65 && r > b && g > b;
+
+            if (L >= avg - C || L > 195 || isWarmCast) {
+              // Smooth transition to pure white
+              const diff = L - (avg - C);
+              const factor = L > 195 || isWarmCast ? 1.0 : Math.min(1.0, diff / 8);
+              r = Math.round(r + (255 - r) * factor);
+              g = Math.round(g + (255 - g) * factor);
+              b = Math.round(b + (255 - b) * factor);
+            } else {
+              // Slightly lighten and enhance contrast of the text/ink
+              const factor = 1.15;
+              r = Math.min(255, r * factor);
+              g = Math.min(255, g * factor);
+              b = Math.min(255, b * factor);
+            }
+
+            data[idx * 4] = r;
+            data[idx * 4 + 1] = g;
+            data[idx * 4 + 2] = b;
+          }
         }
       }
 
