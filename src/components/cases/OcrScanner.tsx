@@ -213,8 +213,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [detectionConfidence, setDetectionConfidence] = useState(0);
 
   const [activeFilter, setActiveFilter] = useState<FilterType>('magic');
-  const [magicBrightness, setMagicBrightness] = useState(1.18);
-  const [magicContrast, setMagicContrast] = useState(1.35);
+  const magicBrightness = 1.18;
+  const magicContrast = 1.35;
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [scanMode, setScanMode] = useState<'individual' | 'lote'>('individual');
@@ -1386,42 +1386,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               ))}
             </div>
 
-            {/* ── Sliders de ajuste — solo cuando 'Mejorar' está activo ── */}
-            <div style={{
-              overflow: 'hidden',
-              maxHeight: activeFilter === 'magic' ? '100px' : '0px',
-              transition: 'max-height 0.3s ease',
-              padding: activeFilter === 'magic' ? '4px 20px 6px' : '0 20px',
-            }}>
-              {/* Brillo */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, width: '52px', flexShrink: 0 }}>Brillo</span>
-                <input
-                  type="range"
-                  min="0.8" max="1.6" step="0.01"
-                  value={magicBrightness}
-                  onChange={e => setMagicBrightness(parseFloat(e.target.value))}
-                  style={{ flex: 1, accentColor: '#00e5a0', height: '3px', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '10px', color: '#00e5a0', fontWeight: 700, width: '32px', textAlign: 'right' }}>
-                  {Math.round((magicBrightness - 1) * 100)}%
-                </span>
-              </div>
-              {/* Contraste */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600, width: '52px', flexShrink: 0 }}>Contraste</span>
-                <input
-                  type="range"
-                  min="0.8" max="2.2" step="0.01"
-                  value={magicContrast}
-                  onChange={e => setMagicContrast(parseFloat(e.target.value))}
-                  style={{ flex: 1, accentColor: '#00e5a0', height: '3px', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '10px', color: '#00e5a0', fontWeight: 700, width: '32px', textAlign: 'right' }}>
-                  {Math.round((magicContrast - 1) * 100)}%
-                </span>
-              </div>
-            </div>
+
 
             {/* Action bar */}
             <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '10px 20px 20px' }}>
@@ -1598,13 +1563,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               }}
             >
               <img 
-                src={capturedImage} 
+                src={processedImage || capturedImage} 
                 alt="Enhanced Preview" 
                 style={{ 
                   maxWidth: '100%', 
                   maxHeight: '52vh', 
                   display: 'block',
-                  filter: getFilterStyle(activeFilter, magicBrightness, magicContrast),
                   transition: 'all 0.25s ease'
                 }} 
               />
