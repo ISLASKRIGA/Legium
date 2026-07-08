@@ -413,60 +413,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     }
   };
 
-  // Rotate image 90 degrees Left or Right
-  const rotateImage = (direction: 'left' | 'right') => {
-    if (!originalImage) return;
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.height;
-      canvas.height = img.width;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        if (direction === 'left') {
-          ctx.translate(0, img.width);
-          ctx.rotate(-Math.PI / 2);
-        } else {
-          ctx.translate(img.height, 0);
-          ctx.rotate(Math.PI / 2);
-        }
-        ctx.drawImage(img, 0, 0);
-        const rotatedUrl = canvas.toDataURL('image/jpeg');
-        setOriginalImage(rotatedUrl);
 
-        if ((step === 'beautify' || step === 'aligning') && capturedImage) {
-          const croppedImg = new Image();
-          croppedImg.onload = () => {
-            const cropCanvas = document.createElement('canvas');
-            cropCanvas.width = croppedImg.height;
-            cropCanvas.height = croppedImg.width;
-            const cropCtx = cropCanvas.getContext('2d');
-            if (cropCtx) {
-              if (direction === 'left') {
-                cropCtx.translate(0, croppedImg.width);
-                cropCtx.rotate(-Math.PI / 2);
-              } else {
-                cropCtx.translate(croppedImg.height, 0);
-                cropCtx.rotate(Math.PI / 2);
-              }
-              cropCtx.drawImage(croppedImg, 0, 0);
-              setCapturedImage(cropCanvas.toDataURL('image/jpeg'));
-            }
-          };
-          croppedImg.src = capturedImage;
-        } else {
-          // Run edge detection on rotated image
-          const tempImg = new Image();
-          tempImg.onload = () => {
-            const detectedQuad = detectDocumentEdges(tempImg);
-            setEdgePoints(detectedQuad);
-          };
-          tempImg.src = rotatedUrl;
-        }
-      }
-    };
-    img.src = originalImage;
-  };
 
   const updateCropPoint = (clientX: number, clientY: number, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
     if (!previewImageRef.current) return;
@@ -1415,17 +1362,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 Recortar
               </button>
 
-              {/* Rotar */}
-              <button
-                onClick={() => rotateImage('left')}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 600, opacity: 0.85 }}
-              >
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <RotateCcw size={18} />
-                </div>
-                Rotar
-              </button>
-
               {/* ✓ Palomita → pantalla decide o directamente procesa */}
               <button
                 disabled={isEnhancing}
@@ -1722,13 +1658,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 <span>Re-tomar</span>
               </button>
 
-              <button 
-                onClick={() => rotateImage('left')}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
-              >
-                <span style={{ fontSize: '16px', lineHeight: 1 }}>↩️</span>
-                <span>Izquierda</span>
-              </button>
 
               <button 
                 onClick={() => setStep('preview-full')}

@@ -263,7 +263,7 @@ export const warpPerspective = (
       }
       srcCtx.drawImage(img, 0, 0);
       const srcData = srcCtx.getImageData(0, 0, img.width, img.height);
-      const destData = ctx.createImageData(targetWidth, targetHeight);
+      let destData = ctx.createImageData(targetWidth, targetHeight);
 
       // Extract points in pixel coordinates
       const x0 = (quad.p1.x / 100) * img.width;
@@ -359,6 +359,44 @@ export const warpPerspective = (
       }
 
       ctx.putImageData(destData, 0, 0);
+
+      // Auto-rotate 90 degrees clockwise if the selected quad is landscape (sideways page)
+      const dxTop = x1 - x0;
+      const dyTop = y1 - y0;
+      const distTop = Math.sqrt(dxTop * dxTop + dyTop * dyTop);
+
+      const dxLeft = x3 - x0;
+      const dyLeft = y3 - y0;
+      const distLeft = Math.sqrt(dxLeft * dxLeft + dyLeft * dyLeft);
+
+      if (distTop > distLeft) {
+        try {
+          const rotCanvas = document.createElement('canvas');
+          rotCanvas.width = targetWidth;
+          rotCanvas.height = targetHeight;
+          const rotCtx = rotCanvas.getContext('2d');
+          if (rotCtx) {
+            rotCtx.fillStyle = '#ffffff';
+            rotCtx.fillRect(0, 0, targetWidth, targetHeight);
+            
+            // Rotate 90 degrees clockwise
+            rotCtx.translate(targetWidth / 2, targetHeight / 2);
+            rotCtx.rotate((90 * Math.PI) / 180);
+            
+            // Draw original canvas scaled to fit the portrait target bounds
+            rotCtx.drawImage(canvas, -targetHeight / 2, -targetWidth / 2, targetHeight, targetWidth);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, targetWidth, targetHeight);
+            ctx.drawImage(rotCanvas, 0, 0);
+
+            // Update destData so that subsequent operations work on the rotated pixels
+            destData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+          }
+        } catch (e) {
+          console.warn('Auto 90-degree rotation failed:', e);
+        }
+      }
 
       // Detect and correct skew automatically
       try {
