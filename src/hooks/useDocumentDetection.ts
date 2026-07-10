@@ -97,6 +97,8 @@ export function useDocumentDetection({
   const canvasRef     = useRef<HTMLCanvasElement | null>(null);
   const lastQuadRef   = useRef<QuadPoints | null>(null);
   const frameCountRef = useRef(0);
+  const lostRef       = useRef(0);
+  const MAX_LOST_FRAMES = 25; // Hold last known good quad for about 1.6s
 
   const detect = useCallback(() => {
     const video = videoRef.current;
@@ -170,30 +172,29 @@ export function useDocumentDetection({
       }
     }
 
-    // ── 3. Achromatic mask + Otsu histogram ───────────────────────────────────
-    const SAT_THRESH = 62;
-    const hist = new Uint32Array(256);
-    let numAchromatic = 0;
-    for (let i = 0; i < N; i++) {
-      if (satArr[i] < SAT_THRESH) {
-        hist[Math.min(255, lum[i] | 0)]++;
-        numAchromatic++;
+    const handleDetectionFailure = () => {
+      lostRef.current++;
+      if (lostRef.current >= MAX_LOST_FRAMES) {
+        lastQuadRef.current = null;
+        onDetection(DEFAULT_QUAD, 0);
+      } else if (lastQuadRef.current) {
+        onDetection(lastQuadRef.current, 0.2); // Keep last position
+      } else {
+        onDetection(DEFAULT_QUAD, 0);
       }
+    };
+
+    // ── 3. Otsu histogram on all pixels (supports any paper color) ────────────
+    const hist = new Uint32Array(256);
+    for (let i = 0; i < N; i++) {
+      hist[Math.min(255, lum[i] | 0)]++;
     }
 
-    if (numAchromatic < N * 0.05) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
-      return;
-    }
+    // ── 4. Otsu threshold ─────────────────────────────────────────────────────
+    const { threshold: thresh, separability } = otsuOnHist(hist, N);
 
-    // ── 4. Otsu threshold on achromatic pixels ────────────────────────────────
-    const { threshold: thresh, separability } = otsuOnHist(hist, numAchromatic);
-
-    if (separability < 0.055) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
+    if (separability < 0.045) {
+      handleDetectionFailure();
       animFrameRef.current = requestAnimationFrame(detect);
       return;
     }
@@ -243,50 +244,48 @@ export function useDocumentDetection({
       }
     }
 
-    // ── 5. BFS on achromatic-bright pixels → largest connected component ──────
+    // ── 5. BFS on bright pixels → largest connected component ─────────────────
     const visited = new Uint8Array(N);
     let bestComp: number[] = [];
     let bestScore = -1;
 
-    const globalThresh = Math.max(55, thresh - 15);
+    const globalThresh = Math.max(50, thresh - 18);
+    const GRAD_BARRIER = 3.2; // tighter barrier to prevent bleeding into dark/colored backgrounds
 
     for (let y = 2; y < H - 2; y++) {
       for (let x = 2; x < W - 2; x++) {
         const idx = y * W + x;
-        // Seed must be achromatic, locally bright, globally bright, flat (not on edge), and unvisited
-        if (satArr[idx] >= SAT_THRESH || !isForeground[idx] || lum[idx] <= globalThresh || grad[idx] >= 4.8 || visited[idx]) continue;
+        // Seed must be locally bright, globally bright, flat (not on edge), and unvisited
+        if (!isForeground[idx] || lum[idx] <= globalThresh || grad[idx] >= GRAD_BARRIER || visited[idx]) continue;
 
         const comp: number[] = [];
         const queue: number[] = [idx];
         visited[idx] = 1;
-        let head = 0, sumX = 0, sumY = 0;
+        let head = 0;
 
         while (head < queue.length) {
           const cur = queue[head++];
           const cx = cur % W, cy = (cur / W) | 0;
           comp.push(cur);
-          sumX += cx; sumY += cy;
 
           // 4-connected neighbors restricted by local & global threshold and gradient barriers
-          if (cx > 1     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && lum[cur - 1] > globalThresh && grad[cur - 1] < 4.8 && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
-          if (cx < W - 2 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && lum[cur + 1] > globalThresh && grad[cur + 1] < 4.8 && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
-          if (cy > 1     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && lum[cur - W] > globalThresh && grad[cur - W] < 4.8 && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
-          if (cy < H - 2 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && lum[cur + W] > globalThresh && grad[cur + W] < 4.8 && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
+          if (cx > 1     && isForeground[cur - 1] && lum[cur - 1] > globalThresh && grad[cur - 1] < GRAD_BARRIER && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
+          if (cx < W - 2 && isForeground[cur + 1] && lum[cur + 1] > globalThresh && grad[cur + 1] < GRAD_BARRIER && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
+          if (cy > 1     && isForeground[cur - W] && lum[cur - W] > globalThresh && grad[cur - W] < GRAD_BARRIER && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
+          if (cy < H - 2 && isForeground[cur + W] && lum[cur + W] > globalThresh && grad[cur + W] < GRAD_BARRIER && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
         }
 
         const area = comp.length;
         if (area < N * 0.03) continue;
 
-        const score = area;
-        if (score > bestScore) { bestScore = score; bestComp = comp; }
+        if (area > bestScore) { bestScore = area; bestComp = comp; }
       }
     }
 
     const compArea = bestComp.length;
 
     if (compArea < N * 0.045 || compArea > N * 0.96) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
+      handleDetectionFailure();
       animFrameRef.current = requestAnimationFrame(detect);
       return;
     }
@@ -360,7 +359,7 @@ export function useDocumentDetection({
     p3 = snapToEdge(p3);
     p4 = snapToEdge(p4);
 
-    // ── 8. Validity check ─────────────────────────────────────────────────────
+    // ── 8. Validity check & Geometry check ─────────────────────────────────────
     const bx1 = Math.min(p1.x, p4.x), bx2 = Math.max(p2.x, p3.x);
     const by1 = Math.min(p1.y, p2.y), by2 = Math.max(p3.y, p4.y);
     const bw   = bx2 - bx1, bh = by2 - by1;
@@ -368,21 +367,50 @@ export function useDocumentDetection({
 
     const confidence = Math.min(1, (separability * 1.35 + compArea / N) / 1.25);
 
-    const isValid =
-      compArea > N  * 0.045  &&
-      compArea < N  * 0.96   &&
-      bw       > W  * 0.15   &&
-      bh       > H  * 0.12   &&
-      aspect   > 0.25        &&
-      aspect   < 4.0         &&
-      confidence > 0.24;
+    const checkQuadGeometry = (q: QuadPoints): boolean => {
+      // Check convexity
+      const v1 = { x: q.p2.x - q.p1.x, y: q.p2.y - q.p1.y };
+      const v2 = { x: q.p3.x - q.p2.x, y: q.p3.y - q.p2.y };
+      const v3 = { x: q.p4.x - q.p3.x, y: q.p4.y - q.p3.y };
+      const v4 = { x: q.p1.x - q.p4.x, y: q.p1.y - q.p4.y };
 
-    if (!isValid) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
-      return;
-    }
+      const z1 = v1.x * v2.y - v1.y * v2.x;
+      const z2 = v2.x * v3.y - v2.y * v3.x;
+      const z3 = v3.x * v4.y - v3.y * v4.x;
+      const z4 = v4.x * v1.y - v4.y * v1.x;
+
+      const allPositive = z1 > 0 && z2 > 0 && z3 > 0 && z4 > 0;
+      const allNegative = z1 < 0 && z2 < 0 && z3 < 0 && z4 < 0;
+      if (!allPositive && !allNegative) return false;
+
+      // Check opposite side ratios
+      const dTop = Math.hypot(v1.x, v1.y);
+      const dBot = Math.hypot(v3.x, v3.y);
+      const dLeft = Math.hypot(v4.x, v4.y);
+      const dRight = Math.hypot(v2.x, v2.y);
+
+      const ratioH = Math.min(dTop, dBot) / Math.max(dTop, dBot);
+      const ratioV = Math.min(dLeft, dRight) / Math.max(dLeft, dRight);
+      
+      if (ratioH < 0.55 || ratioV < 0.55) return false;
+
+      // Check corner angles
+      const dotAngle = (vA: {x:number, y:number}, vB: {x:number, y:number}) => {
+        const lenA = Math.hypot(vA.x, vA.y);
+        const lenB = Math.hypot(vB.x, vB.y);
+        if (lenA < 0.01 || lenB < 0.01) return 1.0;
+        return Math.abs(vA.x * vB.x + vA.y * vB.y) / (lenA * lenB);
+      };
+
+      const cos1 = dotAngle(v1, { x: -v4.x, y: -v4.y });
+      const cos2 = dotAngle({ x: -v1.x, y: -v1.y }, v2);
+      const cos3 = dotAngle({ x: -v2.x, y: -v2.y }, v3);
+      const cos4 = dotAngle({ x: -v3.x, y: -v3.y }, { x: -v4.x, y: -v4.y });
+
+      if (cos1 > 0.72 || cos2 > 0.72 || cos3 > 0.72 || cos4 > 0.72) return false;
+
+      return true;
+    };
 
     // ── 9. Normalise + exponential temporal smoothing ─────────────────────────
     const toP = (pt: { x: number; y: number }) => ({
@@ -392,7 +420,25 @@ export function useDocumentDetection({
 
     const raw: QuadPoints = expandQuad({ p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) });
 
-    const k = 0.82;
+    const isValid =
+      compArea > N  * 0.045  &&
+      compArea < N  * 0.96   &&
+      bw       > W  * 0.15   &&
+      bh       > H  * 0.12   &&
+      aspect   > 0.25        &&
+      aspect   < 4.0         &&
+      confidence > 0.24      &&
+      checkQuadGeometry(raw);
+
+    if (!isValid) {
+      handleDetectionFailure();
+      animFrameRef.current = requestAnimationFrame(detect);
+      return;
+    }
+
+    lostRef.current = 0; // Successfully detected
+
+    const k = 0.93; // 93% history weight = super stable
     const DEAD_ZONE = 0.8;
     const shouldUpdate = (prev: QuadPoints, next: QuadPoints) => {
       const keys = ['p1', 'p2', 'p3', 'p4'] as const;
@@ -426,6 +472,7 @@ export function useDocumentDetection({
   useEffect(() => {
     if (active) {
       frameCountRef.current = 0;
+      lostRef.current       = 0;
       animFrameRef.current  = requestAnimationFrame(detect);
     }
     return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
