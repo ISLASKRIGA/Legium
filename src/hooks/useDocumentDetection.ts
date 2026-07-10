@@ -35,6 +35,15 @@ function expandQuad(quad: QuadPoints, amount = 1.015): QuadPoints {
   };
 }
 
+function getQuadDiff(q1: QuadPoints, q2: QuadPoints): number {
+  return (
+    Math.hypot(q1.p1.x - q2.p1.x, q1.p1.y - q2.p1.y) +
+    Math.hypot(q1.p2.x - q2.p2.x, q1.p2.y - q2.p2.y) +
+    Math.hypot(q1.p3.x - q2.p3.x, q1.p3.y - q2.p3.y) +
+    Math.hypot(q1.p4.x - q2.p4.x, q1.p4.y - q2.p4.y)
+  ) / 4.0;
+}
+
 /**
  * Otsu binarisation on a pre-computed histogram with `totalN` samples.
  * Returns { threshold, separability }.
@@ -98,6 +107,7 @@ export function useDocumentDetection({
   const lastQuadRef   = useRef<QuadPoints | null>(null);
   const frameCountRef = useRef(0);
   const lostRef       = useRef(0);
+  const stableCountRef = useRef(0);
 
   const detect = useCallback(() => {
     const video = videoRef.current;
@@ -425,7 +435,18 @@ export function useDocumentDetection({
 
     const raw: QuadPoints = expandQuad({ p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) });
 
-    const k = 0.93; // Super stable smoothing factor
+    // Calculate distance drift to adapt stableCountRef
+    if (lastQuadRef.current) {
+      const diff = getQuadDiff(lastQuadRef.current, raw);
+      if (diff > 5.0) {
+        stableCountRef.current = 0; // Reset stability on large movement -> fast snap
+      } else if (diff < 2.0) {
+        stableCountRef.current = Math.min(25, stableCountRef.current + 1);
+      }
+    } else {
+      stableCountRef.current = 0;
+    }
+
     const DEAD_ZONE = 0.8;
     const shouldUpdate = (prev: QuadPoints, next: QuadPoints) => {
       const keys = ['p1', 'p2', 'p3', 'p4'] as const;
@@ -439,6 +460,16 @@ export function useDocumentDetection({
       onDetection(lastQuadRef.current, confidence);
       animFrameRef.current = requestAnimationFrame(detect);
       return;
+    }
+
+    // Adaptive smoothing factor:
+    // Starts fast (k = 0.50) to snap quickly, and grows to slow/stable (k = 0.96) as it settles.
+    let k = 0.50;
+    if (lastQuadRef.current) {
+      const baseK = 0.50;
+      const targetK = 0.96;
+      const t = Math.min(1.0, stableCountRef.current / 15.0);
+      k = baseK + (targetK - baseK) * t;
     }
 
     const out: QuadPoints = lastQuadRef.current
