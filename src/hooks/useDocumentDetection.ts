@@ -97,6 +97,7 @@ export function useDocumentDetection({
   const canvasRef     = useRef<HTMLCanvasElement | null>(null);
   const lastQuadRef   = useRef<QuadPoints | null>(null);
   const frameCountRef = useRef(0);
+  const lostRef       = useRef(0);
 
   const detect = useCallback(() => {
     const video = videoRef.current;
@@ -111,6 +112,20 @@ export function useDocumentDetection({
     }
 
     const W = 160, H = 240, N = W * H;
+
+    const handleFailure = () => {
+      lostRef.current++;
+      const maxLost = lastQuadRef.current ? 35 : 12;
+      if (lostRef.current >= maxLost) {
+        lastQuadRef.current = null;
+        onDetection(DEFAULT_QUAD, 0);
+      } else if (lastQuadRef.current) {
+        onDetection(lastQuadRef.current, 0.35);
+      } else {
+        onDetection(DEFAULT_QUAD, 0);
+      }
+      animFrameRef.current = requestAnimationFrame(detect);
+    };
 
     if (!canvasRef.current) {
       canvasRef.current = document.createElement('canvas');
@@ -182,9 +197,7 @@ export function useDocumentDetection({
     }
 
     if (numAchromatic < N * 0.05) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
+      handleFailure();
       return;
     }
 
@@ -192,9 +205,7 @@ export function useDocumentDetection({
     const { threshold: thresh, separability } = otsuOnHist(hist, numAchromatic);
 
     if (separability < 0.055) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
+      handleFailure();
       return;
     }
 
@@ -250,6 +261,17 @@ export function useDocumentDetection({
 
     const globalThresh = Math.max(55, thresh - 15);
 
+    // Get previous centroid if lastQuadRef exists, otherwise screen center
+    let targetX = W / 2;
+    let targetY = H / 2;
+    if (lastQuadRef.current) {
+      const q = lastQuadRef.current;
+      const pctX = (q.p1.x + q.p2.x + q.p3.x + q.p4.x) / 4;
+      const pctY = (q.p1.y + q.p2.y + q.p3.y + q.p4.y) / 4;
+      targetX = (pctX / 100) * W;
+      targetY = (pctY / 100) * H;
+    }
+
     for (let y = 2; y < H - 2; y++) {
       for (let x = 2; x < W - 2; x++) {
         const idx = y * W + x;
@@ -277,7 +299,16 @@ export function useDocumentDetection({
         const area = comp.length;
         if (area < N * 0.03) continue;
 
-        const score = area;
+        // Calculate centroid of this component
+        const compCx = sumX / area;
+        const compCy = sumY / area;
+        const distToTarget = Math.hypot(compCx - targetX, compCy - targetY);
+
+        // Distance penalty to favor the target center (screen center or previous position)
+        // If lastQuadRef exists, we want to be even stickier to avoid switching to a nearby paper.
+        const scale = lastQuadRef.current ? 12.0 : 20.0;
+        const score = area / (1.0 + (distToTarget / scale) ** 2);
+
         if (score > bestScore) { bestScore = score; bestComp = comp; }
       }
     }
@@ -285,9 +316,7 @@ export function useDocumentDetection({
     const compArea = bestComp.length;
 
     if (compArea < N * 0.045 || compArea > N * 0.96) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
+      handleFailure();
       return;
     }
 
@@ -378,11 +407,12 @@ export function useDocumentDetection({
       confidence > 0.24;
 
     if (!isValid) {
-      lastQuadRef.current = null;
-      onDetection(DEFAULT_QUAD, 0);
-      animFrameRef.current = requestAnimationFrame(detect);
+      handleFailure();
       return;
     }
+
+    // Reset failure frames count
+    lostRef.current = 0;
 
     // ── 9. Normalise + exponential temporal smoothing ─────────────────────────
     const toP = (pt: { x: number; y: number }) => ({
@@ -392,7 +422,7 @@ export function useDocumentDetection({
 
     const raw: QuadPoints = expandQuad({ p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) });
 
-    const k = 0.82;
+    const k = 0.93; // Super stable smoothing factor
     const DEAD_ZONE = 0.8;
     const shouldUpdate = (prev: QuadPoints, next: QuadPoints) => {
       const keys = ['p1', 'p2', 'p3', 'p4'] as const;
