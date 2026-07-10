@@ -44,6 +44,62 @@ function getQuadDiff(q1: QuadPoints, q2: QuadPoints): number {
   ) / 4.0;
 }
 
+function isConvex(q: QuadPoints): boolean {
+  const cross = (a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number }) => {
+    return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+  };
+  const c1 = cross(q.p1, q.p2, q.p3);
+  const c2 = cross(q.p2, q.p3, q.p4);
+  const c3 = cross(q.p3, q.p4, q.p1);
+  const c4 = cross(q.p4, q.p1, q.p2);
+  
+  return (c1 > 0 && c2 > 0 && c3 > 0 && c4 > 0) || (c1 < 0 && c2 < 0 && c3 < 0 && c4 < 0);
+}
+
+function hasReasonableAngles(q: QuadPoints): boolean {
+  const getAngle = (a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number }) => {
+    const ux = a.x - b.x, uy = a.y - b.y;
+    const vx = c.x - b.x, vy = c.y - b.y;
+    const lenU = Math.hypot(ux, uy);
+    const lenV = Math.hypot(vx, vy);
+    if (lenU < 0.1 || lenV < 0.1) return 0;
+    const dot = ux * vx + uy * vy;
+    return Math.acos(Math.max(-1.0, Math.min(1.0, dot / (lenU * lenV)))) * (180.0 / Math.PI);
+  };
+  
+  const a1 = getAngle(q.p4, q.p1, q.p2);
+  const a2 = getAngle(q.p1, q.p2, q.p3);
+  const a3 = getAngle(q.p2, q.p3, q.p4);
+  const a4 = getAngle(q.p3, q.p4, q.p1);
+  
+  const minAngle = 45;
+  const maxAngle = 135;
+  return (
+    a1 >= minAngle && a1 <= maxAngle &&
+    a2 >= minAngle && a2 <= maxAngle &&
+    a3 >= minAngle && a3 <= maxAngle &&
+    a4 >= minAngle && a4 <= maxAngle
+  );
+}
+
+function hasReasonableSideRatios(q: QuadPoints): boolean {
+  const d12 = Math.hypot(q.p2.x - q.p1.x, q.p2.y - q.p1.y);
+  const d34 = Math.hypot(q.p3.x - q.p4.x, q.p3.y - q.p4.y);
+  const d14 = Math.hypot(q.p4.x - q.p1.x, q.p4.y - q.p1.y);
+  const d23 = Math.hypot(q.p3.x - q.p2.x, q.p3.y - q.p2.y);
+  
+  const minLen = 5.0;
+  if (d12 < minLen || d34 < minLen || d14 < minLen || d23 < minLen) return false;
+  
+  const ratioH = d12 / d34;
+  const ratioV = d14 / d23;
+  
+  return (
+    ratioH >= 0.35 && ratioH <= 2.85 &&
+    ratioV >= 0.35 && ratioV <= 2.85
+  );
+}
+
 /**
  * Otsu binarisation on a pre-computed histogram with `totalN` samples.
  * Returns { threshold, separability }.
@@ -417,7 +473,10 @@ export function useDocumentDetection({
       bh       > H  * 0.12   &&
       aspect   > 0.25        &&
       aspect   < 4.0         &&
-      confidence > 0.24;
+      confidence > 0.24      &&
+      isConvex({ p1, p2, p3, p4 }) &&
+      hasReasonableAngles({ p1, p2, p3, p4 }) &&
+      hasReasonableSideRatios({ p1, p2, p3, p4 });
 
     if (!isValid) {
       handleFailure();
