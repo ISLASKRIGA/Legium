@@ -74,7 +74,7 @@ export const enhanceImage = (
             data[i * 4 + 2] = Math.min(255, data[i * 4 + 2] * bScale);
           }
           ctx.putImageData(imgData, 0, 0);
-          resolve(canvas.toDataURL('image/jpeg', 0.95));
+          resolve(canvas.toDataURL('image/jpeg', 1.0));
           return;
         }
 
@@ -142,7 +142,7 @@ export const enhanceImage = (
           }
         }
         ctx.putImageData(imgData, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        resolve(canvas.toDataURL('image/jpeg', 1.0));
         return;
       }
 
@@ -270,7 +270,7 @@ export const enhanceImage = (
           }
         }
         ctx.putImageData(new ImageData(output, w, h), 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        resolve(canvas.toDataURL('image/jpeg', 1.0));
         return;
       }
 
@@ -346,7 +346,7 @@ export const enhanceImage = (
       }
 
       ctx.putImageData(imgData, 0, 0);
-      resolve(canvas.toDataURL('image/jpeg', 0.9));
+      resolve(canvas.toDataURL('image/jpeg', 1.0));
     };
     img.src = imgSrc;
   });
@@ -456,7 +456,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     try {
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
       });
       setCameraStream(stream);
       setHasCamera(true);
@@ -504,7 +504,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setAlignProgress(15);
     setScanPhase('scanning');
     try {
-      const warped = await warpPerspective(imgDataUrl, quad, 800, 1100);
+      const warped = await warpPerspective(imgDataUrl, quad, 1600, 2200);
       // Set the cropped image immediately so it shows under the laser
       setCapturedImage(warped.dataUrl);
       setAlignProgress(70);
@@ -535,7 +535,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
+        const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
         capturedRawRef.current = dataUrl; // store raw immediately for display
         setOriginalImage(dataUrl);
         stopCamera();

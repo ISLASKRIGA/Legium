@@ -23,7 +23,7 @@ export const cropImage = (
   imageDataUrl: string,
   cropBox: CropBox,
   filter: string = 'none',
-  quality: number = 0.88
+  quality: number = 0.99
 ): Promise<CroppedImageResult> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -237,7 +237,7 @@ export const warpPerspective = (
         console.warn('Perspective warp failed, using fallback copy:', err);
         ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
         resolve({
-          dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+          dataUrl: canvas.toDataURL('image/jpeg', 0.99),
           width: targetWidth,
           height: targetHeight
         });
@@ -487,7 +487,7 @@ export const warpPerspective = (
 
 
       resolve({
-        dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+        dataUrl: canvas.toDataURL('image/jpeg', 0.99),
         width: targetWidth,
         height: targetHeight
       });

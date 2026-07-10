@@ -101,7 +101,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     try {
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
       });
       setCameraStream(stream);
       if (videoRef.current) {
@@ -146,7 +146,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     setAlignProgress(15);
     try {
       // Warp perspective to flatten/straighten sheet
-      const warped = await warpPerspective(imgDataUrl, quad, 800, 1100);
+      const warped = await warpPerspective(imgDataUrl, quad, 1600, 2200);
       setAlignProgress(70);
 
       // Animation buffer
@@ -176,7 +176,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
+        const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
         setOriginalImage(dataUrl);
         stopCamera();
         setStep('preview-full');
