@@ -447,7 +447,7 @@ export function useDocumentDetection({
       stableCountRef.current = 0;
     }
 
-    const DEAD_ZONE = 0.8;
+    const DEAD_ZONE = 0.4;
     const shouldUpdate = (prev: QuadPoints, next: QuadPoints) => {
       const keys = ['p1', 'p2', 'p3', 'p4'] as const;
       return keys.some(p =>
@@ -463,12 +463,12 @@ export function useDocumentDetection({
     }
 
     // Adaptive smoothing factor:
-    // Starts fast (k = 0.50) to snap quickly, and grows to slow/stable (k = 0.96) as it settles.
-    let k = 0.50;
+    // Starts fast (k = 0.22) to snap quickly (78% step size), and grows to slow/stable (k = 0.93) as it settles.
+    let k = 0.22;
     if (lastQuadRef.current) {
-      const baseK = 0.50;
-      const targetK = 0.96;
-      const t = Math.min(1.0, stableCountRef.current / 15.0);
+      const baseK = 0.22;
+      const targetK = 0.93;
+      const t = Math.min(1.0, stableCountRef.current / 12.0);
       k = baseK + (targetK - baseK) * t;
     }
 
