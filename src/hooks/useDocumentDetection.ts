@@ -303,10 +303,10 @@ export function useDocumentDetection({
           sumX += cx; sumY += cy;
 
           // 4-connected neighbors: relaxed growThresh (dimmer regions/shadows allowed) and relaxed grad check (flows through soft shadows/text)
-          if (cx > 1     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && lum[cur - 1] > growThresh && grad[cur - 1] < 8.5 && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
-          if (cx < W - 2 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && lum[cur + 1] > growThresh && grad[cur + 1] < 8.5 && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
-          if (cy > 1     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && lum[cur - W] > growThresh && grad[cur - W] < 8.5 && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
-          if (cy < H - 2 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && lum[cur + W] > growThresh && grad[cur + W] < 8.5 && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
+          if (cx > 1     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && lum[cur - 1] > growThresh && grad[cur - 1] < 6.8 && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
+          if (cx < W - 2 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && lum[cur + 1] > growThresh && grad[cur + 1] < 6.8 && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
+          if (cy > 1     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && lum[cur - W] > growThresh && grad[cur - W] < 6.8 && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
+          if (cy < H - 2 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && lum[cur + W] > growThresh && grad[cur + W] < 6.8 && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
         }
 
         const area = comp.length;
@@ -434,6 +434,26 @@ export function useDocumentDetection({
     });
 
     const raw: QuadPoints = expandQuad({ p1: toP(p1), p2: toP(p2), p3: toP(p3), p4: toP(p4) });
+
+    // Geometric validity check to prevent peaks or severe slanting (like overlapping papers)
+    const dyTop = Math.abs(raw.p1.y - raw.p2.y);
+    const dyBot = Math.abs(raw.p4.y - raw.p3.y);
+    const dxLeft = Math.abs(raw.p1.x - raw.p4.x);
+    const dxRight = Math.abs(raw.p2.x - raw.p3.x);
+
+    const dxTop = Math.abs(raw.p1.x - raw.p2.x);
+    const dxBot = Math.abs(raw.p4.x - raw.p3.x);
+    const dyLeft = Math.abs(raw.p1.y - raw.p4.y);
+    const dyRight = Math.abs(raw.p2.y - raw.p3.y);
+
+    const isPortraitRect = dyTop < 18.5 && dyBot < 18.5 && dxLeft < 20.0 && dxRight < 20.0;
+    const isLandscapeRect = dxTop < 18.5 && dxBot < 18.5 && dyLeft < 20.0 && dyRight < 20.0;
+    const isGoodRect = isPortraitRect || isLandscapeRect;
+
+    if (!isGoodRect) {
+      handleFailure();
+      return;
+    }
 
     // Calculate distance drift to adapt stableCountRef
     if (lastQuadRef.current) {
