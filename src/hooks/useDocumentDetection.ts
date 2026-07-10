@@ -244,12 +244,16 @@ export function useDocumentDetection({
     }
 
     // ── 4c. Sobel gradient magnitude of blurred luminance ─────────────────────
+    const gradX = new Float32Array(N);
+    const gradY = new Float32Array(N);
     const grad = new Float32Array(N);
     for (let y = 1; y < H - 1; y++) {
       for (let x = 1; x < W - 1; x++) {
         const idx = y * W + x;
         const gx = lum[idx + 1] - lum[idx - 1];
         const gy = lum[idx + W] - lum[idx - W];
+        gradX[idx] = gx;
+        gradY[idx] = gy;
         grad[idx] = Math.abs(gx) + Math.abs(gy);
       }
     }
@@ -344,50 +348,57 @@ export function useDocumentDetection({
     const cxC = sumX / compArea;
     const cyC = sumY / compArea;
 
-    // ── 7. High-precision ray-casting edge snapper ─────────────────────────────
-    const snapToEdge = (pt: { x: number; y: number }) => {
-      const dx = pt.x - cxC;
-      const dy = pt.y - cyC;
-      const len = Math.hypot(dx, dy);
-      if (len < 5) return pt;
+    // ── 7. High-precision Shi-Tomasi corner snapper (snaps to intersection of perpendicular edges) ──
+    const findExactCorner = (pt: { x: number; y: number }) => {
+      let bestX = pt.x;
+      let bestY = pt.y;
+      let maxCornerness = -1;
 
-      const ux = dx / len;
-      const uy = dy / len;
+      const halfWin = 7; // Search in 15x15 window around the diagonal extreme
+      const startX = Math.max(2, Math.round(pt.x) - halfWin);
+      const endX = Math.min(W - 3, Math.round(pt.x) + halfWin);
+      const startY = Math.max(2, Math.round(pt.y) - halfWin);
+      const endY = Math.min(H - 3, Math.round(pt.y) + halfWin);
 
-      let bestD = len;
-      let maxGrad = -1;
+      for (let cy = startY; cy <= endY; cy++) {
+        for (let cx = startX; cx <= endX; cx++) {
+          // Accumulate structure tensor in a local 3x3 neighborhood
+          let sxx = 0, syy = 0, sxy = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const idx = (cy + dy) * W + (cx + dx);
+              const tx = gradX[idx];
+              const ty = gradY[idx];
+              sxx += tx * tx;
+              syy += ty * ty;
+              sxy += tx * ty;
+            }
+          }
 
-      // Scan along the ray from inside the page to outside
-      for (let d = len - 8; d <= len + 15; d += 0.5) {
-        const px = cxC + ux * d;
-        const py = cyC + uy * d;
-        const ix = Math.round(px);
-        const iy = Math.round(py);
+          // Compute Shi-Tomasi score: min eigenvalue of structure tensor
+          const tr = sxx + syy;
+          const det = sxx * syy - sxy * sxy;
+          const term = Math.sqrt(Math.max(0, tr * tr - 4.0 * det));
+          const lambdaMin = (tr - term) / 2.0;
 
-        if (ix > 1 && ix < W - 2 && iy > 1 && iy < H - 2) {
-          const idx = iy * W + ix;
-          const g = grad[idx];
-          if (g > maxGrad) {
-            maxGrad = g;
-            bestD = d;
+          if (lambdaMin > maxCornerness) {
+            maxCornerness = lambdaMin;
+            bestX = cx;
+            bestY = cy;
           }
         }
       }
 
-      // If a clear edge was found, snap to it, otherwise return original extreme point
-      if (maxGrad > 1.2) {
-        return {
-          x: cxC + ux * bestD,
-          y: cyC + uy * bestD
-        };
+      if (maxCornerness > 0.45) {
+        return { x: bestX, y: bestY };
       }
       return pt;
     };
 
-    p1 = snapToEdge(p1);
-    p2 = snapToEdge(p2);
-    p3 = snapToEdge(p3);
-    p4 = snapToEdge(p4);
+    p1 = findExactCorner(p1);
+    p2 = findExactCorner(p2);
+    p3 = findExactCorner(p3);
+    p4 = findExactCorner(p4);
 
     // ── 8. Validity check ─────────────────────────────────────────────────────
     const bx1 = Math.min(p1.x, p4.x), bx2 = Math.max(p2.x, p3.x);
