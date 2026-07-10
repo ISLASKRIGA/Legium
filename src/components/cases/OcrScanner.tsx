@@ -933,18 +933,14 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 {/* Translucent fill */}
                 <polygon
                   points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                  fill={sheetDetected ? 'rgba(0,255,128,0.16)' : 'rgba(255,255,255,0.035)'}
-                  stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'}
-                  strokeWidth={sheetDetected ? '0.95' : '0.5'}
+                  fill={sheetDetected ? 'rgba(0,255,128,0.16)' : 'rgba(0,255,128,0.04)'}
+                  stroke={sheetDetected ? '#00ff80' : 'rgba(0,255,128,0.45)'}
+                  strokeWidth={sheetDetected ? '0.95' : '0.6'}
                   strokeLinejoin="round"
-                  strokeDasharray={sheetDetected ? '0' : '2 1.4'}
+                  strokeDasharray="0"
                   filter="url(#ocr-glow)"
                   style={{ transition: 'all 0.25s ease-out' }}
                 />
-                <polyline points={`${p1.x + 6},${p1.y} ${p1.x},${p1.y} ${p1.x},${p1.y + 6}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <polyline points={`${p2.x - 6},${p2.y} ${p2.x},${p2.y} ${p2.x},${p2.y + 6}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <polyline points={`${p3.x},${p3.y - 6} ${p3.x},${p3.y} ${p3.x - 6},${p3.y}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <polyline points={`${p4.x},${p4.y - 6} ${p4.x},${p4.y} ${p4.x + 6},${p4.y}`} fill="none" stroke={sheetDetected ? '#00ff80' : 'rgba(255,255,255,0.72)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
 
