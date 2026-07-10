@@ -233,14 +233,35 @@ export function useDocumentDetection({
       }
     }
 
-    // ── 4c. Sobel gradient magnitude of blurred luminance ─────────────────────
+    // ── 4c. Color-aware Sobel gradient magnitude ──────────────────────────────
     const grad = new Float32Array(N);
     for (let y = 1; y < H - 1; y++) {
       for (let x = 1; x < W - 1; x++) {
         const idx = y * W + x;
+
+        // 1. Luminance gradient
         const gx = lum[idx + 1] - lum[idx - 1];
         const gy = lum[idx + W] - lum[idx - W];
-        grad[idx] = Math.abs(gx) + Math.abs(gy);
+        const gLum = Math.abs(gx) + Math.abs(gy);
+
+        // 2. Color channel gradients (divided by 2.2 to match blurred ranges)
+        const idxR = idx * 4, idxL = (idx - 1) * 4, idxRt = (idx + 1) * 4;
+        const idxU = (idx - W) * 4, idxD = (idx + W) * 4;
+
+        const rx = data[idxRt] - data[idxL];
+        const ry = data[idxD] - data[idxU];
+        const gR = (Math.abs(rx) + Math.abs(ry)) / 2.2;
+
+        const gx_color = data[idxRt + 1] - data[idxL + 1];
+        const gy_color = data[idxD + 1] - data[idxU + 1];
+        const gG = (Math.abs(gx_color) + Math.abs(gy_color)) / 2.2;
+
+        const bx = data[idxRt + 2] - data[idxL + 2];
+        const by = data[idxD + 2] - data[idxU + 2];
+        const gB = (Math.abs(bx) + Math.abs(by)) / 2.2;
+
+        // Take the maximum gradient of any channel (handles color-only borders)
+        grad[idx] = Math.max(gLum, gR, gG, gB);
       }
     }
 
@@ -249,8 +270,8 @@ export function useDocumentDetection({
     let bestComp: number[] = [];
     let bestScore = -1;
 
-    const globalThresh = Math.max(50, thresh - 18);
-    const GRAD_BARRIER = 3.2; // tighter barrier to prevent bleeding into dark/colored backgrounds
+    const globalThresh = Math.max(35, thresh - 18); // Lowered cap to support darker/saturated colored papers
+    const GRAD_BARRIER = 3.2; // tight barrier to block bleeding into other objects
 
     for (let y = 2; y < H - 2; y++) {
       for (let x = 2; x < W - 2; x++) {
