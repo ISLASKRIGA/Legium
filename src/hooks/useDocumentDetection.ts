@@ -19,7 +19,7 @@ const DEFAULT_QUAD: QuadPoints = {
 };
 const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
 
-function expandQuad(quad: QuadPoints, amount = 1.015): QuadPoints {
+function expandQuad(quad: QuadPoints, amount = 1.0): QuadPoints {
   const cx = (quad.p1.x + quad.p2.x + quad.p3.x + quad.p4.x) / 4;
   const cy = (quad.p1.y + quad.p2.y + quad.p3.y + quad.p4.y) / 4;
   const expand = (pt: { x: number; y: number }) => ({
