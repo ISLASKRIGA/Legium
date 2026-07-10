@@ -259,7 +259,10 @@ export function useDocumentDetection({
     let bestComp: number[] = [];
     let bestScore = -1;
 
-    const globalThresh = Math.max(55, thresh - 15);
+    // Tighter threshold for seeding to ensure we start on true paper,
+    // and relaxed threshold for growth to propagate into shadows on the paper.
+    const seedThresh = Math.max(62, thresh - 12);
+    const growThresh = Math.max(38, thresh - 48);
 
     // Get previous centroid if lastQuadRef exists, otherwise screen center
     let targetX = W / 2;
@@ -276,7 +279,7 @@ export function useDocumentDetection({
       for (let x = 2; x < W - 2; x++) {
         const idx = y * W + x;
         // Seed must be achromatic, locally bright, globally bright, flat (not on edge), and unvisited
-        if (satArr[idx] >= SAT_THRESH || !isForeground[idx] || lum[idx] <= globalThresh || grad[idx] >= 4.8 || visited[idx]) continue;
+        if (satArr[idx] >= SAT_THRESH || !isForeground[idx] || lum[idx] <= seedThresh || grad[idx] >= 4.0 || visited[idx]) continue;
 
         const comp: number[] = [];
         const queue: number[] = [idx];
@@ -289,11 +292,11 @@ export function useDocumentDetection({
           comp.push(cur);
           sumX += cx; sumY += cy;
 
-          // 4-connected neighbors restricted by local & global threshold and gradient barriers
-          if (cx > 1     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && lum[cur - 1] > globalThresh && grad[cur - 1] < 4.8 && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
-          if (cx < W - 2 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && lum[cur + 1] > globalThresh && grad[cur + 1] < 4.8 && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
-          if (cy > 1     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && lum[cur - W] > globalThresh && grad[cur - W] < 4.8 && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
-          if (cy < H - 2 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && lum[cur + W] > globalThresh && grad[cur + W] < 4.8 && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
+          // 4-connected neighbors: relaxed growThresh (dimmer regions/shadows allowed) and relaxed grad check (flows through soft shadows/text)
+          if (cx > 1     && satArr[cur - 1] < SAT_THRESH && isForeground[cur - 1] && lum[cur - 1] > growThresh && grad[cur - 1] < 8.5 && !visited[cur - 1]) { visited[cur - 1] = 1; queue.push(cur - 1); }
+          if (cx < W - 2 && satArr[cur + 1] < SAT_THRESH && isForeground[cur + 1] && lum[cur + 1] > growThresh && grad[cur + 1] < 8.5 && !visited[cur + 1]) { visited[cur + 1] = 1; queue.push(cur + 1); }
+          if (cy > 1     && satArr[cur - W] < SAT_THRESH && isForeground[cur - W] && lum[cur - W] > growThresh && grad[cur - W] < 8.5 && !visited[cur - W]) { visited[cur - W] = 1; queue.push(cur - W); }
+          if (cy < H - 2 && satArr[cur + W] < SAT_THRESH && isForeground[cur + W] && lum[cur + W] > growThresh && grad[cur + W] < 8.5 && !visited[cur + W]) { visited[cur + W] = 1; queue.push(cur + W); }
         }
 
         const area = comp.length;
