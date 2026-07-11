@@ -623,19 +623,44 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   };
 
   // Capturing photo — grey flash → capture raw frame → start aligning animation
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     // Trigger grey shutter flash
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 350);
 
-    if (hasCamera && videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+    if (hasCamera) {
+      let dataUrl: string | null = null;
+
+      // Try ImageCapture API for highest resolution possible (Chromium / Chrome Android)
+      const track = cameraStream?.getVideoTracks()[0];
+      if (track && typeof window !== 'undefined' && 'ImageCapture' in window) {
+        try {
+          const imageCapture = new (window as any).ImageCapture(track);
+          const blob = await imageCapture.takePhoto();
+          dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (err) {
+          console.warn('ImageCapture failed, falling back to canvas:', err);
+        }
+      }
+
+      // Fallback: draw current frame from video element to canvas
+      if (!dataUrl && videoRef.current) {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth || 640;
+        canvas.height = videoRef.current.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+        }
+      }
+
+      if (dataUrl) {
         capturedRawRef.current = dataUrl; // store raw immediately for display
         setOriginalImage(dataUrl);
 
@@ -643,7 +668,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         setScanPhase('captured');
         setTimeout(() => {
           stopCamera();
-          processAlignment(dataUrl, edgePoints);
+          processAlignment(dataUrl!, edgePoints);
         }, 300);
       }
     }

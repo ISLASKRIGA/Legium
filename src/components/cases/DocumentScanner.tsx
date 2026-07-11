@@ -245,18 +245,43 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   };
 
   // Capture photo from video feed
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     setFlashActive(true);
     setScanPhase('captured');
 
-    if (hasCamera && videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+    if (hasCamera) {
+      let dataUrl: string | null = null;
+
+      // Try ImageCapture API for highest resolution possible (Chromium / Chrome Android)
+      const track = cameraStream?.getVideoTracks()[0];
+      if (track && typeof window !== 'undefined' && 'ImageCapture' in window) {
+        try {
+          const imageCapture = new (window as any).ImageCapture(track);
+          const blob = await imageCapture.takePhoto();
+          dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (err) {
+          console.warn('ImageCapture failed, falling back to canvas:', err);
+        }
+      }
+
+      // Fallback: draw current frame from video element to canvas
+      if (!dataUrl && videoRef.current) {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth || 640;
+        canvas.height = videoRef.current.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+        }
+      }
+
+      if (dataUrl) {
         setOriginalImage(dataUrl);
         
         setTimeout(() => {
