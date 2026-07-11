@@ -1939,13 +1939,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           {/* ── Bottom: filter row + action bar (shown when done) ── */}
           <div
             style={{
-              position: 'relative', zIndex: 3,
-              background: 'rgba(0,0,0,0.85)',
-              backdropFilter: 'blur(12px)',
-              borderTop: '1px solid rgba(255,255,255,0.07)',
+              position: 'relative', zIndex: 10,
+              background: '#ffffff',
+              borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+              boxShadow: '0 -8px 30px rgba(0,0,0,0.06)',
               opacity: scanPhase === 'done' ? 1 : 0,
-              transform: scanPhase === 'done' ? 'translateY(0)' : 'translateY(20px)',
-              transition: 'opacity 0.4s ease, transform 0.4s ease',
+              transform: scanPhase === 'done' ? 'translateY(0)' : 'translateY(30px)',
+              transition: 'opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1), transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
               pointerEvents: scanPhase === 'done' ? 'auto' : 'none',
             }}
           >
@@ -1957,8 +1957,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   onClick={() => setActiveFilter(id)}
                   style={{
                     flexShrink: 0,
-                    background: activeFilter === id ? '#00e5a0' : 'rgba(255,255,255,0.08)',
-                    color: activeFilter === id ? '#000' : '#fff',
+                    background: activeFilter === id ? '#00b37e' : 'rgba(0, 0, 0, 0.05)',
+                    color: activeFilter === id ? '#ffffff' : '#2c2c2e',
                     border: 'none',
                     borderRadius: '20px',
                     padding: '5px 14px',
@@ -1971,17 +1971,15 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               ))}
             </div>
 
-
-
             {/* Action bar */}
             <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '10px 20px 20px' }}>
               {/* Volver a tomar */}
               <button
                 onClick={() => { setScanPhase('idle'); setCapturedImage(null); setStep('capture'); startCamera(); }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 600, opacity: 0.85 }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#2c2c2e', cursor: 'pointer', fontSize: '10px', fontWeight: 600, opacity: 0.9 }}
               >
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Camera size={18} />
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Camera size={18} color="#2c2c2e" />
                 </div>
                 Volver a tomar
               </button>
@@ -1989,10 +1987,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               {/* Recortar / ajustar esquinas */}
               <button
                 onClick={() => { setScanPhase('idle'); setStep('preview-full'); }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', fontWeight: 600, opacity: 0.85 }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#2c2c2e', cursor: 'pointer', fontSize: '10px', fontWeight: 600, opacity: 0.9 }}
               >
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2c2c2e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 6 6 9 6" /><polyline points="15 6 18 6 18 9" />
                     <polyline points="18 15 18 18 15 18" /><polyline points="9 18 6 18 6 15" />
                   </svg>
@@ -2017,27 +2015,25 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     setScannedPages(nextPages);
                     setScanPhase('idle');
                     if (scanMode === 'individual') {
-                      // Trigger OCR directly on this single page!
                       setStep('ocr-processing');
                       setOcrProgress(2);
                       setOcrStatus('Preparando imagen...');
                       runRealOcr(finalImg);
                     } else {
-                      // Multi-page batch mode -> go to decide screen
                       setStep('decide');
                     }
                   };
                   img.src = finalImg;
                 }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#00e5a0', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', background: 'transparent', border: 'none', color: '#00b37e', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}
               >
                 <div style={{
                   width: 52, height: 52, borderRadius: '50%',
-                  background: '#00e5a0',
+                  background: '#00b37e',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 4px 20px rgba(0,229,160,0.45)',
+                  boxShadow: '0 4px 20px rgba(0,179,126,0.3)',
                 }}>
-                  <Check size={26} strokeWidth={3} color="#000" />
+                  <Check size={26} strokeWidth={3} color="#ffffff" />
                 </div>
                 Listo
               </button>
