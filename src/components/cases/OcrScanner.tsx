@@ -1798,9 +1798,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'aligning' && originalImage && (
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#111', display: 'flex', flexDirection: 'column', zIndex: 100 }}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#f4f4f7', display: 'flex', flexDirection: 'column', zIndex: 100, transition: 'background-color 0.5s ease' }}>
 
-          {/* Full screen background image (crisp during cropping & scanning, blurred/dimmed when done) */}
+          {/* Full screen background image (crisp during cropping & scanning, fades out to white when done) */}
           <img
             src={originalImage}
             alt="bg"
@@ -1811,17 +1811,28 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               height: '100%',
               objectFit: 'cover',
               zIndex: 1,
-              opacity: 1,
-              filter: 'none'
+              opacity: scanPhase === 'done' ? 0 : 1,
+              transition: 'opacity 0.5s ease-out'
             }}
           />
 
           {/* ── Top bar ── */}
-          <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(0,0,0,0.5)' }}>
-            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', outline: 'none', opacity: 0.8 }}>
+          <div style={{
+            position: 'relative',
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 20px',
+            background: scanPhase === 'done' ? '#ffffff' : 'rgba(0,0,0,0.4)',
+            borderBottom: scanPhase === 'done' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid transparent',
+            color: scanPhase === 'done' ? '#2c2c2e' : '#ffffff',
+            transition: 'all 0.5s ease'
+          }}>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', outline: 'none', opacity: 0.8 }}>
               <X size={22} />
             </button>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: '0.3px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: 'inherit', letterSpacing: '0.3px' }}>
               {scanPhase === 'scanning' ? 'Escaneando...' : scanPhase === 'cropping' ? 'Recortando...' : '✓ Listo'}
             </span>
             <div style={{ width: 22 }} />
