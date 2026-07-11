@@ -934,8 +934,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     ].join('\n');
 
     try {
-      // Downscale pages to 1800px for PDF (single image load, no double-loading)
-      const pdfPages = await Promise.all(pgs.map(p => downscaleImage(p.dataUrl, 1800, 0.88)));
+      if (pgs.length === 0) { console.error('autoSubmit: no pages'); return; }
+
+      // Downscale pages with timeout safety
+      const pdfPages = await Promise.all(
+        pgs.map(p =>
+          Promise.race([
+            downscaleImage(p.dataUrl, 1800, 0.88),
+            new Promise<{ dataUrl: string; width: number; height: number }>(r =>
+              setTimeout(() => r({ dataUrl: p.dataUrl, width: p.width || 800, height: p.height || 1000 }), 5000)
+            )
+          ])
+        )
+      );
       const pdfBlob = createMultiPagePdf(pdfPages, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
@@ -944,14 +955,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
       const pdfName = fileName.endsWith('.pdf') ? fileName : fileName + '.pdf';
 
-      // Save locally (fast) — don't block on cloud upload
-      await savePdfBlob(docId, pdfBlob);
-
-      // Cloud upload runs in background, doesn't block the user
-      let pdfUrl: string | null = null;
-      uploadPdfToInsforge(docId, pdfBlob, caseId)
-        .then(url => { pdfUrl = url; })
-        .catch(err => console.warn('[Supabase] upload failed silently:', err));
+      // Everything runs in background — don't block onOcrComplete
+      savePdfBlob(docId, pdfBlob).catch(e => console.warn('[PDF] local save failed:', e));
+      uploadPdfToInsforge(docId, pdfBlob, caseId).catch(e => console.warn('[InsForge] upload failed:', e));
+      const pdfUrl: string | null = null;
 
       const newDoc: DocumentItem = {
         id: docId,
@@ -1010,6 +1017,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       onOcrComplete(newCase, newDoc, pdfBlob);
     } catch (err) {
       console.error('Error generating OCR PDF:', err);
+      // Still close the scanner even on error
+      setOcrProgress(100);
+      setOcrStatus('Error al generar PDF');
     }
   };
 
