@@ -108,6 +108,17 @@ export function useDocumentDetection({
   const frameCountRef = useRef(0);
   const lostRef       = useRef(0);
   const stableCountRef = useRef(0);
+  const buffersRef = useRef<{
+    lumRaw: Float32Array;
+    satArr: Uint8Array;
+    temp: Float32Array;
+    lum: Float32Array;
+    hist: Uint32Array;
+    integral: Uint32Array;
+    isForeground: Uint8Array;
+    grad: Float32Array;
+    visited: Uint8Array;
+  } | null>(null);
 
   const detect = useCallback(() => {
     const video = videoRef.current;
@@ -149,10 +160,35 @@ export function useDocumentDetection({
     ctx.drawImage(video, 0, 0, W, H);
     const { data } = ctx.getImageData(0, 0, W, H);
 
-    // ── 1. Per-pixel luminance + absolute saturation ───────────────────────────
-    const lumRaw = new Float32Array(N);
-    const satArr = new Uint8Array(N);
+    // ── Pre-allocated Buffers Setup ───────────────────────────────────────────
+    if (!buffersRef.current) {
+      buffersRef.current = {
+        lumRaw: new Float32Array(N),
+        satArr: new Uint8Array(N),
+        temp: new Float32Array(N),
+        lum: new Float32Array(N),
+        hist: new Uint32Array(256),
+        integral: new Uint32Array(N),
+        isForeground: new Uint8Array(N),
+        grad: new Float32Array(N),
+        visited: new Uint8Array(N),
+      };
+    }
+    const b = buffersRef.current;
+    b.hist.fill(0);
+    b.visited.fill(0);
 
+    const lumRaw = b.lumRaw;
+    const satArr = b.satArr;
+    const temp = b.temp;
+    const lum = b.lum;
+    const hist = b.hist;
+    const integral = b.integral;
+    const isForeground = b.isForeground;
+    const grad = b.grad;
+    const visited = b.visited;
+
+    // ── 1. Per-pixel luminance + absolute saturation ───────────────────────────
     for (let i = 0; i < N; i++) {
       const R = data[i * 4], G = data[i * 4 + 1], B = data[i * 4 + 2];
       lumRaw[i] = 0.299 * R + 0.587 * G + 0.114 * B;
@@ -162,7 +198,6 @@ export function useDocumentDetection({
     }
 
     // ── 2. 5x5 separable box blur on luminance (wipes out text/grout noise) ───
-    const temp = new Float32Array(N);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const idx = y * W + x;
@@ -178,7 +213,6 @@ export function useDocumentDetection({
         temp[idx] = sum / count;
       }
     }
-    const lum = new Float32Array(N);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const idx = y * W + x;
@@ -197,7 +231,6 @@ export function useDocumentDetection({
 
     // ── 3. Achromatic mask + Otsu histogram ───────────────────────────────────
     const SAT_THRESH = 62;
-    const hist = new Uint32Array(256);
     let numAchromatic = 0;
     for (let i = 0; i < N; i++) {
       if (satArr[i] < SAT_THRESH) {
@@ -220,7 +253,6 @@ export function useDocumentDetection({
     }
 
     // ── 4b. Integral Image + Bradley-Roth Local Adaptive Thresholding ─────────
-    const integral = new Uint32Array(N);
     for (let y = 0; y < H; y++) {
       let rowSum = 0;
       for (let x = 0; x < W; x++) {
@@ -233,7 +265,6 @@ export function useDocumentDetection({
     const S = 20;
     const S2 = S >> 1;
     const C = 8;
-    const isForeground = new Uint8Array(N);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const idx = y * W + x;
@@ -254,7 +285,6 @@ export function useDocumentDetection({
     }
 
     // ── 4c. Sobel gradient magnitude of blurred luminance ─────────────────────
-    const grad = new Float32Array(N);
     for (let y = 1; y < H - 1; y++) {
       for (let x = 1; x < W - 1; x++) {
         const idx = y * W + x;
@@ -265,7 +295,6 @@ export function useDocumentDetection({
     }
 
     // ── 5. BFS on achromatic-bright pixels → largest connected component ──────
-    const visited = new Uint8Array(N);
     let bestComp: number[] = [];
     let bestScore = -1;
 
