@@ -171,9 +171,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
               </div>
 
               {/* Title & Desc */}
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {card.user.name.replace(/^(Dr\.|Dra\.|Lic\.|Ing\.)\s+/i, '')}
-              </h3>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '20px', minHeight: '60px' }}>
                 {card.description}
               </p>
