@@ -12,6 +12,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentUser, mobileOpen, onLogout }) => {
   const isTabVisible = (tab: string) => {
+    if (tab === 'logout') return true;
     const role = currentUser.role;
 
     // Cliente solo ve su dashboard
@@ -36,6 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentU
     { id: 'clients', label: 'Clientes', icon: <Users size={20} /> },
     { id: 'reports', label: 'Reportes', icon: <BarChart3 size={20} /> },
     { id: 'it-admin', label: 'TI Administrador', icon: <Monitor size={20} /> },
+    { id: 'logout', label: 'Salir', icon: <LogOut size={20} /> },
   ];
 
   return (
@@ -55,66 +57,45 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentU
           .map((item) => (
             <li
               key={item.id}
-              className={`menu-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => onTabChange(item.id)}
+              className={`menu-item ${activeTab === item.id ? 'active' : ''} ${item.id === 'logout' ? 'menu-item-logout' : ''}`}
+              onClick={() => {
+                if (item.id === 'logout') {
+                  if (onLogout) onLogout();
+                } else {
+                  onTabChange(item.id);
+                }
+              }}
               style={{ cursor: 'pointer' }}
             >
               <a onClick={(e) => e.preventDefault()}>
-                <span className="menu-icon" style={{ display: 'flex', alignItems: 'center', color: activeTab === item.id ? 'var(--primary-blue)' : 'var(--text-secondary)' }}>
+                <span className="menu-icon" style={{ display: 'flex', alignItems: 'center', color: item.id === 'logout' ? 'var(--danger)' : (activeTab === item.id ? 'var(--primary-blue)' : 'var(--text-secondary)') }}>
                   {item.icon}
                 </span>
-                <span>{item.label}</span>
+                <span style={{ color: item.id === 'logout' ? 'var(--danger)' : 'inherit' }}>{item.label}</span>
               </a>
             </li>
           ))}
       </ul>
 
       <div className="sidebar-footer">
-        <div className="user-badge" id="current-user-badge" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-            <div 
-              className="avatar" 
-              id="current-user-avatar"
-              style={{ 
-                border: currentUser.role === 'TI Administrador' ? '2.2px solid var(--danger)' : '2.2px solid var(--primary-gold)',
-                flexShrink: 0
-              }}
-            >
-              {currentUser.avatar}
-            </div>
-            <div className="user-info" style={{ minWidth: 0 }}>
-              <span className="user-name" id="current-user-name" title={currentUser.name} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentUser.name}
-              </span>
-              <span className="user-role" id="current-user-role" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {currentUser.role}
-              </span>
-            </div>
+        <div className="user-badge" id="current-user-badge">
+          <div 
+            className="avatar" 
+            id="current-user-avatar"
+            style={{ 
+              border: currentUser.role === 'TI Administrador' ? '2.2px solid var(--danger)' : '2.2px solid var(--primary-gold)' 
+            }}
+          >
+            {currentUser.avatar}
           </div>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--danger)',
-                cursor: 'pointer',
-                padding: '6px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.2s',
-                marginLeft: '4px',
-                flexShrink: 0
-              }}
-              title="Cerrar Sesión"
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              <LogOut size={16} />
-            </button>
-          )}
+          <div className="user-info">
+            <span className="user-name" id="current-user-name" title={currentUser.name}>
+              {currentUser.name}
+            </span>
+            <span className="user-role" id="current-user-role">
+              {currentUser.role}
+            </span>
+          </div>
         </div>
       </div>
     </aside>

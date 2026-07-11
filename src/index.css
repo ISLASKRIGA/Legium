@@ -1931,7 +1931,7 @@ textarea.form-control {
   }
 
   /* Adjust main container to clear the bottom nav on mobile */
-  .app-container {
+  .app-container.client-mobile {
     padding-bottom: 64px !important;
   }
 
