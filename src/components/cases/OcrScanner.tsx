@@ -373,6 +373,55 @@ export const enhanceImage = (
   });
 };
 
+/**
+ * Detects older or low-end mobile devices (like Redmi Note 9)
+ * where high-resolution camera video streams (e.g. 4K) are either
+ * unsupported or cause rendering freezes in the browser.
+ */
+export const isOldOrLowEndDevice = (): boolean => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+
+  const ua = navigator.userAgent || '';
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  if (!isMobile) return false;
+
+  // 1. Check for specific devices/brands known to have issues with 4K streams (like Redmi, Xiaomi budget line, Moto, etc.)
+  const isRedmi = /Redmi/i.test(ua) || /Xiaomi/i.test(ua);
+  const isMoto = /Moto/i.test(ua) || /Motorola/i.test(ua);
+  const isHuawei = /Huawei/i.test(ua) || /Honor/i.test(ua);
+  
+  // Model specific check for Redmi Note 9 (M2003J15SG, M2003J15SS, M2003J15SR, etc.)
+  if (/Redmi Note 9|M2003J15/i.test(ua)) {
+    return true;
+  }
+
+  // 2. Check navigator.deviceMemory (RAM in GB) if available
+  // Budget devices usually have 4GB RAM or less.
+  const memory = (navigator as any).deviceMemory;
+  if (memory !== undefined && memory <= 4) {
+    return true;
+  }
+
+  // 3. Check hardware concurrency (CPU cores)
+  // Low-end/budget devices might have fewer cores or lower core counts.
+  const cores = navigator.hardwareConcurrency;
+  if (cores !== undefined && cores <= 8 && (isRedmi || isMoto || isHuawei)) {
+    return true;
+  }
+
+  // 4. Android version check: Android 11 or older on budget brands
+  const androidMatch = ua.match(/Android\s+([0-9]+)/);
+  if (androidMatch) {
+    const version = parseInt(androidMatch[1], 10);
+    if (version <= 11 && (isRedmi || isMoto || isHuawei)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
   const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
@@ -508,9 +557,44 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const startCamera = async () => {
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
-      });
+      const isOld = isOldOrLowEndDevice();
+      const resolutions = isOld
+        ? [
+            { width: 1920, height: 1080 },
+            { width: 1280, height: 720 }
+          ]
+        : [
+            { width: 4096, height: 3072 },
+            { width: 1920, height: 1080 },
+            { width: 1280, height: 720 }
+          ];
+
+      let stream: MediaStream | null = null;
+      let lastError: any = null;
+
+      for (const res of resolutions) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'environment',
+              width: { ideal: res.width },
+              height: { ideal: res.height }
+            }
+          });
+          if (stream) {
+            console.log(`Successfully started camera stream at ${res.width}x${res.height}`);
+            break;
+          }
+        } catch (e) {
+          lastError = e;
+          console.warn(`Failed to initialize camera at ${res.width}x${res.height}, trying next...`, e);
+        }
+      }
+
+      if (!stream) {
+        throw lastError || new Error('No stream obtained');
+      }
+
       setCameraStream(stream);
       setHasCamera(true);
       setScannerMsg('Encuadre el documento...');
