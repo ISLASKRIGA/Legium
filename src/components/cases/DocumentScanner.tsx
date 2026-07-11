@@ -5,7 +5,7 @@ import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumen
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
-import { enhanceImage, isOldOrLowEndDevice } from './OcrScanner';
+import { enhanceImage } from './OcrScanner';
 
 interface DocumentScannerProps {
   onScanComplete: (newDoc: DocumentItem, fileBlob: Blob) => void;
@@ -133,44 +133,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const startCamera = async () => {
     try {
       stopCamera();
-      const isOld = isOldOrLowEndDevice();
-      const resolutions = isOld
-        ? [
-            { width: 1920, height: 1080 },
-            { width: 1280, height: 720 }
-          ]
-        : [
-            { width: 4096, height: 3072 },
-            { width: 1920, height: 1080 },
-            { width: 1280, height: 720 }
-          ];
-
-      let stream: MediaStream | null = null;
-      let lastError: any = null;
-
-      for (const res of resolutions) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: 'environment',
-              width: { ideal: res.width },
-              height: { ideal: res.height }
-            }
-          });
-          if (stream) {
-            console.log(`Successfully started camera stream at ${res.width}x${res.height}`);
-            break;
-          }
-        } catch (e) {
-          lastError = e;
-          console.warn(`Failed to initialize camera at ${res.width}x${res.height}, trying next...`, e);
-        }
-      }
-
-      if (!stream) {
-        throw lastError || new Error('No stream obtained');
-      }
-
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
+      });
       setCameraStream(stream);
       setHasCamera(true);
       setScannerMsg('Encuadre el documento...');
