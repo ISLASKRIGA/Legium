@@ -764,20 +764,25 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     };
   }, []);
 
-  // Downscale a dataUrl to maxWidth px — key speedup for OCR and PDF
-  const downscaleImage = (dataUrl: string, maxWidth: number, quality = 0.85): Promise<string> =>
+  // Downscale a dataUrl to maxWidth px, returns {dataUrl, width, height} — single image load
+  const downscaleImage = (dataUrl: string, maxWidth: number, quality = 0.85): Promise<{ dataUrl: string; width: number; height: number }> =>
     new Promise(resolve => {
       const img = new Image();
       img.onload = () => {
-        if (img.width <= maxWidth) { resolve(dataUrl); return; }
+        if (img.width <= maxWidth) {
+          resolve({ dataUrl, width: img.width, height: img.height });
+          return;
+        }
         const scale = maxWidth / img.width;
+        const w = maxWidth;
+        const h = Math.round(img.height * scale);
         const canvas = document.createElement('canvas');
-        canvas.width = maxWidth;
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', quality), width: w, height: h });
       };
-      img.onerror = () => resolve(dataUrl);
+      img.onerror = () => resolve({ dataUrl, width: 800, height: 1000 });
       img.src = dataUrl;
     });
 
@@ -788,7 +793,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setOcrStatus('Preparando imagen...');
 
     // Downscale to 1400px max for OCR — 4-8x faster than full 4K
-    const ocrImage = await downscaleImage(imageSrc, 1400, 0.92);
+    const { dataUrl: ocrImage } = await downscaleImage(imageSrc, 1400, 0.92);
     setOcrProgress(10);
 
     let rawText = '';
@@ -929,15 +934,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     ].join('\n');
 
     try {
-      // Downscale pages to 1800px for PDF — fast generation, still print-quality
-      const pdfPages = await Promise.all(
-        pgs.map(async p => {
-          const scaled = await downscaleImage(p.dataUrl, 1800, 0.88);
-          const img = new Image();
-          await new Promise<void>(r => { img.onload = () => r(); img.src = scaled; });
-          return { dataUrl: scaled, width: img.width, height: img.height };
-        })
-      );
+      // Downscale pages to 1800px for PDF (single image load, no double-loading)
+      const pdfPages = await Promise.all(pgs.map(p => downscaleImage(p.dataUrl, 1800, 0.88)));
       const pdfBlob = createMultiPagePdf(pdfPages, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
@@ -946,9 +944,14 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
       const pdfName = fileName.endsWith('.pdf') ? fileName : fileName + '.pdf';
 
+      // Save locally (fast) — don't block on cloud upload
       await savePdfBlob(docId, pdfBlob);
 
-      const pdfUrl = await uploadPdfToSupabase(docId, pdfBlob, caseId);
+      // Cloud upload runs in background, doesn't block the user
+      let pdfUrl: string | null = null;
+      uploadPdfToSupabase(docId, pdfBlob, caseId)
+        .then(url => { pdfUrl = url; })
+        .catch(err => console.warn('[Supabase] upload failed silently:', err));
 
       const newDoc: DocumentItem = {
         id: docId,
@@ -997,8 +1000,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         documents: [newDoc]
       };
 
-      await saveCaseRecord(newCase);
-      await saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl });
+      // DB syncs in background — don't block onOcrComplete
+      saveCaseRecord(newCase).catch(e => console.warn('[DB] case sync failed:', e));
+      saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl: null })
+        .catch(e => console.warn('[DB] doc sync failed:', e));
 
       setOcrProgress(100);
       setOcrStatus('¡Listo!');
