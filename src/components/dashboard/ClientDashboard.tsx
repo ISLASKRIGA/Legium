@@ -125,14 +125,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
           </h2>
         </div>
         
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <GlassButton 
-            className="btn-primary" 
-            onClick={() => onOpenScanner ? onOpenScanner() : setActiveModal('scanner')}
-          >
-            <Camera size={16} /> Escanear Nuevo Documento
-          </GlassButton>
-        </div>
+
       </div>
 
       {/* Metrics Row */}

@@ -479,13 +479,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                 <FileText size={18} style={{ color: 'var(--danger)' }} />
                 Documentos PDF
               </h3>
-              <GlassButton 
-                className="btn-secondary" 
-                size="sm"
-                onClick={() => setActiveModal('scanner')}
-              >
-                <Camera size={13} /> Escanear
-              </GlassButton>
+
             </div>
 
             <div 

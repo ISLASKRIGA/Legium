@@ -75,16 +75,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 
       <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
         
-        {/* Sign Out Button */}
-        <GlassButton
-          id="btn-logout"
-          onClick={onLogout}
-          size="sm"
-          className="btn-secondary"
-        >
-          <LogOut size={13} style={{ color: 'var(--danger)' }} />
-          <span>Cerrar Sesión</span>
-        </GlassButton>
+
 
         {/* Notification Bell with Dropdown */}
         <div style={{ position: 'relative' }} ref={dropdownRef}>
