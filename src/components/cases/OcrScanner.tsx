@@ -569,17 +569,20 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           setTimeout(() => {
             setAlignProgress(100);
             setScanPhase('done');
+            setStep('aligning');
           }, 1500);
         } catch (innerErr) {
           console.error('Perspective warp failed inside timeout:', innerErr);
           setCapturedImage(imgDataUrl);
           setScanPhase('done');
+          setStep('aligning');
         }
       }, 1200);
     } catch (err) {
       console.error('Perspective warp outer failed:', err);
       setCapturedImage(imgDataUrl);
       setScanPhase('done');
+      setStep('aligning');
     }
   };
 
@@ -600,10 +603,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         capturedRawRef.current = dataUrl; // store raw immediately for display
         setOriginalImage(dataUrl);
 
-        // Short delay so grey flash is visible, then transition to aligning
+        // Freeze frame, and start processing alignment (keeping step as 'capture'!)
         setScanPhase('captured');
         setTimeout(() => {
-          setStep('aligning');
           stopCamera();
           processAlignment(dataUrl, edgePoints);
         }, 300);
@@ -1038,25 +1040,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       {step === 'capture' && (
         <>
           <div className="camera-preview-wrapper" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden', background: '#000', zIndex: 1 }}>
-            {hasCamera && scanPhase !== 'captured' ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{
-                  position: 'absolute',
-                  top: 0, left: 0,
-                  width: '100%', height: '100%',
-                  objectFit: 'cover',
-                  zIndex: 2
-                }}
-              />
-            ) : (
-              (scanPhase === 'captured' && originalImage) ? (
-                <img
-                  src={originalImage}
-                  alt="Captured still"
+            {scanPhase === 'idle' ? (
+              hasCamera ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
                   style={{
                     position: 'absolute',
                     top: 0, left: 0,
@@ -1089,10 +1079,131 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   </p>
                 </div>
               )
+            ) : scanPhase === 'captured' ? (
+              <img
+                src={originalImage || ''}
+                alt="Captured still"
+                style={{
+                  position: 'absolute',
+                  top: 0, left: 0,
+                  width: '100%', height: '100%',
+                  objectFit: 'cover',
+                  zIndex: 2
+                }}
+              />
+            ) : scanPhase === 'cropping' ? (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+                {/* Crisp background of full original photo */}
+                <img
+                  src={originalImage || ''}
+                  alt="Uncropped bg"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                {/* Lifting clipped sheet */}
+                <img
+                  src={originalImage || ''}
+                  alt="Clipped sheet"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
+                    animation: 'liftSheet 1.2s forwards ease-in-out',
+                    zIndex: 3
+                  }}
+                />
+                {/* Fading green crop outline */}
+                <svg
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                    zIndex: 4
+                  }}
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                >
+                  <polygon
+                    points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+                    fill="rgba(0, 229, 160, 0.12)"
+                    stroke="#00ff80"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </div>
+            ) : (
+              /* scanPhase === 'scanning' */
+              <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+                {/* Frozen original background image (crisp) */}
+                <img
+                  src={originalImage || ''}
+                  alt="Uncropped bg"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                {/* Straightened document centered */}
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
+                  <div
+                    style={{
+                      position: 'relative',
+                      maxWidth: '85%',
+                      maxHeight: '100%',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
+                      background: '#fff',
+                      animation: 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
+                    }}
+                  >
+                    <img
+                      src={capturedImage || ''}
+                      alt="Documento recortado"
+                      style={{
+                        display: 'block',
+                        maxWidth: '100%',
+                        maxHeight: 'calc(100vh - 280px)',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    {/* Green laser sweep */}
+                    <>
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
+                        background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
+                        boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
+                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        zIndex: 10,
+                      }} />
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
+                        background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
+                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        zIndex: 9, pointerEvents: 'none',
+                      }} />
+                    </>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* ── SVG Perspective Quad Overlay ── */}
-            {hasCamera && (
+            {hasCamera && scanPhase === 'idle' && (
               <svg
                 style={{
                   position: 'absolute', top: 0, left: 0,
