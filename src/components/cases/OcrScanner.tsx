@@ -764,24 +764,44 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     };
   }, []);
 
+  // Downscale a dataUrl to maxWidth px — key speedup for OCR and PDF
+  const downscaleImage = (dataUrl: string, maxWidth: number, quality = 0.85): Promise<string> =>
+    new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        if (img.width <= maxWidth) { resolve(dataUrl); return; }
+        const scale = maxWidth / img.width;
+        const canvas = document.createElement('canvas');
+        canvas.width = maxWidth;
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+
   // Parse OCR text and auto-submit — no confirmation screen
   const runRealOcr = async (imageSrc: string, pages: typeof scannedPages) => {
     setStep('ocr-processing');
     setOcrProgress(5);
-    setOcrStatus('Cargando motor de reconocimiento de texto...');
+    setOcrStatus('Preparando imagen...');
+
+    // Downscale to 1400px max for OCR — 4-8x faster than full 4K
+    const ocrImage = await downscaleImage(imageSrc, 1400, 0.92);
+    setOcrProgress(10);
 
     let rawText = '';
     try {
-      const result = await Tesseract.recognize(imageSrc, 'spa', {
+      const result = await Tesseract.recognize(ocrImage, 'spa', {
         logger: (m) => {
           if (m.status === 'recognizing text') {
-            const pct = Math.round(10 + m.progress * 80);
+            const pct = Math.round(12 + m.progress * 78);
             setOcrProgress(pct);
             setOcrStatus(
-              pct < 30 ? 'Segmentando bloques de texto...' :
-              pct < 60 ? 'Reconociendo caracteres...' :
-              pct < 85 ? 'Analizando estructura del documento...' :
-              'Generando PDF con OCR...'
+              pct < 35 ? 'Reconociendo caracteres...' :
+              pct < 70 ? 'Analizando estructura del documento...' :
+              'Extrayendo información clave...'
             );
           }
         }
@@ -909,7 +929,16 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     ].join('\n');
 
     try {
-      const pdfBlob = createMultiPagePdf(pgs, ocrText);
+      // Downscale pages to 1800px for PDF — fast generation, still print-quality
+      const pdfPages = await Promise.all(
+        pgs.map(async p => {
+          const scaled = await downscaleImage(p.dataUrl, 1800, 0.88);
+          const img = new Image();
+          await new Promise<void>(r => { img.onload = () => r(); img.src = scaled; });
+          return { dataUrl: scaled, width: img.width, height: img.height };
+        })
+      );
+      const pdfBlob = createMultiPagePdf(pdfPages, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
       const docId = 'doc-' + Date.now();

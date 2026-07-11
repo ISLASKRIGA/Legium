@@ -57,60 +57,57 @@ export const cropImage = (
 };
 
 export const createSearchablePdf = (image: CroppedImageResult, ocrText: string): Blob => {
-  const pdf = new jsPDF({
-    orientation: image.width > image.height ? 'landscape' : 'portrait',
-    unit: 'px',
-    format: [image.width, image.height]
-  });
+  const orientation = (image.width || 1) > (image.height || 1) ? 'landscape' : 'portrait';
+  const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
 
-  const text = ocrText.trim() || DEFAULT_SCANNED_OCR_TEXT;
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(Math.max(8, Math.min(16, image.width / 55)));
+  pdf.setFontSize(6);
   pdf.setTextColor(255, 255, 255);
+  const text = ocrText.trim() || DEFAULT_SCANNED_OCR_TEXT;
+  const lines = pdf.splitTextToSize(text, pageW - 20);
+  pdf.text(lines, 10, 10, { baseline: 'top', lineHeightFactor: 1.2 });
 
-  const margin = Math.max(18, image.width * 0.04);
-  const lines = pdf.splitTextToSize(text, Math.max(40, image.width - margin * 2));
-  pdf.text(lines, margin, margin + 10, {
-    baseline: 'top',
-    lineHeightFactor: 1.25
-  });
+  const imgAspect = (image.width || 1) / (image.height || 1);
+  const pageAspect = pageW / pageH;
+  let imgW = pageW, imgH = pageH;
+  if (imgAspect > pageAspect) imgH = pageW / imgAspect;
+  else imgW = pageH * imgAspect;
 
-  pdf.addImage(image.dataUrl, 'JPEG', 0, 0, image.width, image.height);
+  pdf.addImage(image.dataUrl, 'JPEG', (pageW - imgW) / 2, (pageH - imgH) / 2, imgW, imgH, '', 'FAST');
   return pdf.output('blob');
 };
 
-/** Creates a multi-page PDF from an array of scanned page images.
- *  OCR text is embedded as invisible white text on page 1 for searchability. */
+/** Creates a multi-page PDF from scanned pages using A4 mm units for fast generation. */
 export const createMultiPagePdf = (pages: CroppedImageResult[], ocrText: string): Blob => {
   if (pages.length === 0) throw new Error('No pages to render');
 
-  const first = pages[0];
-  const pdf = new jsPDF({
-    orientation: first.width > first.height ? 'landscape' : 'portrait',
-    unit: 'px',
-    format: [first.width, first.height]
-  });
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();   // 210 mm
+  const pageH = pdf.internal.pageSize.getHeight();  // 297 mm
 
   pages.forEach((page, index) => {
-    if (index > 0) {
-      pdf.addPage(
-        [page.width, page.height],
-        page.width > page.height ? 'landscape' : 'portrait'
-      );
-    }
+    if (index > 0) pdf.addPage('a4', 'portrait');
 
-    // Embed invisible OCR text on the first page only
+    // Embed invisible OCR text on page 1 only
     if (index === 0) {
-      const text = ocrText.trim() || DEFAULT_SCANNED_OCR_TEXT;
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(Math.max(8, Math.min(16, page.width / 55)));
+      pdf.setFontSize(6);
       pdf.setTextColor(255, 255, 255);
-      const margin = Math.max(18, page.width * 0.04);
-      const lines = pdf.splitTextToSize(text, Math.max(40, page.width - margin * 2));
-      pdf.text(lines, margin, margin + 10, { baseline: 'top', lineHeightFactor: 1.25 });
+      const text = ocrText.trim() || DEFAULT_SCANNED_OCR_TEXT;
+      const lines = pdf.splitTextToSize(text, pageW - 20);
+      pdf.text(lines, 10, 10, { baseline: 'top', lineHeightFactor: 1.2 });
     }
 
-    pdf.addImage(page.dataUrl, 'JPEG', 0, 0, page.width, page.height);
+    // Fit image to A4 maintaining aspect ratio
+    const imgAspect = (page.width || 1) / (page.height || 1);
+    const pageAspect = pageW / pageH;
+    let imgW = pageW, imgH = pageH;
+    if (imgAspect > pageAspect) imgH = pageW / imgAspect;
+    else imgW = pageH * imgAspect;
+
+    pdf.addImage(page.dataUrl, 'JPEG', (pageW - imgW) / 2, (pageH - imgH) / 2, imgW, imgH, '', 'FAST');
   });
 
   return pdf.output('blob');
