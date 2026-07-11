@@ -1813,9 +1813,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               height: '100%',
               objectFit: 'cover',
               zIndex: 1,
-              opacity: scanPhase === 'done' ? 0.25 : 1,
-              filter: scanPhase === 'done' ? 'blur(15px) brightness(0.2) saturate(0.4)' : 'none',
-              transition: 'filter 0.4s ease, opacity 0.4s ease'
+              opacity: 1,
+              filter: 'none'
             }}
           />
 
