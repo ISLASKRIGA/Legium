@@ -508,9 +508,37 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const startCamera = async () => {
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
-      });
+      
+      let stream: MediaStream;
+      try {
+        // Try Full HD first - high-res, standard aspect ratio, highly compatible
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'environment', 
+            width: { ideal: 1920, max: 2560 }, 
+            height: { ideal: 1080, max: 1440 } 
+          }
+        });
+      } catch (e) {
+        console.warn('FHD camera constraints failed, trying basic HD constraints:', e);
+        try {
+          // Fallback to standard HD 720p
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+              facingMode: 'environment', 
+              width: { ideal: 1280 }, 
+              height: { ideal: 720 } 
+            }
+          });
+        } catch (e2) {
+          console.warn('HD camera constraints failed, trying basic video:', e2);
+          // Ultimate fallback with no resolution requirements
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+        }
+      }
+      
       setCameraStream(stream);
       setHasCamera(true);
       setScannerMsg('Encuadre el documento...');
@@ -1116,11 +1144,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     top: 0, left: 0,
                     width: '100%', height: '100%',
                     objectFit: 'cover',
-                    zIndex: 2,
-                    transform: 'translate3d(0, 0, 0)',
-                    WebkitTransform: 'translate3d(0, 0, 0)',
-                    backfaceVisibility: 'hidden',
-                    WebkitBackfaceVisibility: 'hidden'
+                    zIndex: 2
                   }}
                 />
               ) : (
