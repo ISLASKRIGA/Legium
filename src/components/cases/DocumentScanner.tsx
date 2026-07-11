@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Wand2, RefreshCw, ChevronRight, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult, normalizeImageOrientation } from '../../utils/scannerPdf';
+import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
@@ -136,31 +136,43 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       
       let stream: MediaStream;
       try {
-        // Try Full HD first - high-res, standard aspect ratio, highly compatible
+        // Try 4K resolution first to get maximum sensor detail for document scanning!
         stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'environment', 
-            width: { ideal: 1920, max: 2560 }, 
-            height: { ideal: 1080, max: 1440 } 
+            width: { ideal: 4096 }, 
+            height: { ideal: 3072 } 
           }
         });
       } catch (e) {
-        console.warn('FHD camera constraints failed, trying basic HD constraints:', e);
+        console.warn('4K camera constraints failed, trying FHD constraints:', e);
         try {
-          // Fallback to standard HD 720p
+          // Try Full HD - high-res, standard aspect ratio, highly compatible
           stream = await navigator.mediaDevices.getUserMedia({
             video: { 
               facingMode: 'environment', 
-              width: { ideal: 1280 }, 
-              height: { ideal: 720 } 
+              width: { ideal: 1920, max: 2560 }, 
+              height: { ideal: 1080, max: 1440 } 
             }
           });
         } catch (e2) {
-          console.warn('HD camera constraints failed, trying basic video:', e2);
-          // Ultimate fallback with no resolution requirements
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-          });
+          console.warn('FHD camera constraints failed, trying basic HD constraints:', e2);
+          try {
+            // Fallback to standard HD 720p
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { 
+                facingMode: 'environment', 
+                width: { ideal: 1280 }, 
+                height: { ideal: 720 } 
+              }
+            });
+          } catch (e3) {
+            console.warn('HD camera constraints failed, trying basic video:', e3);
+            // Ultimate fallback with no resolution requirements
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'environment' }
+            });
+          }
         }
       }
       
@@ -282,9 +294,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       }
 
       if (dataUrl) {
-        // Normalize EXIF orientation to keep dimensions matching the view!
-        const orientedUrl = await normalizeImageOrientation(dataUrl);
-        setOriginalImage(orientedUrl);
+        setOriginalImage(dataUrl);
         
         setTimeout(() => {
           setFlashActive(false);
@@ -299,10 +309,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = async (event) => {
+      reader.onload = (event) => {
         if (event.target?.result) {
-          const rawUrl = event.target.result as string;
-          const dataUrl = await normalizeImageOrientation(rawUrl);
+          const dataUrl = event.target.result as string;
           setOriginalImage(dataUrl);
           stopCamera();
 

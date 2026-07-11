@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw, Eye, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult, normalizeImageOrientation } from '../../utils/scannerPdf';
+import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
@@ -514,31 +514,43 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       
       let stream: MediaStream;
       try {
-        // Try Full HD first - high-res, standard aspect ratio, highly compatible
+        // Try 4K resolution first to get maximum sensor detail for document OCR scanning!
         stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'environment', 
-            width: { ideal: 1920, max: 2560 }, 
-            height: { ideal: 1080, max: 1440 } 
+            width: { ideal: 4096 }, 
+            height: { ideal: 3072 } 
           }
         });
       } catch (e) {
-        console.warn('FHD camera constraints failed, trying basic HD constraints:', e);
+        console.warn('4K camera constraints failed, trying FHD constraints:', e);
         try {
-          // Fallback to standard HD 720p
+          // Try Full HD - high-res, standard aspect ratio, highly compatible
           stream = await navigator.mediaDevices.getUserMedia({
             video: { 
               facingMode: 'environment', 
-              width: { ideal: 1280 }, 
-              height: { ideal: 720 } 
+              width: { ideal: 1920, max: 2560 }, 
+              height: { ideal: 1080, max: 1440 } 
             }
           });
         } catch (e2) {
-          console.warn('HD camera constraints failed, trying basic video:', e2);
-          // Ultimate fallback with no resolution requirements
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-          });
+          console.warn('FHD camera constraints failed, trying basic HD constraints:', e2);
+          try {
+            // Fallback to standard HD 720p
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { 
+                facingMode: 'environment', 
+                width: { ideal: 1280 }, 
+                height: { ideal: 720 } 
+              }
+            });
+          } catch (e3) {
+            console.warn('HD camera constraints failed, trying basic video:', e3);
+            // Ultimate fallback with no resolution requirements
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'environment' }
+            });
+          }
         }
       }
       
@@ -664,16 +676,14 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       }
 
       if (dataUrl) {
-        // Normalize EXIF orientation to keep dimensions matching the view!
-        const orientedUrl = await normalizeImageOrientation(dataUrl);
-        capturedRawRef.current = orientedUrl; // store raw immediately for display
-        setOriginalImage(orientedUrl);
+        capturedRawRef.current = dataUrl; // store raw immediately for display
+        setOriginalImage(dataUrl);
 
         // Freeze frame, and start processing alignment (keeping step as 'capture'!)
         setScanPhase('captured');
         setTimeout(() => {
           stopCamera();
-          processAlignment(orientedUrl, edgePoints);
+          processAlignment(dataUrl!, edgePoints);
         }, 300);
       }
     }
@@ -683,10 +693,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = async (event) => {
+      reader.onload = (event) => {
         if (event.target?.result) {
-          const rawUrl = event.target.result as string;
-          const dataUrl = await normalizeImageOrientation(rawUrl);
+          const dataUrl = event.target.result as string;
           setOriginalImage(dataUrl);
           stopCamera();
 
@@ -704,8 +713,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       reader.readAsDataURL(file);
     }
   };
-
-
 
   const updateCropPoint = (clientX: number, clientY: number, corner: 'p1' | 'p2' | 'p3' | 'p4') => {
     if (!previewImageRef.current) return;
