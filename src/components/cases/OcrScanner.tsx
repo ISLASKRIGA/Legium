@@ -555,36 +555,33 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   // Alignment process: warp immediately → show cropped doc → laser sweep → reveal action bar
   const processAlignment = async (imgDataUrl: string, quad: QuadPoints) => {
     setAlignProgress(15);
-    setScanPhase('cropping');
     try {
-      // 1. Let the crop & lift animation play for 450ms
-      setTimeout(async () => {
-        try {
-          const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
-          setCapturedImage(warped.dataUrl);
-          setAlignProgress(70);
-          setScanPhase('straightening');
+      // 1. Run perspective warp immediately!
+      const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
+      setCapturedImage(warped.dataUrl);
+      setAlignProgress(70);
 
-          // 2. Let the straighten & flatten animation settle for 500ms
+      // 2. Start the slow lift phase (cropping) using the flat warped document
+      setScanPhase('cropping');
+
+      // Let the slow lift animation play for 800ms
+      setTimeout(() => {
+        setScanPhase('scanning');
+
+        // 3. Let the laser sweep scan the flat doc for 800ms
+        setTimeout(() => {
+          setScanPhase('enhancing');
+
+          // 4. Let the magic enhancement flash fade in for 400ms
           setTimeout(() => {
-            setScanPhase('scanning');
-
-            // 3. Let the laser sweep run for 600ms
-            setTimeout(() => {
-              setAlignProgress(100);
-              setScanPhase('done');
-              setStep('aligning');
-            }, 600);
-          }, 500);
-        } catch (innerErr) {
-          console.error('Perspective warp failed inside timeout:', innerErr);
-          setCapturedImage(imgDataUrl);
-          setScanPhase('done');
-          setStep('aligning');
-        }
-      }, 450);
+            setAlignProgress(100);
+            setScanPhase('done');
+            setStep('aligning');
+          }, 400);
+        }, 800);
+      }, 800);
     } catch (err) {
-      console.error('Perspective warp outer failed:', err);
+      console.error('Perspective warp failed:', err);
       setCapturedImage(imgDataUrl);
       setScanPhase('done');
       setStep('aligning');
@@ -1018,6 +1015,18 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             filter: drop-shadow(0 20px 50px rgba(0,0,0,0.7));
           }
         }
+        @keyframes liftFlatSheet {
+          0% {
+            transform: scale(0.85) translateY(30px);
+            opacity: 0;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.15));
+          }
+          100% {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+            filter: drop-shadow(0 20px 60px rgba(0,0,0,0.85));
+          }
+        }
         @keyframes fadeOutDoc {
           0% { opacity: 1; }
           100% { opacity: 0; }
@@ -1130,65 +1139,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     objectFit: 'cover',
                   }}
                 />
-                {/* Lifting clipped sheet */}
-                <img
-                  src={originalImage || ''}
-                  alt="Clipped sheet"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
-                    animation: 'liftSheet 0.45s forwards ease-in-out',
-                    zIndex: 3
-                  }}
-                />
-                {/* Fading green crop outline */}
-                <svg
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    pointerEvents: 'none',
-                    animation: 'fadeOutLine 0.45s forwards ease-in-out',
-                    zIndex: 4
-                  }}
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                >
-                  <polygon
-                    points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                    fill="rgba(0, 229, 160, 0.12)"
-                    stroke="#00ff80"
-                    strokeWidth="1.5"
-                  />
-                </svg>
-              </div>
-            ) : scanPhase === 'straightening' ? (
-              <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
-                {/* Frozen original background image (crisp) */}
-                <img
-                  src={originalImage || ''}
-                  alt="Uncropped bg"
-                  style={{
-                                ) : scanPhase === 'straightening' ? (
-              <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
-                {/* Frozen original background image (crisp) */}
-                <img
-                  src={originalImage || ''}
-                  alt="Uncropped bg"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                {/* Straightened document centered (settling with animation, no laser) */}
+                {/* Already cropped/warped document lifting up slowly in the center */}
                 <div style={{ position: 'absolute', top: '54px', bottom: '140px', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 3 }}>
                   <div
                     style={{
@@ -1199,7 +1150,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       overflow: 'hidden',
                       boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
                       background: '#fff',
-                      animation: 'straightenDoc 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+                      animation: 'liftFlatSheet 0.8s cubic-bezier(0.25, 1, 0.5, 1) both',
                     }}
                   >
                     <img
