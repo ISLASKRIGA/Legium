@@ -508,9 +508,42 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const startCamera = async () => {
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
-      });
+      
+      const constraintSets = [
+        { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } },
+        { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+        { facingMode: 'environment' }
+      ];
+
+      let stream: MediaStream | null = null;
+      let lastError: any = null;
+
+      for (const videoConstraints of constraintSets) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+          if (stream) {
+            break;
+          }
+        } catch (err) {
+          console.warn('getUserMedia failed with constraints:', videoConstraints, err);
+          lastError = err;
+        }
+      }
+
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!stream) {
+        throw lastError || new Error('No stream available');
+      }
+
       setCameraStream(stream);
       setHasCamera(true);
       setScannerMsg('Encuadre el documento...');
