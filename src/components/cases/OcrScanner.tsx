@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw, Eye, Plus, Files } from 'lucide-react';
+import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
@@ -378,7 +378,7 @@ export const enhanceImage = (
 };
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'ocr-processing' | 'ocr-confirm'>('capture');
+  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'ocr-processing'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -429,7 +429,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
   // Multi-page: accumulated processed pages (filtered data URLs + dimensions)
   const [scannedPages, setScannedPages] = useState<CroppedImageResult[]>([]);
-  const [finalPdfUrl, setFinalPdfUrl] = useState<string | null>(null);
 
   // Zoom and pan states for high-res preview
   const [zoomScale, setZoomScale] = useState(1);
@@ -469,15 +468,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatus, setOcrStatus] = useState('Iniciando OCR...');
 
-  // Extracted Metadata Form - editable by user after OCR
-  const [workerName, setWorkerName] = useState('Juan Pablo Martínez Díaz');
-  const [claimAmount, setClaimAmount] = useState('18,500,000 CLP');
-  const [court, setCourt] = useState('1° Juzgado de Letras del Trabajo de Santiago');
-  const [judge, setJudge] = useState('Dra. Eliana Rodríguez');
-  const [description, setDescription] = useState(
-    'Demanda laboral de tutela laboral por vulneración de derechos fundamentales con ocasión del despido injustificado e indemnización de perjuicios. Se reclaman recargos legales y años de servicio.'
-  );
-  const [fileName, setFileName] = useState('Documento_Escaneado.pdf');
+  const [fileName] = useState('Documento_Escaneado.pdf');
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -773,185 +764,233 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     };
   }, []);
 
-  // Run Tesseract OCR and parse results
-  const runRealOcr = async (imageSrc: string) => {
+  // Parse OCR text and auto-submit — no confirmation screen
+  const runRealOcr = async (imageSrc: string, pages: typeof scannedPages) => {
     setStep('ocr-processing');
     setOcrProgress(5);
     setOcrStatus('Cargando motor de reconocimiento de texto...');
 
+    let rawText = '';
     try {
       const result = await Tesseract.recognize(imageSrc, 'spa', {
         logger: (m) => {
           if (m.status === 'recognizing text') {
-            const pct = Math.round(10 + m.progress * 85);
+            const pct = Math.round(10 + m.progress * 80);
             setOcrProgress(pct);
             setOcrStatus(
               pct < 30 ? 'Segmentando bloques de texto...' :
-              pct < 60 ? 'Reconociendo caracteres (OCR en progreso)...' :
-              pct < 90 ? 'Analizando estructura del documento...' :
-              'Finalizando extracción de texto...'
+              pct < 60 ? 'Reconociendo caracteres...' :
+              pct < 85 ? 'Analizando estructura del documento...' :
+              'Generando PDF con OCR...'
             );
           }
         }
       });
-
-      const rawText = result.data.text;
-      setOcrProgress(100);
-      setOcrStatus('Texto extraído correctamente.');
-
-      // Initialize default values for the parsed results
-      let parsedName = '';
-      let parsedAmount = 'Por determinar';
-      let parsedCourt = '1° Juzgado de Letras del Trabajo';
-      let parsedJudge = 'Por designar';
-      let parsedDesc = rawText.substring(0, 250).trim() || 'Sin texto extraído en el escaneo';
-
-      // Advanced parser
-      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      
-      const nameMatch = rawText.match(/(?:demandante|trabajador|contrade|persona|don|doña)[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{3,40})/i);
-      if (nameMatch && nameMatch[1]) {
-        parsedName = nameMatch[1].trim();
-      } else {
-        const nameLine = lines.find(l => /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+/.test(l));
-        if (nameLine) parsedName = nameLine;
-      }
-
-      const amountMatch = rawText.match(/(\d+[\d\.,]*\s*(?:CLP|\$|pesos))/i) || rawText.match(/(\$\s*\d+[\d\.,]*)/i);
-      if (amountMatch) {
-        parsedAmount = amountMatch[1].trim();
-      }
-
-      const courtMatch = rawText.match(/(?:juzgado|tribunal|corte)[^\n]{0,50}/i);
-      if (courtMatch) {
-        parsedCourt = courtMatch[0].trim();
-      }
-
-      setWorkerName(parsedName || 'Trabajador Detectado');
-      setClaimAmount(amountMatch ? parsedAmount : '18,500,000 CLP'); // Fallback to realistic value if parsing fails
-      setCourt(parsedCourt || '1° Juzgado de Letras del Trabajo de Santiago');
-      setJudge(parsedJudge || 'Dra. Eliana Rodríguez');
-      setDescription(parsedDesc);
-
-      setTimeout(() => setStep('ocr-confirm'), 500);
+      rawText = result.data.text;
     } catch (err) {
       console.error('Tesseract OCR error:', err);
-      setWorkerName('Demanda Escaneada');
-      setClaimAmount('Por determinar');
-      setCourt('Juzgado del Trabajo');
-      setJudge('Por designar');
-      setDescription('No se pudo procesar el texto automáticamente. Ingrese descripción.');
-      setOcrStatus('Error en OCR. Puedes editar los campos manualmente.');
-      setTimeout(() => setStep('ocr-confirm'), 1200);
+      rawText = '';
     }
+
+    setOcrProgress(92);
+    setOcrStatus('Extrayendo información clave...');
+
+    // ── Improved extraction ──────────────────────────────────────────
+    const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+    const fullText = lines.join(' ');
+
+    // Document type detection
+    const isCompraventa = /compraventa|escritura\s+p[úu]blica|contrato\s+de\s+compra/i.test(fullText);
+    const isLaboral     = /demanda|demandante|trabajador|cuant[íi]a|despido/i.test(fullText);
+    const isNotarial    = /notario|notaría|escritura|volumen/i.test(fullText);
+
+    // ── Party / name extraction ───────────────────────────────────────
+    let parsedName = '';
+
+    // 1) Compradora / comprador
+    const compradorMatch = fullText.match(/(?:compradora?|adquirente)[:\s"«]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑA-Za-záéíóúñ\s]{4,50}?)(?:\s*[,."»]|\s{2,}|$)/i);
+    if (compradorMatch) parsedName = compradorMatch[1].trim();
+
+    // 2) Demandante / trabajador
+    if (!parsedName) {
+      const demanMatch = fullText.match(/(?:demandante|trabajador)[:\s]+([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ\s]{4,40}?)(?=[,\n]|$)/i);
+      if (demanMatch) parsedName = demanMatch[1].trim();
+    }
+
+    // 3) Don / Doña / señor / señora
+    if (!parsedName) {
+      const donMatch = fullText.match(/(?:\bdon\b|\bdoña\b|\bse[ñn]or[a]?\b)[:\s]+([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ\s]{4,45}?)(?=[,\n]|\s{2,}|$)/i);
+      if (donMatch) parsedName = donMatch[1].trim();
+    }
+
+    // 4) Capitalize-only full name on its own line (e.g. "MARIA DE LOURDES ESPINO TORRES")
+    if (!parsedName) {
+      const capsLine = lines.find(l => /^[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{8,50}$/.test(l) && l.split(' ').length >= 2);
+      if (capsLine) parsedName = capsLine.trim();
+    }
+
+    // ── Amount extraction ─────────────────────────────────────────────
+    let parsedAmount = 'Por determinar';
+    const amtMatch =
+      fullText.match(/\$\s*([\d,\.]+)\s*(M\.?N\.?|MXN|pesos?|CLP|USD)?/i) ||
+      fullText.match(/([\d,\.]{5,})\s*(pesos?|MXN|CLP|USD)/i) ||
+      fullText.match(/(?:cuant[íi]a|monto|valor)[^\d]*([\d,\.]{4,})/i);
+    if (amtMatch) parsedAmount = amtMatch[0].replace(/(?:cuant[íi]a|monto|valor)[^\d]*/i, '').trim();
+
+    // ── Court / Notary extraction ──────────────────────────────────────
+    let parsedCourt = 'Por determinar';
+    const courtMatch =
+      fullText.match(/(?:juzgado|tribunal|corte)[^\n.]{0,80}/i) ||
+      fullText.match(/notaría[^\n.]{0,60}/i) ||
+      fullText.match(/notario\s+p[úu]blico[^\n.]{0,60}/i);
+    if (courtMatch) parsedCourt = courtMatch[0].trim().replace(/\s+/g, ' ');
+
+    // ── Authority / Judge / Notary name ───────────────────────────────
+    let parsedJudge = 'Por designar';
+    const judgeMatch =
+      fullText.match(/(?:juez|magistrado)[:\s]+([A-Za-záéíóúñÁÉÍÓÚÑ\s\.]{5,50}?)(?=[,\n]|$)/i) ||
+      fullText.match(/(?:Lic\.|Dr\.|Dra\.|Ing\.)\s+([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ\s]{4,40}?)(?=[,\n]|$)/);
+    if (judgeMatch) parsedJudge = judgeMatch[1]?.trim() || judgeMatch[0].trim();
+
+    // ── Description / Summary ─────────────────────────────────────────
+    // Use first ~400 chars of meaningful text, clean OCR artifacts
+    const parsedDesc = lines
+      .filter(l => l.length > 15 && !/^[-–—|]+$/.test(l))
+      .slice(0, 8)
+      .join(' ')
+      .substring(0, 400)
+      .replace(/\s{2,}/g, ' ')
+      .trim() || 'Documento legal procesado con OCR.';
+
+    // ── Practice area ─────────────────────────────────────────────────
+    const practiceArea = isLaboral ? 'Laboral' : isCompraventa ? 'Inmobiliario' : isNotarial ? 'Notarial' : 'Civil';
+
+    // ── Document title ────────────────────────────────────────────────
+    const docTitle = isCompraventa
+      ? (parsedName ? parsedName + ' — Contrato de Compraventa' : 'Contrato de Compraventa')
+      : isLaboral
+      ? (parsedName ? parsedName + ' vs. ' + (currentUser.name || 'Empresa') : 'Demanda Laboral')
+      : parsedName
+      ? parsedName + ' — Documento Legal'
+      : 'Escrito Judicial Escaneado';
+
+    setOcrProgress(96);
+    setOcrStatus('Generando PDF con OCR incrustado...');
+
+    // ── Auto-submit directly ──────────────────────────────────────────
+    await autoSubmit({
+      name: parsedName || 'Parte Detectada',
+      amount: parsedAmount,
+      court: parsedCourt,
+      judge: parsedJudge,
+      description: parsedDesc,
+      practiceArea,
+      docTitle,
+      rawText,
+      pages,
+    });
   };
 
-  const startOcrProcessing = async () => {
-    const sourceImage = scannedPages.length > 0 ? scannedPages[0].dataUrl : capturedImage;
-    if (!sourceImage) return;
-    try {
-      setStep('ocr-processing');
-      setOcrProgress(2);
-      setOcrStatus('Preparando imagen...');
-      // Pages are already filtered — use directly
-      await runRealOcr(sourceImage);
-    } catch (err) {
-      console.error('Error preparing image for OCR:', err);
-      await runRealOcr(sourceImage);
-    }
-  };
-
-  const handleFinalSubmit = async () => {
-    if (scannedPages.length === 0) return;
+  const autoSubmit = async (parsed: {
+    name: string; amount: string; court: string; judge: string;
+    description: string; practiceArea: string; docTitle: string;
+    rawText: string; pages: typeof scannedPages;
+  }) => {
+    const { name, amount, court: parsedCourt, judge: parsedJudge, description, practiceArea, docTitle, rawText, pages: pgs } = parsed;
 
     const ocrText = [
-      'Trabajador demandante: ' + workerName,
-      'Cuantia estimada: ' + claimAmount,
-      'Tribunal asignado: ' + court,
-      'Juez a cargo: ' + judge,
-      'Resumen: ' + description,
-      'Documento procesado con OCR real (Tesseract.js) en Legium.'
+      rawText,
+      '---',
+      'Extracción automática Legium OCR:',
+      'Parte principal: ' + name,
+      'Monto/Cuantía: ' + amount,
+      'Tribunal/Notaría: ' + parsedCourt,
+      'Autoridad/Juez: ' + parsedJudge,
     ].join('\n');
 
     try {
-      // Build multi-page PDF from all scanned pages
-      const pdfBlob = createMultiPagePdf(scannedPages, ocrText);
+      const pdfBlob = createMultiPagePdf(pgs, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
       const docId = 'doc-' + Date.now();
       const uploadDate = new Date().toISOString().split('T')[0];
       const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
+      const pdfName = fileName.endsWith('.pdf') ? fileName : fileName + '.pdf';
 
-      // 1. Persist PDF locally
       await savePdfBlob(docId, pdfBlob);
 
-      // 2. Upload to InsForge Storage
       const pdfUrl = await uploadPdfToSupabase(docId, pdfBlob, caseId);
-      if (pdfUrl) setFinalPdfUrl(pdfUrl);
 
       const newDoc: DocumentItem = {
         id: docId,
-        name: fileName.endsWith('.pdf') ? fileName : fileName + '.pdf',
+        name: pdfName,
         size: sizeKB + ' KB',
         uploadDate,
         ocrText,
-        storageKey: caseId => caseId + '/' + docId + '.pdf'
+        pdfUrl,
+        storageKey: caseId + '/' + docId + '.pdf'
       };
 
       const newCase: Case = {
         id: caseId,
-        title: (workerName.trim() ? workerName : 'Trabajador') + ' vs. Constructora Alfa',
+        title: docTitle,
         clientId: currentUser.clientId || 'cli-01',
-        clientName: 'Constructora Alfa S.A.',
-        opposingParty: workerName,
-        opposingLawyer: 'Estudio Patrocinante Gómez & Asociados',
-        practiceArea: 'Laboral',
+        clientName: currentUser.name,
+        opposingParty: name,
+        opposingLawyer: 'Por determinar',
+        practiceArea,
         status: 'Activo',
-        court: court,
-        judge: judge,
-        assignedLawyerId: 'usr-03',
-        assignedLawyerName: 'Lic. Mateo Ríos',
+        court: parsedCourt,
+        judge: parsedJudge,
+        assignedLawyerId: 'usr-02',
+        assignedLawyerName: 'Dra. Sofía Valenzuela',
         startDate: uploadDate,
-        description: description,
+        description,
         timeline: [{
           date: uploadDate,
-          title: 'Ingreso por Portal Cliente (OCR Real)',
-          desc: 'Escaneado con cámara real. OCR con Tesseract.js. PDF guardado ' + (pdfUrl ? 'en InsForge Storage' : 'localmente') + '.',
+          title: 'Ingreso por Portal Cliente (OCR)',
+          desc: 'Documento escaneado y procesado automáticamente. PDF ' + (pdfUrl ? 'sincronizado en la nube.' : 'guardado localmente.'),
           completed: true
         }],
         tasks: [{
           id: 'tsk-' + Date.now().toString().slice(-4),
-          title: 'Revisar y contestar demanda laboral',
-          dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          assignedTo: 'usr-03',
+          title: 'Revisar documento y asignar estrategia legal',
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          assignedTo: 'usr-02',
           completed: false
         }],
         notes: [{
           id: 'nt-' + Date.now(),
           date: uploadDate + ' ' + new Date().toTimeString().slice(0, 5),
-          author: 'OCR Real (Tesseract.js)',
-          text: 'Texto extraído automáticamente del documento. Cuantía: ' + claimAmount + '. Tribunal: ' + court + '.'
+          author: 'Legium OCR',
+          text: 'Extracción: Parte=' + name + ' | Monto=' + amount + ' | ' + parsedCourt,
         }],
         documents: [newDoc]
       };
 
-      // 3. Save case & document record to InsForge Database
       await saveCaseRecord(newCase);
-      await saveDocumentRecord({
-        id: docId,
-        caseId,
-        name: newDoc.name,
-        sizeKb: parseFloat(sizeKB),
-        uploadDate,
-        ocrText,
-        pdfUrl,
-      });
+      await saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl });
 
+      setOcrProgress(100);
+      setOcrStatus('¡Listo!');
       onOcrComplete(newCase, newDoc, pdfBlob);
     } catch (err) {
       console.error('Error generating OCR PDF:', err);
     }
   };
+
+  const startOcrProcessing = async () => {
+    const pages = scannedPages.length > 0 ? scannedPages : [];
+    const sourceImage = pages.length > 0 ? pages[0].dataUrl : capturedImage;
+    if (!sourceImage) return;
+    const finalPages = pages.length > 0 ? pages : (capturedImage ? [{ dataUrl: capturedImage, width: 0, height: 0 }] : []);
+    setStep('ocr-processing');
+    setOcrProgress(2);
+    setOcrStatus('Preparando imagen...');
+    await runRealOcr(sourceImage, finalPages);
+  };
+
+  const handleFinalSubmit = startOcrProcessing;
 
   const handleImageDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (zoomScale > 1) {
@@ -2218,104 +2257,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         </div>
       )}
 
-      {step === 'ocr-confirm' && (
-        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, background: '#1c1c1e', padding: '16px', overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(52,199,89,0.15)', color: '#34c759', marginBottom: '8px' }}>
-              <Check size={20} />
-            </div>
-            <h4 style={{ fontWeight: '700', color: '#fff', margin: 0 }}>Información Extraída del Escrito</h4>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-              {scannedPages.length > 1 ? `${scannedPages.length} páginas • ` : ''}Revisa los campos autocompletados mediante OCR real antes de guardarlos.
-            </p>
-            {/* Eye button — view uploaded PDF */}
-            {finalPdfUrl && (
-              <a
-                href={finalPdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '6px 16px', borderRadius: '20px', background: 'rgba(0,229,160,0.12)', color: '#00e5a0', fontSize: '12px', fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(0,229,160,0.25)' }}
-              >
-                <Eye size={14} /> Ver PDF subido
-              </a>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, marginBottom: '16px' }}>
-            <div className="form-group">
-              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Nombre del Trabajador (Demandante)</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={workerName} 
-                onChange={(e) => setWorkerName(e.target.value)} 
-                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Cuantía Estimada Reclamada</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={claimAmount} 
-                onChange={(e) => setClaimAmount(e.target.value)} 
-                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Tribunal Competente</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={court} 
-                onChange={(e) => setCourt(e.target.value)} 
-                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Juez Asignado</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={judge} 
-                onChange={(e) => setJudge(e.target.value)} 
-                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Resumen Técnico / Reseña Fáctica</label>
-              <textarea 
-                className="form-control" 
-                rows={3}
-                value={description} 
-                onChange={(e) => setDescription(e.target.value)} 
-                style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12.5px', resize: 'none' }}
-              />
-            </div>
-          </div>
-
-          <div className="scanner-controls" style={{ gap: '12px' }}>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => setStep('aligning')}
-              style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
-            >
-              Atrás
-            </button>
-            <button 
-              className="btn btn-primary" 
-              onClick={handleFinalSubmit}
-              style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              <Check size={16} /> Crear Caso y Subir PDF
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
