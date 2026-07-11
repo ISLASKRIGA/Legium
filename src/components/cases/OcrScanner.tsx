@@ -1024,14 +1024,15 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   };
 
   const startOcrProcessing = async () => {
-    const pages = scannedPages.length > 0 ? scannedPages : [];
-    const sourceImage = pages.length > 0 ? pages[0].dataUrl : capturedImage;
-    if (!sourceImage) return;
-    const finalPages = pages.length > 0 ? pages : (capturedImage ? [{ dataUrl: capturedImage, width: 0, height: 0 }] : []);
+    const img = processedImage || capturedImage;
+    const pages = scannedPages.length > 0
+      ? scannedPages
+      : img ? [{ dataUrl: img, width: 0, height: 0 }] : [];
+    if (pages.length === 0 || !pages[0].dataUrl) return;
     setStep('ocr-processing');
     setOcrProgress(2);
     setOcrStatus('Preparando imagen...');
-    await runRealOcr(sourceImage, finalPages);
+    await runRealOcr(pages[0].dataUrl, pages);
   };
 
   const handleFinalSubmit = startOcrProcessing;
@@ -2180,7 +2181,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       setStep('ocr-processing');
                       setOcrProgress(2);
                       setOcrStatus('Preparando imagen...');
-                      runRealOcr(finalImg);
+                      runRealOcr(finalImg, nextPages);
                     } else {
                       setStep('decide');
                     }
