@@ -587,7 +587,11 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                   top: 0, left: 0,
                   width: '100%', height: '100%',
                   objectFit: 'cover',
-                  zIndex: 2
+                  zIndex: 2,
+                  transform: 'translate3d(0, 0, 0)',
+                  WebkitTransform: 'translate3d(0, 0, 0)',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden'
                 }}
               />
             ) : (
