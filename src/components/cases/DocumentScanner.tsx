@@ -210,8 +210,8 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
         setOriginalImage(dataUrl);
-        stopCamera();
         setStep('preview-full');
+        stopCamera();
       }
     }
   };

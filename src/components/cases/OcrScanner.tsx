@@ -591,12 +591,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
         capturedRawRef.current = dataUrl; // store raw immediately for display
         setOriginalImage(dataUrl);
-        stopCamera();
 
         // Short delay so grey flash is visible, then transition to aligning
         setScanPhase('captured');
         setTimeout(() => {
           setStep('aligning');
+          stopCamera();
           processAlignment(dataUrl, edgePoints);
         }, 300);
       }

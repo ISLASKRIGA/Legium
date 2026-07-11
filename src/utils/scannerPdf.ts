@@ -251,43 +251,49 @@ export const warpPerspective = (
       const sw = img.width;
       const sh = img.height;
 
+      let destIdx = 0;
+      const sw4 = sw * 4;
+
       // Map each destination pixel (u, v) back to source (x, y)
       for (let v = 0; v < h; v++) {
+        const a1v_a2 = a1 * v + a2;
+        const a4v_a5 = a4 * v + a5;
+        const a7v_1  = a7 * v + 1;
+
         for (let u = 0; u < w; u++) {
-          const denom = a6 * u + a7 * v + 1;
-          const x = (a0 * u + a1 * v + a2) / denom;
-          const y = (a3 * u + a4 * v + a5) / denom;
+          const denom = a6 * u + a7v_1;
+          const x = (a0 * u + a1v_a2) / denom;
+          const y = (a3 * u + a4v_a5) / denom;
 
           // Bilinear interpolation
           if (x >= 0 && x < sw - 1 && y >= 0 && y < sh - 1) {
-            const xFloor = Math.floor(x);
-            const yFloor = Math.floor(y);
+            const xFloor = x | 0;
+            const yFloor = y | 0;
             const xWeight = x - xFloor;
             const yWeight = y - yFloor;
 
             const idx00 = (yFloor * sw + xFloor) * 4;
-            const idx10 = (yFloor * sw + (xFloor + 1)) * 4;
-            const idx01 = ((yFloor + 1) * sw + xFloor) * 4;
-            const idx11 = ((yFloor + 1) * sw + (xFloor + 1)) * 4;
+            const idx10 = idx00 + 4;
+            const idx01 = idx00 + sw4;
+            const idx11 = idx01 + 4;
 
-            const destIdx = (v * w + u) * 4;
+            const w00 = (1 - xWeight) * (1 - yWeight);
+            const w10 = xWeight * (1 - yWeight);
+            const w01 = (1 - xWeight) * yWeight;
+            const w11 = xWeight * yWeight;
 
-            for (let c = 0; c < 4; c++) {
-              const val =
-                sData[idx00 + c] * (1 - xWeight) * (1 - yWeight) +
-                sData[idx10 + c] * xWeight * (1 - yWeight) +
-                sData[idx01 + c] * (1 - xWeight) * yWeight +
-                sData[idx11 + c] * xWeight * yWeight;
-              dData[destIdx + c] = val;
-            }
+            dData[destIdx]     = sData[idx00] * w00 + sData[idx10] * w10 + sData[idx01] * w01 + sData[idx11] * w11;
+            dData[destIdx + 1] = sData[idx00 + 1] * w00 + sData[idx10 + 1] * w10 + sData[idx01 + 1] * w01 + sData[idx11 + 1] * w11;
+            dData[destIdx + 2] = sData[idx00 + 2] * w00 + sData[idx10 + 2] * w10 + sData[idx01 + 2] * w01 + sData[idx11 + 2] * w11;
+            dData[destIdx + 3] = sData[idx00 + 3] * w00 + sData[idx10 + 3] * w10 + sData[idx01 + 3] * w01 + sData[idx11 + 3] * w11;
           } else {
             // Out of bounds - fill with white
-            const destIdx = (v * w + u) * 4;
-            dData[destIdx] = 255;
+            dData[destIdx]     = 255;
             dData[destIdx + 1] = 255;
             dData[destIdx + 2] = 255;
             dData[destIdx + 3] = 255;
           }
+          destIdx += 4;
         }
       }
 
