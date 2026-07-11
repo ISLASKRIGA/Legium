@@ -381,6 +381,16 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
     video.playsInline = true;
     video.setAttribute('autoplay', 'true');
     
+    // Hide it offscreen but append to DOM so mobile browsers actually play the video
+    video.style.position = 'absolute';
+    video.style.top = '0';
+    video.style.left = '0';
+    video.style.width = '1px';
+    video.style.height = '1px';
+    video.style.opacity = '0';
+    video.style.pointerEvents = 'none';
+    document.body.appendChild(video);
+    
     let resolved = false;
 
     let timeoutId = setTimeout(() => {
@@ -389,7 +399,7 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
         cleanup();
         resolve(false);
       }
-    }, 1200);
+    }, 600); // 600ms is more than enough for a working stream to fire playing
 
     const cleanup = () => {
       clearTimeout(timeoutId);
@@ -398,6 +408,9 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
         video.pause();
       } catch (e) {}
       video.srcObject = null;
+      if (video.parentNode) {
+        video.parentNode.removeChild(video);
+      }
     };
 
     const onPlaying = () => {
@@ -419,7 +432,8 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
           
           let hasColor = false;
           for (let i = 0; i < data.length; i += 4) {
-            if (data[i] > 5 || data[i+1] > 5 || data[i+2] > 5) {
+            // Check if pixels are not completely pitch black (R, G, B > 8)
+            if (data[i] > 8 || data[i+1] > 8 || data[i+2] > 8) {
               hasColor = true;
               break;
             }
@@ -432,7 +446,7 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
           cleanup();
           resolve(true);
         }
-      }, 150);
+      }, 100);
     };
 
     video.addEventListener('playing', onPlaying);
@@ -449,7 +463,7 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
 export const getBestCameraStream = async (): Promise<{ stream: MediaStream; width: number; height: number }> => {
   let cached: string | null = null;
   try {
-    cached = localStorage.getItem('legium_camera_resolution');
+    cached = localStorage.getItem('legium_camera_res_v2');
   } catch (e) {}
 
   if (cached) {
@@ -471,24 +485,25 @@ export const getBestCameraStream = async (): Promise<{ stream: MediaStream; widt
         } else {
           stream.getTracks().forEach(t => t.stop());
           try {
-            localStorage.removeItem('legium_camera_resolution');
+            localStorage.removeItem('legium_camera_res_v2');
           } catch (e) {}
         }
       }
     } catch (e) {
       console.warn('Failed to start camera with cached resolution:', e);
       try {
-        localStorage.removeItem('legium_camera_resolution');
+        localStorage.removeItem('legium_camera_res_v2');
       } catch (e) {}
     }
   }
 
+  // Optimized resolutions list: 4:3 resolutions prioritize sensor coverage for document OCR.
   const resolutions = [
-    { width: 4096, height: 3072 },
-    { width: 3264, height: 2448 },
-    { width: 2560, height: 1440 },
-    { width: 1920, height: 1080 },
-    { width: 1280, height: 720 }
+    { width: 2560, height: 1920 }, // 5MP (4:3) - Ultra sharp document resolution
+    { width: 2048, height: 1536 }, // 3MP (4:3) - Sharp document resolution
+    { width: 1920, height: 1080 }, // 1080p (16:9) - Safe fallback (known to work on Redmi Note 9)
+    { width: 1440, height: 1080 }, // 1080p (4:3) - Standard 4:3 fallback
+    { width: 1280, height: 720 }   // 720p (16:9) - HD fallback
   ];
 
   let lastError: any = null;
@@ -507,7 +522,7 @@ export const getBestCameraStream = async (): Promise<{ stream: MediaStream; widt
         const finalH = settings.height || res.height;
         
         try {
-          localStorage.setItem('legium_camera_resolution', `${finalW}x${finalH}`);
+          localStorage.setItem('legium_camera_res_v2', `${finalW}x${finalH}`);
         } catch (e) {}
         return {
           stream,
