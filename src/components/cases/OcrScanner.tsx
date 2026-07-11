@@ -11,6 +11,7 @@ interface OcrScannerProps {
   currentUser: User;
   onOcrComplete: (newCase: Case, newDoc: DocumentItem, fileBlob: Blob) => void;
   onClose: () => void;
+  existingCase?: Case;
 }
 
 type FilterType = 'original' | 'lighten' | 'magic' | 'bw' | 'grayscale';

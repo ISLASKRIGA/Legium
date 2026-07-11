@@ -371,7 +371,6 @@ export const App: React.FC = () => {
           // Siempre arrancar en dashboard para mostrar el correcto según el rol
           window.location.hash = 'dashboard';
           setActiveTab('dashboard');
-          showToast('Sesión Iniciada', `Bienvenido al sistema, ${user.name}.`, 'success');
         }}
       />
     );
