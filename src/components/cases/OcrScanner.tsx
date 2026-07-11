@@ -1018,6 +1018,14 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             filter: drop-shadow(0 20px 50px rgba(0,0,0,0.7));
           }
         }
+        @keyframes fadeOutDoc {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes fadeInDoc {
+          0% { opacity: 0; filter: brightness(1.25) contrast(1.15) saturate(0.8); }
+          100% { opacity: 1; filter: none; }
+        }
       `}</style>
 
       {/* Hidden SVG filter definitions — legium-sharpen used by 'magic' filter */}
@@ -1200,8 +1208,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   </div>
                 </div>
               </div>
-            ) : (
-              /* scanPhase === 'scanning' */
+            ) : scanPhase === 'scanning' ? (
               <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
                 {/* Frozen original background image (crisp) */}
                 <img
@@ -1215,7 +1222,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     objectFit: 'cover',
                   }}
                 />
-                {/* Straightened document centered (fully straight and static) */}
+                {/* Straightened document centered (fully straight and static, raw image) */}
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
                   <div
                     style={{
@@ -1254,6 +1261,64 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                         zIndex: 9, pointerEvents: 'none',
                       }} />
                     </>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* scanPhase === 'enhancing' or done fallback */
+              <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+                {/* Frozen original background image (crisp) */}
+                <img
+                  src={originalImage || ''}
+                  alt="Uncropped bg"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                {/* Cross-fading raw and enhanced documents */}
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
+                  <div
+                    style={{
+                      position: 'relative',
+                      maxWidth: '85%',
+                      maxHeight: '100%',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
+                      background: '#fff',
+                    }}
+                  >
+                    {/* Raw warped image (fading out) */}
+                    <img
+                      src={capturedImage || ''}
+                      alt="Raw doc"
+                      style={{
+                        display: 'block',
+                        maxWidth: '100%',
+                        maxHeight: 'calc(100vh - 280px)',
+                        objectFit: 'contain',
+                        opacity: 0,
+                        animation: 'fadeOutDoc 0.4s forwards ease-in-out',
+                      }}
+                    />
+                    {/* Enhanced image (fading in) */}
+                    <img
+                      src={processedImage || capturedImage || ''}
+                      alt="Enhanced doc"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        opacity: 0,
+                        animation: 'fadeInDoc 0.4s forwards ease-in-out',
+                      }}
+                    />
                   </div>
                 </div>
               </div>
