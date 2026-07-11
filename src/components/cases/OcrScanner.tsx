@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw, Eye, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
+import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult, normalizeImageOrientation } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
@@ -664,14 +664,16 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       }
 
       if (dataUrl) {
-        capturedRawRef.current = dataUrl; // store raw immediately for display
-        setOriginalImage(dataUrl);
+        // Normalize EXIF orientation to keep dimensions matching the view!
+        const orientedUrl = await normalizeImageOrientation(dataUrl);
+        capturedRawRef.current = orientedUrl; // store raw immediately for display
+        setOriginalImage(orientedUrl);
 
         // Freeze frame, and start processing alignment (keeping step as 'capture'!)
         setScanPhase('captured');
         setTimeout(() => {
           stopCamera();
-          processAlignment(dataUrl!, edgePoints);
+          processAlignment(orientedUrl, edgePoints);
         }, 300);
       }
     }
@@ -681,9 +683,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         if (event.target?.result) {
-          const dataUrl = event.target.result as string;
+          const rawUrl = event.target.result as string;
+          const dataUrl = await normalizeImageOrientation(rawUrl);
           setOriginalImage(dataUrl);
           stopCamera();
 

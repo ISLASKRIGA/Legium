@@ -720,3 +720,127 @@ export function detectDocumentEdges(img: HTMLImageElement): QuadPoints {
     p4: { x: 14, y: 90 },
   };
 }
+
+function getExifOrientation(dataUrl: string): number {
+  try {
+    const parts = dataUrl.split(',');
+    if (parts.length < 2) return -1;
+    const base64 = parts[1];
+    const binary = atob(base64);
+    const len = binary.length;
+    const buffer = new ArrayBuffer(len);
+    const view = new DataView(buffer);
+    for (let i = 0; i < len; i++) {
+      view.setUint8(i, binary.charCodeAt(i));
+    }
+    
+    if (view.byteLength < 2 || view.getUint16(0, false) !== 0xFFD8) return -2; // Not a valid JPEG
+    
+    let offset = 2;
+    const length = view.byteLength;
+    
+    while (offset < length) {
+      if (offset + 2 > length) break;
+      const marker = view.getUint16(offset, false);
+      if (marker === 0xFFE1) {
+        const app1Offset = offset + 4;
+        if (app1Offset + 6 <= length && view.getUint32(app1Offset, false) === 0x45786966) { // "Exif"
+          const tiffOffset = app1Offset + 6;
+          if (tiffOffset + 8 <= length) {
+            const littleEndian = view.getUint16(tiffOffset, false) === 0x4949;
+            const ifdOffset = view.getUint32(tiffOffset + 4, littleEndian);
+            const firstIFDOffset = tiffOffset + ifdOffset;
+            if (firstIFDOffset + 2 <= length) {
+              const entries = view.getUint16(firstIFDOffset, littleEndian);
+              for (let i = 0; i < entries; i++) {
+                const entryOffset = firstIFDOffset + 2 + i * 12;
+                if (entryOffset + 12 <= length) {
+                  if (view.getUint16(entryOffset, littleEndian) === 0x0112) { // Orientation tag
+                    return view.getUint16(entryOffset + 8, littleEndian);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      if (offset + 2 + 2 <= length) {
+        offset += 2 + view.getUint16(offset + 2, false);
+      } else {
+        break;
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing EXIF orientation:", e);
+  }
+  return -1;
+}
+
+export const normalizeImageOrientation = (dataUrl: string): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!dataUrl.startsWith('data:image/jpeg') && !dataUrl.startsWith('data:image/jpg')) {
+      resolve(dataUrl);
+      return;
+    }
+
+    const orientation = getExifOrientation(dataUrl);
+    if (orientation <= 1) {
+      resolve(dataUrl);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+
+      if (orientation >= 5 && orientation <= 8) {
+        canvas.width = img.height;
+        canvas.height = img.width;
+      } else {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
+
+      switch (orientation) {
+        case 2: // Horizontal flip
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          break;
+        case 3: // 180° rotation
+          ctx.translate(canvas.width, canvas.height);
+          ctx.rotate(Math.PI);
+          break;
+        case 4: // Vertical flip
+          ctx.translate(0, canvas.height);
+          ctx.scale(1, -1);
+          break;
+        case 5: // Vertical flip + 90° rotation
+          ctx.rotate(Math.PI / 2);
+          ctx.scale(1, -1);
+          break;
+        case 6: // 90° CW rotation
+          ctx.translate(canvas.width, 0);
+          ctx.rotate(Math.PI / 2);
+          break;
+        case 7: // Horizontal flip + 90° rotation
+          ctx.rotate(-Math.PI / 2);
+          ctx.scale(-1, 1);
+          break;
+        case 8: // 270° CW rotation
+          ctx.translate(0, canvas.height);
+          ctx.rotate(-Math.PI / 2);
+          break;
+      }
+
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL('image/jpeg', 0.98));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+};

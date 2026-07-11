@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Wand2, RefreshCw, ChevronRight, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
+import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult, normalizeImageOrientation } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
@@ -282,7 +282,9 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       }
 
       if (dataUrl) {
-        setOriginalImage(dataUrl);
+        // Normalize EXIF orientation to keep dimensions matching the view!
+        const orientedUrl = await normalizeImageOrientation(dataUrl);
+        setOriginalImage(orientedUrl);
         
         setTimeout(() => {
           setFlashActive(false);
@@ -297,9 +299,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         if (event.target?.result) {
-          const dataUrl = event.target.result as string;
+          const rawUrl = event.target.result as string;
+          const dataUrl = await normalizeImageOrientation(rawUrl);
           setOriginalImage(dataUrl);
           stopCamera();
 
