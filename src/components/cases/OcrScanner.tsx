@@ -378,7 +378,7 @@ export const enhanceImage = (
 };
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
+  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'ocr-processing' | 'ocr-confirm'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -2188,190 +2188,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         </div>
       )}
 
-      {step === 'beautify' && capturedImage && (
-        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'space-between', height: '100%', background: '#000', padding: 0, position: 'relative' }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px', color: '#fff', alignItems: 'center', background: 'rgba(0,0,0,0.8)', height: '54px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <button onClick={() => { setStep('preview-full'); }} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', outline: 'none' }}>
-              <X size={24} />
-            </button>
-            <span style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '0.3px' }}>Ajuste de Filtro y PDF</span>
-            <div style={{ width: '24px' }} />
-          </div>
-
-          {/* Central Image Container */}
-          <div 
-            style={{ 
-              flexGrow: 1,
-              width: '100%', 
-              background: '#0a0a0c', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              position: 'relative',
-              padding: '20px'
-            }}
-          >
-            <div 
-              style={{ 
-                position: 'relative', 
-                maxWidth: '100%', 
-                maxHeight: '100%', 
-                boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
-                borderRadius: '4px',
-                overflow: 'hidden'
-              }}
-            >
-              <img 
-                src={processedImage || capturedImage} 
-                alt="Enhanced Preview" 
-                style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: '52vh', 
-                  display: 'block',
-                  transition: 'all 0.25s ease'
-                }} 
-              />
-            </div>
-          </div>
-
-          {/* Bottom control panel */}
-          <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(10,10,12,0.95)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingBottom: '24px' }}>
-            
-            {/* Horizontal Filter Picker list */}
-            <div style={{ overflowX: 'auto', padding: '14px 10px', display: 'flex', justifyContent: 'center', gap: '14px', whiteSpace: 'nowrap', userSelect: 'none', background: 'rgba(0,0,0,0.3)' }}>
-              <button
-                onClick={() => setActiveFilter('original')}
-                style={{ 
-                  background: activeFilter === 'original' ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '11px',
-                  color: activeFilter === 'original' ? '#00ff80' : 'rgba(255,255,255,0.6)',
-                  fontWeight: 600,
-                  outline: 'none'
-                }}
-              >
-                <span>Sin Manusc.</span>
-              </button>
-
-              <button
-                onClick={() => setActiveFilter('magic')}
-                style={{ 
-                  background: activeFilter === 'magic' ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '11px',
-                  color: activeFilter === 'magic' ? '#00ff80' : 'rgba(255,255,255,0.6)',
-                  fontWeight: 600,
-                  outline: 'none'
-                }}
-              >
-                <span>Mejorar</span>
-              </button>
-
-              <button
-                onClick={() => setActiveFilter('bw')}
-                style={{ 
-                  background: activeFilter === 'bw' ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '11px',
-                  color: activeFilter === 'bw' ? '#00ff80' : 'rgba(255,255,255,0.6)',
-                  fontWeight: 600,
-                  outline: 'none'
-                }}
-              >
-                <span>B&N</span>
-              </button>
-            </div>
-
-            {/* Document PDF filename entry */}
-            <div style={{ padding: '8px 24px 0 24px' }}>
-              <input 
-                type="text" 
-                value={fileName} 
-                onChange={(e) => setFileName(e.target.value)} 
-                placeholder="Nombre del PDF"
-                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', textAlign: 'center' }}
-              />
-            </div>
-
-            {/* Bottom action panel - matches CamScanner example */}
-            <div className="scanner-controls" style={{ padding: '14px 28px 4px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              
-              <button 
-                onClick={() => {
-                  setStep('capture');
-                  startCamera();
-                }}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
-              >
-                <RotateCcw size={18} />
-                <span>Re-tomar</span>
-              </button>
-
-
-              <button 
-                onClick={() => setStep('preview-full')}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
-              >
-                <span style={{ fontSize: '16px', lineHeight: 1 }}>📐</span>
-                <span>Recortar</span>
-              </button>
-
-              <button 
-                onClick={startOcrProcessing}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '10px', width: '60px' }}
-              >
-                <FileText size={18} style={{ color: 'var(--primary-gold)' }} />
-                <span>OCR</span>
-              </button>
-
-              <button 
-                onClick={startOcrProcessing}
-                style={{ 
-                  width: '42px', 
-                  height: '42px', 
-                  borderRadius: '50%', 
-                  background: '#00ff80', 
-                  color: '#000', 
-                  border: 'none', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0,255,128,0.3)',
-                  padding: 0,
-                  outline: 'none'
-                }}
-              >
-                <Check size={22} style={{ strokeWidth: 3 }} />
-              </button>
-
-            </div>
-          </div>
-        </div>
-      )}
-
       {step === 'ocr-processing' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', flexGrow: 1, background: '#1c1c1e', minHeight: '300px' }}>
           <div style={{ position: 'relative', width: '50px', height: '50px', marginBottom: '16px' }}>
@@ -2485,7 +2301,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           <div className="scanner-controls" style={{ gap: '12px' }}>
             <button 
               className="btn btn-secondary" 
-              onClick={() => setStep('beautify')}
+              onClick={() => setStep('aligning')}
               style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
             >
               Atrás
