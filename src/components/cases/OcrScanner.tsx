@@ -380,7 +380,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
-  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'cropping' | 'scanning' | 'enhancing' | 'done'>('idle');
+  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'cropping' | 'straightening' | 'scanning' | 'enhancing' | 'done'>('idle');
   const capturedRawRef = useRef<string | null>(null);
   const [scannerMsg, setScannerMsg] = useState('Apunta la cámara al escrito judicial...');
   const [alignProgress, setAlignProgress] = useState(0);
@@ -563,14 +563,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
           setCapturedImage(warped.dataUrl);
           setAlignProgress(70);
-          setScanPhase('scanning');
+          setScanPhase('straightening');
 
-          // 2. Let the laser sweep run for 600ms
+          // 2. Let the straighten & flatten animation settle for 500ms
           setTimeout(() => {
-            setAlignProgress(100);
-            setScanPhase('done');
-            setStep('aligning');
-          }, 600);
+            setScanPhase('scanning');
+
+            // 3. Let the laser sweep run for 600ms
+            setTimeout(() => {
+              setAlignProgress(100);
+              setScanPhase('done');
+              setStep('aligning');
+            }, 600);
+          }, 500);
         } catch (innerErr) {
           console.error('Perspective warp failed inside timeout:', innerErr);
           setCapturedImage(imgDataUrl);
@@ -1001,6 +1006,18 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           0% { opacity: 1; transform: scale(1); }
           100% { opacity: 0; transform: scale(1.01); }
         }
+        @keyframes straightenDoc {
+          0% {
+            transform: scale(0.9) rotate(-3deg);
+            opacity: 0;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3));
+          }
+          100% {
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+            filter: drop-shadow(0 20px 50px rgba(0,0,0,0.7));
+          }
+        }
       `}</style>
 
       {/* Hidden SVG filter definitions — legium-sharpen used by 'magic' filter */}
@@ -1142,6 +1159,47 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   />
                 </svg>
               </div>
+            ) : scanPhase === 'straightening' ? (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+                {/* Frozen original background image (crisp) */}
+                <img
+                  src={originalImage || ''}
+                  alt="Uncropped bg"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                {/* Straightened document centered (settling with animation, no laser) */}
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
+                  <div
+                    style={{
+                      position: 'relative',
+                      maxWidth: '85%',
+                      maxHeight: '100%',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
+                      background: '#fff',
+                      animation: 'straightenDoc 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+                    }}
+                  >
+                    <img
+                      src={capturedImage || ''}
+                      alt="Documento recortado"
+                      style={{
+                        display: 'block',
+                        maxWidth: '100%',
+                        maxHeight: 'calc(100vh - 280px)',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             ) : (
               /* scanPhase === 'scanning' */
               <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
@@ -1157,7 +1215,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     objectFit: 'cover',
                   }}
                 />
-                {/* Straightened document centered */}
+                {/* Straightened document centered (fully straight and static) */}
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
                   <div
                     style={{
@@ -1168,7 +1226,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       overflow: 'hidden',
                       boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
                       background: '#fff',
-                      animation: 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
                     }}
                   >
                     <img

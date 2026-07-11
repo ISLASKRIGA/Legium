@@ -36,7 +36,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const [sheetDetected, setSheetDetected] = useState(false);
   const [detectionConfidence, setDetectionConfidence] = useState(0);
   const [alignProgress, setAlignProgress] = useState(0);
-  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'cropping' | 'scanning' | 'done'>('idle');
+  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'cropping' | 'straightening' | 'scanning' | 'done'>('idle');
   
   // Zoom and pan states for high-res preview
   const [zoomScale, setZoomScale] = useState(1);
@@ -541,6 +541,18 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         @keyframes fadeOutLine {
           0% { opacity: 1; transform: scale(1); }
           100% { opacity: 0; transform: scale(1.01); }
+        }
+        @keyframes straightenDoc {
+          0% {
+            transform: scale(0.9) rotate(-3deg);
+            opacity: 0;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3));
+          }
+          100% {
+            transform: scale(1) rotate(0deg);
+            opacity: 1;
+            filter: drop-shadow(0 20px 50px rgba(0,0,0,0.7));
+          }
         }
       `}</style>
        {/* Top Bar for camera */}
