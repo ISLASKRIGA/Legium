@@ -1944,14 +1944,15 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           {/* ── Bottom: filter row + action bar (shown when done) ── */}
           <div
             style={{
-              position: 'relative', zIndex: 10,
+              position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
               background: '#ffffff',
               borderTop: '1px solid rgba(0, 0, 0, 0.08)',
               boxShadow: '0 -8px 30px rgba(0,0,0,0.06)',
               opacity: scanPhase === 'done' ? 1 : 0,
-              transform: scanPhase === 'done' ? 'translateY(0)' : 'translateY(30px)',
+              transform: scanPhase === 'done' ? 'translateY(0)' : 'translateY(100%)',
               transition: 'opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1), transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
               pointerEvents: scanPhase === 'done' ? 'auto' : 'none',
+              paddingBottom: '24px',
             }}
           >
             {/* Filter chips row */}
