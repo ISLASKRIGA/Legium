@@ -210,7 +210,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   // Capture photo from video feed
   const capturePhoto = () => {
     setFlashActive(true);
-    setTimeout(() => setFlashActive(false), 200);
+    setScanPhase('captured');
 
     if (hasCamera && videoRef.current) {
       const canvas = document.createElement('canvas');
@@ -221,8 +221,12 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
         setOriginalImage(dataUrl);
-        setStep('preview-full');
-        stopCamera();
+        
+        setTimeout(() => {
+          setFlashActive(false);
+          setStep('preview-full');
+          stopCamera();
+        }, 250);
       }
     }
   };
@@ -560,7 +564,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       {step === 'capture' && (
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, position: 'relative', height: '100%', justifyContent: 'space-between' }}>
           <div className="camera-preview-wrapper" style={{ flexGrow: 1, height: 'calc(100vh - 240px)', width: '100%', position: 'relative', borderRadius: 0, overflow: 'hidden', background: '#000' }}>
-            {hasCamera ? (
+            {hasCamera && scanPhase !== 'captured' ? (
               <video
                 ref={videoRef}
                 autoPlay
@@ -575,28 +579,42 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                 }}
               />
             ) : (
-              <div 
-                style={{ 
-                  position: 'absolute', 
-                  inset: 0, 
-                  background: 'linear-gradient(135deg, #1c1c1e, #2c2c2e)', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  padding: '24px',
-                  color: 'var(--text-secondary)',
-                  zIndex: 2
-                }}
-              >
-                <Upload size={48} style={{ color: '#00ff80', marginBottom: '12px' }} />
-                <p style={{ fontSize: '14px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
-                  Escáner de Documento de Caso
-                </p>
-                <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
-                  Cámara no disponible. Sube una foto de tu documento para ajustar sus esquinas y recortarlo.
-                </p>
-              </div>
+              (scanPhase === 'captured' && originalImage) ? (
+                <img
+                  src={originalImage}
+                  alt="Captured still"
+                  style={{
+                    position: 'absolute',
+                    top: 0, left: 0,
+                    width: '100%', height: '100%',
+                    objectFit: 'cover',
+                    zIndex: 2
+                  }}
+                />
+              ) : (
+                <div 
+                  style={{ 
+                    position: 'absolute', 
+                    inset: 0, 
+                    background: 'linear-gradient(135deg, #1c1c1e, #2c2c2e)', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    padding: '24px',
+                    color: 'var(--text-secondary)',
+                    zIndex: 2
+                  }}
+                >
+                  <Upload size={48} style={{ color: '#00ff80', marginBottom: '12px' }} />
+                  <p style={{ fontSize: '14px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
+                    Escáner de Documento de Caso
+                  </p>
+                  <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
+                    Cámara no disponible. Sube una foto de tu documento para ajustar sus esquinas y recortarlo.
+                  </p>
+                </div>
+              )
             )}
 
             {/* ── SVG Perspective Quad Overlay ── */}

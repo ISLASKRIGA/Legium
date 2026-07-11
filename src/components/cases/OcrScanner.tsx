@@ -1038,7 +1038,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       {step === 'capture' && (
         <>
           <div className="camera-preview-wrapper" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden', background: '#000', zIndex: 1 }}>
-            {hasCamera ? (
+            {hasCamera && scanPhase !== 'captured' ? (
               <video
                 ref={videoRef}
                 autoPlay
@@ -1053,28 +1053,42 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 }}
               />
             ) : (
-              <div 
-                style={{ 
-                  position: 'absolute', 
-                  inset: 0, 
-                  background: 'linear-gradient(135deg, #1c1c1e, #2c2c2e)', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  padding: '24px',
-                  color: 'var(--text-secondary)',
-                  zIndex: 2
-                }}
-              >
-                <Upload size={48} style={{ color: '#00ff80', marginBottom: '12px' }} />
-                <p style={{ fontSize: '14px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
-                  Escáner de Escritos Judiciales
-                </p>
-                <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
-                  Cámara no disponible. Sube una foto de tu documento para ajustar sus esquinas y recortarlo.
-                </p>
-              </div>
+              (scanPhase === 'captured' && originalImage) ? (
+                <img
+                  src={originalImage}
+                  alt="Captured still"
+                  style={{
+                    position: 'absolute',
+                    top: 0, left: 0,
+                    width: '100%', height: '100%',
+                    objectFit: 'cover',
+                    zIndex: 2
+                  }}
+                />
+              ) : (
+                <div 
+                  style={{ 
+                    position: 'absolute', 
+                    inset: 0, 
+                    background: 'linear-gradient(135deg, #1c1c1e, #2c2c2e)', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    padding: '24px',
+                    color: 'var(--text-secondary)',
+                    zIndex: 2
+                  }}
+                >
+                  <Upload size={48} style={{ color: '#00ff80', marginBottom: '12px' }} />
+                  <p style={{ fontSize: '14px', fontWeight: '600', color: '#fff', textAlign: 'center' }}>
+                    Escáner de Escritos Judiciales
+                  </p>
+                  <p style={{ fontSize: '11px', textAlign: 'center', maxWidth: '280px', marginTop: '4px' }}>
+                    Cámara no disponible. Sube una foto de tu documento para ajustar sus esquinas y recortarlo.
+                  </p>
+                </div>
+              )
             )}
 
             {/* ── SVG Perspective Quad Overlay ── */}
