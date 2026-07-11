@@ -219,7 +219,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       // 1. Let the crop & lift animation play for 1.2s
       setTimeout(async () => {
         try {
-          const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
+          const warped = await warpPerspective(imgDataUrl, quad, 2480, 3508);
           setCapturedImage(warped.dataUrl);
           setAlignProgress(70);
           setScanPhase('scanning');

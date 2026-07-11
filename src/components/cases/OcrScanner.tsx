@@ -167,8 +167,8 @@ export const enhanceImage = (
         // 3. Local adaptive gain filter (Bradley-Roth style enhancement)
         const S = Math.max(16, (w / 16) | 0);
         const S2 = S >> 1;
-        const C = 12 * brightness; // Slightly increased for better cleaning
-        const exponent = 2.4 * contrast; // Steeper contrast for crisper text
+        const C = 16 * brightness; // Increased for stronger shadow and gradient cleaning
+        const exponent = 2.8 * contrast; // Increased contrast for crisper text
 
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
@@ -200,11 +200,11 @@ export const enhanceImage = (
             // Classify as color only if it has high chroma and is NOT just paper yellowing
             const isColor = chroma > 30 && !isWarmCast;
 
-            // Aggressive whitening of background (especially if L is bright or it is warm cast paper)
-            if (L >= avg - C && (!isColor || L > 200)) {
-              // Whitening factor increases with brightness and warm cast detection
+            // Aggressive whitening of background (shadows/paper details)
+            if (L >= avg - C && (!isColor || L > 190)) {
+              // Whitening factor: force pure white for bright/warm-cast paper or pixels significantly above average
               const diff = L - (avg - C);
-              const factor = L > 200 || isWarmCast ? 1.0 : Math.min(1.0, diff / 5);
+              const factor = (L > 180 || isWarmCast || diff > 6) ? 1.0 : Math.min(1.0, diff / 4);
               r = Math.round(r + (255 - r) * factor);
               g = Math.round(g + (255 - g) * factor);
               b = Math.round(b + (255 - b) * factor);
@@ -218,7 +218,7 @@ export const enhanceImage = (
               const L_norm = 0.299 * r_norm + 0.587 * g_norm + 0.114 * b_norm;
 
               // Boost saturation of real colors
-              const satFactor = isColor ? 2.2 : 1.0;
+              const satFactor = isColor ? 2.5 : 1.0;
               const r_sat = L_norm + (r_norm - L_norm) * satFactor;
               const g_sat = L_norm + (g_norm - L_norm) * satFactor;
               const b_sat = L_norm + (b_norm - L_norm) * satFactor;
@@ -230,9 +230,12 @@ export const enhanceImage = (
               const colorWeight = isColor ? (maxVal / 255) : 0;
               const finalRatio = enhancedRatio * (1 - colorWeight) + colorWeight;
 
-              r = Math.min(255, Math.max(0, r_sat * finalRatio));
-              g = Math.min(255, Math.max(0, g_sat * finalRatio));
-              b = Math.min(255, Math.max(0, b_sat * finalRatio));
+              // Force dark ink to be even darker for crisp text reading
+              const scaleRatio = finalRatio < 0.38 && !isColor ? finalRatio * 0.70 : finalRatio;
+
+              r = Math.min(255, Math.max(0, r_sat * scaleRatio));
+              g = Math.min(255, Math.max(0, g_sat * scaleRatio));
+              b = Math.min(255, Math.max(0, b_sat * scaleRatio));
             }
 
             data[idx * 4] = r;
@@ -316,7 +319,7 @@ export const enhanceImage = (
         // 3. Adaptive background whitening with color preservation
         const S = Math.max(16, (w / 16) | 0);
         const S2 = S >> 1;
-        const C = 15 * brightness; // Higher margin for aggressive background whitening
+        const C = 20 * brightness; // Increased threshold for cleaner white background margins
 
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
@@ -344,10 +347,10 @@ export const enhanceImage = (
             const chroma = maxVal - minVal;
             const isWarmCast = chroma < 65 && r > b && g > b;
 
-            if (L >= avg - C || L > 195 || isWarmCast) {
-              // Smooth transition to pure white
+            if (L >= avg - C || L > 185 || isWarmCast) {
+              // Bleach background to pure white aggressively
               const diff = L - (avg - C);
-              const factor = L > 195 || isWarmCast ? 1.0 : Math.min(1.0, diff / 8);
+              const factor = (L > 180 || isWarmCast || diff > 5) ? 1.0 : Math.min(1.0, diff / 5);
               r = Math.round(r + (255 - r) * factor);
               g = Math.round(g + (255 - g) * factor);
               b = Math.round(b + (255 - b) * factor);
@@ -591,7 +594,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setAlignProgress(15);
     try {
       // 1. Run perspective warp immediately!
-      const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
+      const warped = await warpPerspective(imgDataUrl, quad, 2480, 3508);
       setCapturedImage(warped.dataUrl);
       setAlignProgress(70);
 

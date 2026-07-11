@@ -170,8 +170,8 @@ function solveGaussian(A: number[][], B: number[]): number[] {
 export const warpPerspective = (
   imageDataUrl: string,
   quad: QuadPoints,
-  targetWidth: number = 800,
-  targetHeight: number = 1100
+  targetWidth: number = 2480,
+  targetHeight: number = 3508
 ): Promise<{ dataUrl: string; width: number; height: number }> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
