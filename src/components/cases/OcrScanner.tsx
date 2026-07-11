@@ -407,6 +407,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setZoomScale(1);
     setPanOffset({ x: 0, y: 0 });
 
+    if (scanPhase === 'scanning') {
+      return;
+    }
+
     if (capturedImage) {
       setIsEnhancing(true);
       enhanceImage(capturedImage, activeFilter, magicBrightness, magicContrast)
@@ -421,7 +425,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     } else {
       setProcessedImage(null);
     }
-  }, [capturedImage, activeFilter, magicBrightness, magicContrast]);
+  }, [capturedImage, activeFilter, magicBrightness, magicContrast, scanPhase]);
 
   // Multi-page: accumulated processed pages (filtered data URLs + dimensions)
   const [scannedPages, setScannedPages] = useState<CroppedImageResult[]>([]);
@@ -562,6 +566,15 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         try {
           const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
           setCapturedImage(warped.dataUrl);
+          
+          try {
+            const enhancedUrl = await enhanceImage(warped.dataUrl, 'magic', magicBrightness, magicContrast);
+            setProcessedImage(enhancedUrl);
+          } catch (enhErr) {
+            console.error('Pre-enhancement failed:', enhErr);
+            setProcessedImage(warped.dataUrl);
+          }
+
           setAlignProgress(70);
           setScanPhase('scanning');
 
@@ -1001,6 +1014,15 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           0% { opacity: 1; transform: scale(1); }
           100% { opacity: 0; transform: scale(1.01); }
         }
+        @keyframes revealEnhanced {
+          0% { clip-path: inset(0 0 100% 0); }
+          100% { clip-path: inset(0 0 0% 0); }
+        }
+        @keyframes sweepLaserOnce {
+          0% { top: 0%; opacity: 1; }
+          90% { top: 100%; opacity: 1; }
+          100% { top: 100%; opacity: 0; }
+        }
       `}</style>
 
       {/* Hidden SVG filter definitions — legium-sharpen used by 'magic' filter */}
@@ -1171,9 +1193,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       animation: 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
                     }}
                   >
+                    {/* Bottom image: original raw warp */}
                     <img
                       src={capturedImage || ''}
-                      alt="Documento recortado"
+                      alt="Documento original"
                       style={{
                         display: 'block',
                         maxWidth: '100%',
@@ -1181,19 +1204,36 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                         objectFit: 'contain',
                       }}
                     />
-                    {/* Green laser sweep */}
+
+                    {/* Top image: enhanced magic warped (revealed by sweep keyframes) */}
+                    <img
+                      src={processedImage || capturedImage || ''}
+                      alt="Documento mejorado"
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        animation: 'revealEnhanced 0.6s forwards linear',
+                        zIndex: 2
+                      }}
+                    />
+
+                    {/* Single sweep green laser line */}
                     <>
                       <div style={{
                         position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
                         background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
                         boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
-                        animation: 'sweepLaser 0.8s ease-in-out infinite',
+                        animation: 'sweepLaserOnce 0.6s forwards linear',
                         zIndex: 10,
                       }} />
                       <div style={{
                         position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
                         background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
-                        animation: 'sweepLaser 0.8s ease-in-out infinite',
+                        animation: 'sweepLaserOnce 0.6s forwards linear',
                         zIndex: 9, pointerEvents: 'none',
                       }} />
                     </>
@@ -1764,50 +1804,80 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     animation: 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
                   }}
                 >
-                  <img
-                    src={processedImage || capturedImage}
-                    alt="Documento recortado"
-                    style={{
-                      display: 'block',
-                      maxWidth: '100%',
-                      maxHeight: 'calc(100vh - 280px)',
-                      objectFit: 'contain',
-                      opacity: isEnhancing ? 0.5 : 1,
-                      transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
-                      transformOrigin: 'center center',
-                      cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
-                      transition: (isPanning || touchStartDistRef.current !== null) ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                      touchAction: zoomScale > 1 ? 'none' : 'auto',
-                    }}
-                    onMouseDown={handlePointerDown}
-                    onMouseMove={handlePointerMove}
-                    onMouseUp={handlePointerUp}
-                    onMouseLeave={handlePointerUp}
-                    onTouchStart={handlePointerDown}
-                    onTouchMove={handlePointerMove}
-                    onTouchEnd={handlePointerUp}
-                    onDoubleClick={handleImageDoubleClick}
-                  />
+                  {scanPhase === 'scanning' ? (
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                      {/* Bottom image: original raw warp */}
+                      <img
+                        src={capturedImage || ''}
+                        alt="Documento original"
+                        style={{
+                          display: 'block',
+                          maxWidth: '100%',
+                          maxHeight: 'calc(100vh - 280px)',
+                          objectFit: 'contain',
+                        }}
+                      />
 
-                  {/* ── Green laser sweep ── */}
-                  {scanPhase === 'scanning' && (
-                    <>
-                      <div style={{
-                        position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
-                        background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
-                        boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
-                        animation: 'sweepLaser 0.8s ease-in-out infinite',
-                        zIndex: 10,
-                      }} />
-                      <div style={{
-                        position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
-                        background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
-                        animation: 'sweepLaser 0.8s ease-in-out infinite',
-                        zIndex: 9, pointerEvents: 'none',
-                      }} />
-                    </>
+                      {/* Top image: enhanced magic warped (revealed by sweep keyframes) */}
+                      <img
+                        src={processedImage || capturedImage || ''}
+                        alt="Documento mejorado"
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          animation: 'revealEnhanced 0.6s forwards linear',
+                          zIndex: 2
+                        }}
+                      />
+
+                      {/* Single sweep green laser line */}
+                      <>
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
+                          background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
+                          boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
+                          animation: 'sweepLaserOnce 0.6s forwards linear',
+                          zIndex: 10,
+                        }} />
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
+                          background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
+                          animation: 'sweepLaserOnce 0.6s forwards linear',
+                          zIndex: 9, pointerEvents: 'none',
+                        }} />
+                      </>
+                    </div>
+                  ) : (
+                    <img
+                      src={processedImage || capturedImage}
+                      alt="Documento recortado"
+                      style={{
+                        display: 'block',
+                        maxWidth: '100%',
+                        maxHeight: 'calc(100vh - 280px)',
+                        objectFit: 'contain',
+                        opacity: isEnhancing ? 0.5 : 1,
+                        transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+                        transformOrigin: 'center center',
+                        cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
+                        transition: (isPanning || touchStartDistRef.current !== null) ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        touchAction: zoomScale > 1 ? 'none' : 'auto',
+                      }}
+                      onMouseDown={handlePointerDown}
+                      onMouseMove={handlePointerMove}
+                      onMouseUp={handlePointerUp}
+                      onMouseLeave={handlePointerUp}
+                      onTouchStart={handlePointerDown}
+                      onTouchMove={handlePointerMove}
+                      onTouchEnd={handlePointerUp}
+                      onDoubleClick={handleImageDoubleClick}
+                    />
                   )}
                 </div>
               </div>
