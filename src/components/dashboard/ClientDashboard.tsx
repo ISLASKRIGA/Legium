@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert, Download, Upload } from 'lucide-react';
 import { Case, User, DocumentItem, Client } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
+import { DocumentScanner } from '../cases/DocumentScanner';
 import { getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
 import { GlassButton } from '../ui/glass-button';
+import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
 
 interface ClientDashboardProps {
   currentUser: User;
   cases: Case[];
   clients: Client[];
   searchQuery: string;
+  onUpdateCase: (updatedCase: Case) => void;
   onAddCase: (newCase: Case) => void;
   onAddLog: (action: string, status: 'Success' | 'Warning' | 'Denied') => void;
   onShowToast: (title: string, message: string, type: 'success' | 'warning' | 'danger') => void;
@@ -21,14 +24,131 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
   cases,
   clients,
   searchQuery,
+  onUpdateCase,
   onAddCase,
   onAddLog,
   onShowToast,
   onOpenScanner
 }) => {
-  const [activeModal, setActiveModal] = useState<'none' | 'scanner' | 'pdf'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'scanner' | 'scanner-case' | 'pdf'>('none');
   const [scannerSheetOpen, setScannerSheetOpen] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent, caseObj: Case) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await processUploadedFile(files[0], caseObj);
+    }
+  };
+
+  const processUploadedFile = async (file: File, caseObj: Case) => {
+    if (file.type !== 'application/pdf') {
+      onShowToast('Archivo no soportado', 'Solo se admiten documentos en formato PDF.', 'danger');
+      return;
+    }
+
+    const docId = 'doc-' + Date.now();
+    const uploadDate = new Date().toISOString().split('T')[0];
+    const sizeStr = (file.size / 1024).toFixed(1) + ' KB';
+
+    try {
+      const storageKey = await savePdfBlob(docId, file);
+
+      let pdfUrl: string | null = null;
+      try {
+        await saveCaseRecord(caseObj);
+        pdfUrl = await uploadPdfToSupabase(docId, file, caseObj.id);
+        await saveDocumentRecord({
+          id: docId,
+          caseId: caseObj.id,
+          name: file.name,
+          sizeKb: parseFloat((file.size / 1024).toFixed(1)),
+          uploadDate,
+          ocrText: '',
+          pdfUrl
+        });
+      } catch (err) {
+        console.error('[Supabase Upload] Failed syncing case or uploading document:', err);
+      }
+
+      const newDoc: DocumentItem = {
+        id: docId,
+        name: file.name,
+        size: sizeStr,
+        uploadDate,
+        ocrText: '',
+        storageKey,
+        pdfUrl
+      };
+
+      const updated = { ...caseObj, documents: [...caseObj.documents, newDoc] };
+      onUpdateCase(updated);
+      onAddLog(`Cliente ${currentUser.name} cargó documento PDF ${file.name} en expediente ${caseObj.id}`, 'Success');
+      onShowToast('Documento Cargado', `El PDF ${file.name} se ha cargado con éxito.`, 'success');
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      onShowToast('Error al cargar', 'No se pudo procesar el archivo PDF.', 'danger');
+    }
+  };
+
+  const handleCaseScanComplete = async (scannedDoc: DocumentItem, fileBlob: Blob, caseObj: Case) => {
+    const docId = scannedDoc.id || 'doc-' + Date.now();
+    const uploadDate = scannedDoc.uploadDate || new Date().toISOString().split('T')[0];
+    const sizeStr = (fileBlob.size / 1024).toFixed(1) + ' KB';
+
+    try {
+      const storageKey = await savePdfBlob(docId, fileBlob);
+
+      let pdfUrl: string | null = null;
+      try {
+        await saveCaseRecord(caseObj);
+        pdfUrl = await uploadPdfToSupabase(docId, fileBlob, caseObj.id);
+        await saveDocumentRecord({
+          id: docId,
+          caseId: caseObj.id,
+          name: scannedDoc.name.endsWith('.pdf') ? scannedDoc.name : scannedDoc.name + '.pdf',
+          sizeKb: parseFloat((fileBlob.size / 1024).toFixed(1)),
+          uploadDate,
+          ocrText: scannedDoc.ocrText || '',
+          pdfUrl
+        });
+      } catch (err) {
+        console.error('[Supabase Upload] Failed syncing case or uploading document:', err);
+      }
+
+      const newDoc: DocumentItem = {
+        ...scannedDoc,
+        id: docId,
+        name: scannedDoc.name.endsWith('.pdf') ? scannedDoc.name : scannedDoc.name + '.pdf',
+        size: sizeStr,
+        uploadDate,
+        storageKey,
+        pdfUrl
+      };
+
+      const updated = { ...caseObj, documents: [...caseObj.documents, newDoc] };
+      onUpdateCase(updated);
+      onAddLog(`Cliente ${currentUser.name} cargó documento PDF escaneado ${newDoc.name} en expediente ${caseObj.id}`, 'Success');
+      onShowToast('Documento Escaneado', `El PDF escaneado ${newDoc.name} se ha guardado con éxito.`, 'success');
+    } catch (err) {
+      console.error('Error handling scanned document:', err);
+      onShowToast('Error al escanear', 'No se pudo guardar el documento escaneado.', 'danger');
+    }
+  };
 
   // Resolve the client name dynamically from the clients list
   const clientRecord = clients.find(cl => cl.id === currentUser.clientId);
@@ -236,8 +356,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                   ))}
                 </div>
               </div>
-
-              {/* Case Specific Documents */}
+                    {/* Case Specific Documents */}
               <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <FileText size={15} style={{ color: 'var(--danger)' }} /> Documentos Adjuntos
@@ -250,13 +369,71 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                       </div>
                       <div className="doc-info">
                         <div className="doc-name">{doc.name}</div>
-                        <div className="doc-meta">{doc.size} â€¢ {doc.uploadDate}</div>
+                        <div className="doc-meta">{doc.size} • {doc.uploadDate}</div>
                       </div>
                       <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name)}>
                         Visualizar
                       </button>
                     </div>
                   ))}
+                </div>
+
+                <div 
+                  className={`file-upload-zone ${dragOver ? 'dragover' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, selectedCase)}
+                  style={{
+                    border: '1.5px dashed var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    textAlign: 'center',
+                    background: dragOver ? 'rgba(0,122,255,0.04)' : 'rgba(0,0,0,0.01)',
+                    borderColor: dragOver ? 'var(--primary-blue)' : 'var(--border-color)',
+                    transition: 'all 0.2s ease',
+                    marginTop: '12px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={22} style={{ color: 'var(--text-secondary)', margin: '0 auto 6px', opacity: 0.7 }} />
+                  <p style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Arrastra tu demanda o PDF aquí
+                  </p>
+                  <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Solo formato PDF (máx. 15MB)
+                  </p>
+                </div>
+
+                <div style={{ marginTop: '14px', display: 'flex', gap: '10px' }}>
+                  <GlassButton
+                    className="btn-secondary"
+                    size="sm"
+                    onClick={() => setActiveModal('scanner-case')}
+                  >
+                    <Camera size={13} /> Escanear
+                  </GlassButton>
+                  
+                  <GlassButton
+                    className="btn-secondary"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={13} /> Adjuntar PDF
+                  </GlassButton>
+                  
+                  <input
+                    type="file"
+                    id="client-case-pdf-input"
+                    accept="application/pdf"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        processUploadedFile(e.target.files[0], selectedCase);
+                      }
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -410,6 +587,30 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
         </div>
       )}
 
+      {/* 1.5. CASE SPECIFIC SCANNER MODAL */}
+      {activeModal === 'scanner-case' && selectedCase && (
+        <div className="modal active">
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div className="ios-grabber" />
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Camera size={18} style={{ color: 'var(--primary-blue)' }} /> Escáner de Documentos Judiciales
+              </h3>
+              <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
+            </div>
+            <div className="modal-body" style={{ padding: '16px' }}>
+              <DocumentScanner 
+                onScanComplete={(newDoc, blob) => {
+                  handleCaseScanComplete(newDoc, blob, selectedCase);
+                  setActiveModal('none');
+                }} 
+                onClose={() => setActiveModal('none')} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. PDF VIEW MODAL */}
       {activeModal === 'pdf' && (
         <div className="modal active">
@@ -417,7 +618,19 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
             <div className="ios-grabber" />
             <div className="modal-header">
               <h3 className="modal-title">{activeDocName}</h3>
-              <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {activeDocUrl && (
+                  <a
+                    href={activeDocUrl}
+                    download={activeDocName}
+                    className="btn btn-secondary btn-sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+                  >
+                    <Download size={14} /> Exportar
+                  </a>
+                )}
+                <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
+              </div>
             </div>
             <div className="modal-body" style={{ padding: 0 }}>
               <div id="pdf-viewer-container" style={{ width: '100%', height: '70vh', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

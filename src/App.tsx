@@ -145,11 +145,52 @@ export const App: React.FC = () => {
 
   // --- CRUD ACTIONS ---
 
-  // Update single case
-  const handleUpdateCase = (updatedCase: Case) => {
+  // Update existing case
+  const handleUpdateCase = async (updatedCase: Case) => {
+    const oldCase = cases.find(c => c.id === updatedCase.id);
     const updatedCases = cases.map((c) => (c.id === updatedCase.id ? updatedCase : c));
     LegiumDB.set('cases', updatedCases);
     setCases(updatedCases);
+
+    // Sync case to Supabase
+    try {
+      await saveCaseRecord(updatedCase);
+    } catch (err) {
+      console.error('[Supabase] Failed to sync updated case:', err);
+    }
+
+    if (currentUser?.role === 'Cliente' && oldCase && updatedCase.documents.length > oldCase.documents.length) {
+      const addedDoc = updatedCase.documents[updatedCase.documents.length - 1];
+      const notiId = 'noti-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      const notiDate = new Date().toISOString();
+      const notiTitle = 'Nuevo Documento Adjuntado';
+      const notiMsg = `El cliente ${currentUser.name} ha subido el documento "${addedDoc.name}" en el expediente ${updatedCase.id}.`;
+
+      // 1. Add notification locally
+      LegiumDB.addNotification(
+        notiTitle,
+        notiMsg,
+        updatedCase.id,
+        'Abogado Senior'
+      );
+      setNotifications(LegiumDB.getNotifications());
+      showToast('Documento Notificado', 'Se ha notificado al equipo de Abogados Senior sobre el nuevo archivo.', 'info');
+
+      // 2. Sync notification to Supabase
+      try {
+        await saveNotificationRecord({
+          id: notiId,
+          title: notiTitle,
+          message: notiMsg,
+          date: notiDate,
+          read: false,
+          caseId: updatedCase.id,
+          targetRole: 'Abogado Senior'
+        });
+      } catch (err) {
+        console.error('[Supabase] Failed to sync notification:', err);
+      }
+    }
   };
 
   // Create new case
@@ -371,6 +412,7 @@ export const App: React.FC = () => {
                   cases={cases}
                   clients={clients}
                   searchQuery={searchQuery}
+                  onUpdateCase={handleUpdateCase}
                   onAddCase={handleAddCase}
                   onAddLog={addLogEntry}
                   onShowToast={showToast}

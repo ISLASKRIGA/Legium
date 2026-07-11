@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Plus, Calendar, CheckSquare, MessageSquare, FileText, Trash2, Camera, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, CheckSquare, MessageSquare, FileText, Trash2, Camera, Upload, Download } from 'lucide-react';
 import { Case, User, DocumentItem, TimelineItem, TaskItem } from '../../utils/types';
 import { DocumentScanner } from './DocumentScanner';
 import { deletePdfBlob, getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
@@ -694,7 +694,19 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
             <div className="ios-grabber" />
             <div className="modal-header">
               <h3 className="modal-title" id="pdf-viewer-title">{activeDocName}</h3>
-              <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {activeDocUrl && (
+                  <a
+                    href={activeDocUrl}
+                    download={activeDocName}
+                    className="btn btn-secondary btn-sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+                  >
+                    <Download size={14} /> Exportar
+                  </a>
+                )}
+                <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
+              </div>
             </div>
             <div className="modal-body" style={{ padding: 0 }}>
               <div id="pdf-viewer-container" style={{ width: '100%', height: '70vh', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
