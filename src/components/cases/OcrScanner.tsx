@@ -434,6 +434,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const panStartRef = useRef({ x: 0, y: 0 });
   const touchStartDistRef = useRef<number | null>(null);
   const touchStartScaleRef = useRef<number>(1);
+  const isPinchModeRef = useRef(false);
 
   // Drag corners state
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
@@ -881,13 +882,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   };
 
   const handlePointerDown = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if ('touches' in e && e.touches.length === 2) {
-      setIsPanning(false);
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      touchStartDistRef.current = Math.hypot(dx, dy);
-      touchStartScaleRef.current = zoomScale;
-      return;
+    if ('touches' in e) {
+      if (e.touches.length === 2) {
+        setIsPanning(false);
+        isPinchModeRef.current = true;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        touchStartDistRef.current = Math.hypot(dx, dy);
+        touchStartScaleRef.current = zoomScale;
+        return;
+      }
+      if (e.touches.length === 1 && isPinchModeRef.current) {
+        return;
+      }
     }
 
     if (zoomScale === 1) return;
@@ -898,19 +905,26 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   };
 
   const handlePointerMove = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if ('touches' in e && e.touches.length === 2 && touchStartDistRef.current !== null) {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.hypot(dx, dy);
-      const scale = touchStartScaleRef.current * (dist / touchStartDistRef.current);
-      
-      const clampedScale = Math.max(1.0, Math.min(4.0, scale));
-      setZoomScale(clampedScale);
-      if (clampedScale === 1.0) {
-        setPanOffset({ x: 0, y: 0 });
+    if ('touches' in e) {
+      if (e.touches.length === 2 && touchStartDistRef.current !== null) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        
+        if (Math.abs(dist - touchStartDistRef.current) > 3) {
+          const scale = touchStartScaleRef.current * (dist / touchStartDistRef.current);
+          const clampedScale = Math.max(1.0, Math.min(4.0, scale));
+          setZoomScale(clampedScale);
+          if (clampedScale === 1.0) {
+            setPanOffset({ x: 0, y: 0 });
+          }
+        }
+        return;
       }
-      return;
+      if (e.touches.length > 1 || isPinchModeRef.current) {
+        return;
+      }
     }
 
     if (!isPanning || zoomScale === 1) return;
@@ -922,9 +936,16 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     });
   };
 
-  const handlePointerUp = () => {
-    setIsPanning(false);
-    touchStartDistRef.current = null;
+  const handlePointerUp = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if ('touches' in e) {
+      if (e.touches.length === 0) {
+        setIsPanning(false);
+        isPinchModeRef.current = false;
+        touchStartDistRef.current = null;
+      }
+    } else {
+      setIsPanning(false);
+    }
   };
 
   const p1 = edgePoints.p1;
@@ -1546,7 +1567,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
                   transformOrigin: 'center center',
                   cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
-                  transition: isPanning ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
+                  transition: (isPanning || touchStartDistRef.current !== null) ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   touchAction: zoomScale > 1 ? 'none' : 'auto',
