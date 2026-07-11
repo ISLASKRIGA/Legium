@@ -509,7 +509,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     try {
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       setCameraStream(stream);
       setHasCamera(true);
@@ -524,6 +524,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   useEffect(() => {
     if (cameraStream && videoRef.current) {
       videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch((err) => {
+        console.warn('Error playing camera stream, retrying:', err);
+        setTimeout(() => {
+          videoRef.current?.play().catch(e => console.error('Play retry failed:', e));
+        }, 150);
+      });
     }
   }, [cameraStream]);
 
