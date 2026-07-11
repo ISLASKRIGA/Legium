@@ -134,7 +134,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     try {
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
       });
       setCameraStream(stream);
       setHasCamera(true);

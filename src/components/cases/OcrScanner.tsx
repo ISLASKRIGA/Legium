@@ -509,7 +509,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     try {
       stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        video: { facingMode: 'environment', width: { ideal: 4096 }, height: { ideal: 3072 } }
       });
       setCameraStream(stream);
       setHasCamera(true);
