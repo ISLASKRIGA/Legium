@@ -557,7 +557,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setAlignProgress(15);
     setScanPhase('cropping');
     try {
-      // 1. Let the crop & lift animation play for 1.2s
+      // 1. Let the crop & lift animation play for 450ms
       setTimeout(async () => {
         try {
           const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
@@ -565,19 +565,19 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           setAlignProgress(70);
           setScanPhase('scanning');
 
-          // 2. Let the laser sweep run for 1.5s
+          // 2. Let the laser sweep run for 600ms
           setTimeout(() => {
             setAlignProgress(100);
             setScanPhase('done');
             setStep('aligning');
-          }, 1500);
+          }, 600);
         } catch (innerErr) {
           console.error('Perspective warp failed inside timeout:', innerErr);
           setCapturedImage(imgDataUrl);
           setScanPhase('done');
           setStep('aligning');
         }
-      }, 1200);
+      }, 450);
     } catch (err) {
       console.error('Perspective warp outer failed:', err);
       setCapturedImage(imgDataUrl);
@@ -1116,7 +1116,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     height: '100%',
                     objectFit: 'cover',
                     clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
-                    animation: 'liftSheet 1.2s forwards ease-in-out',
+                    animation: 'liftSheet 0.45s forwards ease-in-out',
                     zIndex: 3
                   }}
                 />
@@ -1128,7 +1128,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     width: '100%',
                     height: '100%',
                     pointerEvents: 'none',
-                    animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                    animation: 'fadeOutLine 0.45s forwards ease-in-out',
                     zIndex: 4
                   }}
                   viewBox="0 0 100 100"
@@ -1187,13 +1187,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                         position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
                         background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
                         boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
-                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        animation: 'sweepLaser 0.8s ease-in-out infinite',
                         zIndex: 10,
                       }} />
                       <div style={{
                         position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
                         background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
-                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        animation: 'sweepLaser 0.8s ease-in-out infinite',
                         zIndex: 9, pointerEvents: 'none',
                       }} />
                     </>
@@ -1678,7 +1678,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'aligning' && originalImage && (
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#111', zIndex: 100 }}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#111', display: 'flex', flexDirection: 'column', zIndex: 100 }}>
 
           {/* Full screen background image (crisp during cropping & scanning, blurred/dimmed when done) */}
           <img
@@ -1708,8 +1708,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <div style={{ width: 22 }} />
           </div>
 
-          {/* Main workspace container (overlay layout for crop alignment) */}
-          <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+          {/* Main workspace container (flex child in the middle) */}
+          <div style={{ flex: 1, position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {scanPhase === 'cropping' ? (
               <div style={{ position: 'absolute', inset: 0 }}>
                 {/* Pixel-perfect clipped sheet lifting up */}
@@ -1723,7 +1723,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     height: '100%',
                     objectFit: 'cover',
                     clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
-                    animation: 'liftSheet 1.2s forwards ease-in-out',
+                    animation: 'liftSheet 0.45s forwards ease-in-out',
                     zIndex: 3
                   }}
                 />
@@ -1735,7 +1735,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     width: '100%',
                     height: '100%',
                     pointerEvents: 'none',
-                    animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                    animation: 'fadeOutLine 0.45s forwards ease-in-out',
                     zIndex: 4
                   }}
                   viewBox="0 0 100 100"
@@ -1750,8 +1750,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 </svg>
               </div>
             ) : (
-              /* Scanning & Done: Render in central container so we can zoom/pan properly */
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px' }}>
+              /* Scanning & Done: Render centered */
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                 <div
                   style={{
                     position: 'relative',
@@ -1798,13 +1798,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                         position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
                         background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
                         boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
-                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        animation: 'sweepLaser 0.8s ease-in-out infinite',
                         zIndex: 10,
                       }} />
                       <div style={{
                         position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
                         background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
-                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        animation: 'sweepLaser 0.8s ease-in-out infinite',
                         zIndex: 9, pointerEvents: 'none',
                       }} />
                     </>

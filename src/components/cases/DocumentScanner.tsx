@@ -1079,7 +1079,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                     height: '100%',
                     objectFit: 'cover',
                     clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
-                    animation: 'liftSheet 1.2s forwards ease-in-out',
+                    animation: 'liftSheet 0.45s forwards ease-in-out',
                     zIndex: 3
                   }}
                 />
@@ -1092,7 +1092,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                     width: '100%',
                     height: '100%',
                     pointerEvents: 'none',
-                    animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                    animation: 'fadeOutLine 0.45s forwards ease-in-out',
                     zIndex: 4
                   }}
                   viewBox="0 0 100 100"
@@ -1144,7 +1144,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                     height: '3px',
                     background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
                     boxShadow: '0 0 10px #00ff80, 0 0 3px #007aff',
-                    animation: 'sweepLaser 1.2s ease-in-out infinite',
+                    animation: 'sweepLaser 0.8s ease-in-out infinite',
                     zIndex: 5
                   }}
                 />
