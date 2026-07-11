@@ -37,6 +37,12 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const [detectionConfidence, setDetectionConfidence] = useState(0);
   const [alignProgress, setAlignProgress] = useState(0);
   
+  // Zoom and pan states for high-res preview
+  const [zoomScale, setZoomScale] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+
   // Drag corners state
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
@@ -69,6 +75,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const [isEnhancing, setIsEnhancing] = useState(false);
 
   useEffect(() => {
+    // Reset zoom on filter/step/image changes
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+
     if (capturedImage && step === 'beautify') {
       setIsEnhancing(true);
       enhanceImage(capturedImage, activeFilter)
@@ -146,7 +156,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
     setAlignProgress(15);
     try {
       // Warp perspective to flatten/straighten sheet
-      const warped = await warpPerspective(imgDataUrl, quad, 1600, 2200);
+      const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
       setAlignProgress(70);
 
       // Animation buffer
@@ -238,6 +248,41 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
       }
     };
     img.src = originalImage;
+  };
+
+  const handleImageDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (zoomScale > 1) {
+      setZoomScale(1);
+      setPanOffset({ x: 0, y: 0 });
+    } else {
+      setZoomScale(3.0);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left - rect.width / 2;
+      const clickY = e.clientY - rect.top - rect.height / 2;
+      setPanOffset({ x: -clickX * 2.0, y: -clickY * 2.0 });
+    }
+  };
+
+  const handlePointerDown = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (zoomScale === 1) return;
+    setIsPanning(true);
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    panStartRef.current = { x: clientX - panOffset.x, y: clientY - panOffset.y };
+  };
+
+  const handlePointerMove = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!isPanning || zoomScale === 1) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setPanOffset({
+      x: clientX - panStartRef.current.x,
+      y: clientY - panStartRef.current.y
+    });
+  };
+
+  const handlePointerUp = () => {
+    setIsPanning(false);
   };
 
   // Drag Corners event handlers
@@ -986,8 +1031,22 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                   maxHeight: '100%', 
                   display: 'block',
                   opacity: isEnhancing ? 0.5 : 1,
-                  transition: 'opacity 0.25s ease'
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+                  transformOrigin: 'center center',
+                  cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
+                  transition: isPanning ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: zoomScale > 1 ? 'none' : 'auto',
                 }} 
+                onMouseDown={handlePointerDown}
+                onMouseMove={handlePointerMove}
+                onMouseUp={handlePointerUp}
+                onMouseLeave={handlePointerUp}
+                onTouchStart={handlePointerDown}
+                onTouchMove={handlePointerMove}
+                onTouchEnd={handlePointerUp}
+                onDoubleClick={handleImageDoubleClick}
               />
             </div>
             

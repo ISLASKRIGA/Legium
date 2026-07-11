@@ -241,34 +241,55 @@ export const enhanceImage = (
           }
         }
 
-        // 4. Smooth Sharpening (9-point kernel to avoid jagged text edges)
+        // 4. Smooth Sharpening (9-point kernel optimized with unrolled loops & no inner boundary checks)
         const output = new Uint8ClampedArray(data.length);
-        const kernel = [
-          -0.1, -0.2, -0.1,
-          -0.2,  2.2, -0.2,
-          -0.1, -0.2, -0.1
-        ];
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            let rSum = 0, gSum = 0, bSum = 0;
-            for (let ky = 0; ky < 3; ky++) {
-              for (let kx = 0; kx < 3; kx++) {
-                const py = Math.min(h - 1, Math.max(0, y + ky - 1));
-                const px = Math.min(w - 1, Math.max(0, x + kx - 1));
-                const kidx = (py * w + px) * 4;
-                const k = kernel[ky * 3 + kx];
-                rSum += data[kidx] * k;
-                gSum += data[kidx + 1] * k;
-                bSum += data[kidx + 2] * k;
-              }
-            }
-            const oidx = (y * w + x) * 4;
-            output[oidx] = Math.min(255, Math.max(0, rSum));
-            output[oidx + 1] = Math.min(255, Math.max(0, gSum));
-            output[oidx + 2] = Math.min(255, Math.max(0, bSum));
-            output[oidx + 3] = data[oidx + 3];
+        
+        // Copy border pixels directly to output
+        for (let x = 0; x < w; x++) {
+          const topIdx = x * 4;
+          const botIdx = ((h - 1) * w + x) * 4;
+          for (let c = 0; c < 4; c++) {
+            output[topIdx + c] = data[topIdx + c];
+            output[botIdx + c] = data[botIdx + c];
           }
         }
+        for (let y = 0; y < h; y++) {
+          const leftIdx = y * w * 4;
+          const rightIdx = (y * w + w - 1) * 4;
+          for (let c = 0; c < 4; c++) {
+            output[leftIdx + c] = data[leftIdx + c];
+            output[rightIdx + c] = data[rightIdx + c];
+          }
+        }
+
+        // Inner pixels
+        const w4 = w * 4;
+        for (let y = 1; y < h - 1; y++) {
+          const rowStart = y * w4;
+          for (let x = 1; x < w - 1; x++) {
+            const idx = rowStart + x * 4;
+            
+            const idx_tl = idx - w4 - 4;
+            const idx_t  = idx - w4;
+            const idx_tr = idx - w4 + 4;
+            const idx_l  = idx - 4;
+            const idx_r  = idx + 4;
+            const idx_bl = idx + w4 - 4;
+            const idx_b  = idx + w4;
+            const idx_br = idx + w4 + 4;
+
+            for (let c = 0; c < 3; c++) {
+              const sum = 
+                (data[idx_tl + c] + data[idx_tr + c] + data[idx_bl + c] + data[idx_br + c]) * -0.1 +
+                (data[idx_t + c] + data[idx_l + c] + data[idx_r + c] + data[idx_b + c]) * -0.2 +
+                data[idx + c] * 2.2;
+              
+              output[idx + c] = sum < 0 ? 0 : (sum > 255 ? 255 : sum);
+            }
+            output[idx + 3] = data[idx + 3];
+          }
+        }
+
         ctx.putImageData(new ImageData(output, w, h), 0, 0);
         resolve(canvas.toDataURL('image/jpeg', 1.0));
         return;
@@ -382,6 +403,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [scanMode, setScanMode] = useState<'individual' | 'lote'>('individual');
 
   useEffect(() => {
+    // Reset zoom when switching filters or images
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+
     if (capturedImage) {
       setIsEnhancing(true);
       enhanceImage(capturedImage, activeFilter, magicBrightness, magicContrast)
@@ -401,6 +426,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   // Multi-page: accumulated processed pages (filtered data URLs + dimensions)
   const [scannedPages, setScannedPages] = useState<CroppedImageResult[]>([]);
   const [finalPdfUrl, setFinalPdfUrl] = useState<string | null>(null);
+
+  // Zoom and pan states for high-res preview
+  const [zoomScale, setZoomScale] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
 
   // Drag corners state
   const [activeCorner, setActiveCorner] = useState<'p1' | 'p2' | 'p3' | 'p4' | null>(null);
@@ -504,7 +535,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setAlignProgress(15);
     setScanPhase('scanning');
     try {
-      const warped = await warpPerspective(imgDataUrl, quad, 1600, 2200);
+      const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
       // Set the cropped image immediately so it shows under the laser
       setCapturedImage(warped.dataUrl);
       setAlignProgress(70);
@@ -813,6 +844,41 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     } catch (err) {
       console.error('Error generating OCR PDF:', err);
     }
+  };
+
+  const handleImageDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (zoomScale > 1) {
+      setZoomScale(1);
+      setPanOffset({ x: 0, y: 0 });
+    } else {
+      setZoomScale(3.0);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left - rect.width / 2;
+      const clickY = e.clientY - rect.top - rect.height / 2;
+      setPanOffset({ x: -clickX * 2.0, y: -clickY * 2.0 });
+    }
+  };
+
+  const handlePointerDown = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (zoomScale === 1) return;
+    setIsPanning(true);
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    panStartRef.current = { x: clientX - panOffset.x, y: clientY - panOffset.y };
+  };
+
+  const handlePointerMove = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!isPanning || zoomScale === 1) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setPanOffset({
+      x: clientX - panStartRef.current.x,
+      y: clientY - panStartRef.current.y
+    });
+  };
+
+  const handlePointerUp = () => {
+    setIsPanning(false);
   };
 
   const p1 = edgePoints.p1;
@@ -1422,7 +1488,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               }}
             >
               {/* Show cropped image once ready, else show original */}
-              <img
+               <img
                 src={processedImage || capturedImage || originalImage}
                 alt="Documento recortado"
                 style={{
@@ -1431,8 +1497,22 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   maxHeight: 'calc(100vh - 280px)',
                   objectFit: 'contain',
                   opacity: isEnhancing ? 0.5 : 1,
-                  transition: 'opacity 0.25s ease',
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+                  transformOrigin: 'center center',
+                  cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
+                  transition: isPanning ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: zoomScale > 1 ? 'none' : 'auto',
                 }}
+                onMouseDown={handlePointerDown}
+                onMouseMove={handlePointerMove}
+                onMouseUp={handlePointerUp}
+                onMouseLeave={handlePointerUp}
+                onTouchStart={handlePointerDown}
+                onTouchMove={handlePointerMove}
+                onTouchEnd={handlePointerUp}
+                onDoubleClick={handleImageDoubleClick}
               />
 
               {/* ── Green laser sweep ── */}
