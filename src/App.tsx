@@ -126,7 +126,6 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     LegiumDB.setCurrentUser(null);
     setCurrentUser(null);
-    showToast('Sesión Cerrada', 'Has cerrado tu sesión de forma segura.', 'info');
   };
 
   const handleNotificationClick = (caseId: string, notificationId: string) => {
