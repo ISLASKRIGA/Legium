@@ -1027,6 +1027,30 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             filter: drop-shadow(0 20px 60px rgba(0,0,0,0.85));
           }
         }
+        @keyframes liftAndMorphSkewedSheet {
+          0% {
+            clip-path: polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%);
+            transform: scale(1) translate(0, 0);
+            opacity: 1;
+            filter: drop-shadow(0 0 0 rgba(0,0,0,0));
+          }
+          100% {
+            clip-path: polygon(10% 5%, 90% 5%, 90% 95%, 10% 95%);
+            transform: scale(1.05) translate(0, -15px);
+            opacity: 0;
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.65));
+          }
+        }
+        @keyframes fadeInWarpedSheet {
+          0% {
+            opacity: 0;
+            transform: scale(0.9) translateY(20px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
         @keyframes fadeOutDoc {
           0% { opacity: 1; }
           100% { opacity: 0; }
@@ -1139,8 +1163,24 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     objectFit: 'cover',
                   }}
                 />
-                {/* Already cropped/warped document lifting up slowly in the center */}
-                <div style={{ position: 'absolute', top: '54px', bottom: '140px', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 3 }}>
+
+                {/* 1. Skewed original sheet (peeling off, morphing to a rectangle and fading out) */}
+                <img
+                  src={originalImage || ''}
+                  alt="Peeling sheet"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    animation: 'liftAndMorphSkewedSheet 0.8s cubic-bezier(0.25, 1, 0.5, 1) both',
+                    zIndex: 3,
+                  }}
+                />
+
+                {/* 2. Flat warped document card (fading in and settling in the center) */}
+                <div style={{ position: 'absolute', top: '54px', bottom: '140px', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 4 }}>
                   <div
                     style={{
                       position: 'relative',
@@ -1150,7 +1190,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       overflow: 'hidden',
                       boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
                       background: '#fff',
-                      animation: 'liftFlatSheet 0.8s cubic-bezier(0.25, 1, 0.5, 1) both',
+                      animation: 'fadeInWarpedSheet 0.8s cubic-bezier(0.25, 1, 0.5, 1) both',
                     }}
                   >
                     <img
