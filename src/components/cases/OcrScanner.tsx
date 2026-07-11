@@ -1618,7 +1618,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           >
             {/* Filter chips row */}
             <div style={{ overflowX: 'auto', display: 'flex', gap: '8px', padding: '12px 16px 6px', scrollbarWidth: 'none' }}>
-              {([['original', 'Sin filtro'], ['magic', 'Mejorar'], ['lighten', 'Aclarar'], ['bw', 'B&N'], ['grayscale', 'Eco']] as [FilterType, string][]).map(([id, label]) => (
+              {([['original', 'Sin filtro'], ['magic', 'Mejorar'], ['bw', 'B&N']] as [FilterType, string][]).map(([id, label]) => (
                 <button
                   key={id}
                   onClick={() => setActiveFilter(id)}
@@ -1854,27 +1854,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               </button>
 
               <button
-                onClick={() => setActiveFilter('lighten')}
-                style={{ 
-                  background: activeFilter === 'lighten' ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '11px',
-                  color: activeFilter === 'lighten' ? '#00ff80' : 'rgba(255,255,255,0.6)',
-                  fontWeight: 600,
-                  outline: 'none'
-                }}
-              >
-                <span>Aclarar</span>
-              </button>
-
-              <button
                 onClick={() => setActiveFilter('magic')}
                 style={{ 
                   background: activeFilter === 'magic' ? 'rgba(255,255,255,0.12)' : 'transparent',
@@ -1913,28 +1892,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   outline: 'none'
                 }}
               >
-                <span>Eco</span>
-              </button>
-
-              <button
-                onClick={() => setActiveFilter('grayscale')}
-                style={{ 
-                  background: activeFilter === 'grayscale' ? 'rgba(255,255,255,0.12)' : 'transparent',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '11px',
-                  color: activeFilter === 'grayscale' ? '#00ff80' : 'rgba(255,255,255,0.6)',
-                  fontWeight: 600,
-                  outline: 'none'
-                }}
-              >
-                <span>Grises</span>
+                <span>B&N</span>
               </button>
             </div>
 
