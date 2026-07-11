@@ -5,7 +5,7 @@ import { OcrScanner } from '../cases/OcrScanner';
 import { DocumentScanner } from '../cases/DocumentScanner';
 import { getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
 import { GlassButton } from '../ui/glass-button';
-import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
+import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
 
 interface ClientDashboardProps {
   currentUser: User;
@@ -71,7 +71,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
       let pdfUrl: string | null = null;
       try {
         await saveCaseRecord(caseObj);
-        pdfUrl = await uploadPdfToSupabase(docId, file, caseObj.id);
+        pdfUrl = await uploadPdfToInsforge(docId, file, caseObj.id);
         await saveDocumentRecord({
           id: docId,
           caseId: caseObj.id,
@@ -116,7 +116,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
       let pdfUrl: string | null = null;
       try {
         await saveCaseRecord(caseObj);
-        pdfUrl = await uploadPdfToSupabase(docId, fileBlob, caseObj.id);
+        pdfUrl = await uploadPdfToInsforge(docId, fileBlob, caseObj.id);
         await saveDocumentRecord({
           id: docId,
           caseId: caseObj.id,

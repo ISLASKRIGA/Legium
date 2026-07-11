@@ -3,7 +3,7 @@ import { ArrowLeft, Plus, Calendar, CheckSquare, MessageSquare, FileText, Trash2
 import { Case, User, DocumentItem, TimelineItem, TaskItem } from '../../utils/types';
 import { DocumentScanner } from './DocumentScanner';
 import { deletePdfBlob, getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
-import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
+import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
 import { GlassButton } from '../ui/glass-button';
 
 interface CaseDetailProps {
@@ -191,7 +191,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
       await saveCaseRecord(c);
       
       // Upload the PDF blob
-      pdfUrl = await uploadPdfToSupabase(docId, fileBlob, c.id);
+      pdfUrl = await uploadPdfToInsforge(docId, fileBlob, c.id);
       
       // Save document record
       await saveDocumentRecord({

@@ -5,7 +5,7 @@ import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumen
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
-import { uploadPdfToSupabase, saveDocumentRecord, saveCaseRecord } from '../../utils/supabaseClient';
+import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
 
 interface OcrScannerProps {
   currentUser: User;
@@ -949,7 +949,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
       // Cloud upload runs in background, doesn't block the user
       let pdfUrl: string | null = null;
-      uploadPdfToSupabase(docId, pdfBlob, caseId)
+      uploadPdfToInsforge(docId, pdfBlob, caseId)
         .then(url => { pdfUrl = url; })
         .catch(err => console.warn('[Supabase] upload failed silently:', err));
 
