@@ -1116,11 +1116,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     top: 0, left: 0,
                     width: '100%', height: '100%',
                     objectFit: 'cover',
-                    zIndex: 2,
-                    transform: 'translate3d(0, 0, 0)',
-                    WebkitTransform: 'translate3d(0, 0, 0)',
-                    backfaceVisibility: 'hidden',
-                    WebkitBackfaceVisibility: 'hidden'
+                    zIndex: 2
                   }}
                 />
               ) : (
@@ -1149,7 +1145,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
               )
             ) : scanPhase === 'captured' ? (
               <img
-                src={originalImage || ''}
+                src={originalImage || capturedRawRef.current || ''}
                 alt="Captured still"
                 style={{
                   position: 'absolute',
