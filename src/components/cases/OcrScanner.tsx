@@ -1567,93 +1567,92 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       )}
 
       {step === 'aligning' && originalImage && (
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#111', display: 'flex', flexDirection: 'column', zIndex: 100 }}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#111', zIndex: 100 }}>
 
-          {/* ── Blurred original as full background ── */}
+          {/* Full screen background image (crisp during cropping & scanning, blurred/dimmed when done) */}
           <img
             src={originalImage}
             alt="bg"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(22px) brightness(0.18) saturate(0.4)', zIndex: 1 }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              zIndex: 1,
+              opacity: scanPhase === 'done' ? 0.25 : 1,
+              filter: scanPhase === 'done' ? 'blur(15px) brightness(0.2) saturate(0.4)' : 'none',
+              transition: 'filter 0.4s ease, opacity 0.4s ease'
+            }}
           />
 
           {/* ── Top bar ── */}
-          <div style={{ position: 'relative', zIndex: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(0,0,0,0.5)' }}>
+          <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(0,0,0,0.5)' }}>
             <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', outline: 'none', opacity: 0.8 }}>
               <X size={22} />
             </button>
             <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: '0.3px' }}>
-              {scanPhase === 'scanning' ? 'Escaneando...' : '✓ Listo'}
+              {scanPhase === 'scanning' ? 'Escaneando...' : scanPhase === 'cropping' ? 'Recortando...' : '✓ Listo'}
             </span>
             <div style={{ width: 22 }} />
           </div>
 
-          {/* ── Cropped document in center ── */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 2, padding: '12px 20px' }}>
-            <div
-              style={{
-                position: 'relative',
-                maxWidth: '82%',
-                maxHeight: '100%',
-                borderRadius: '6px',
-                overflow: 'hidden',
-                boxShadow: scanPhase === 'cropping' ? 'none' : '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
-                background: scanPhase === 'cropping' ? 'transparent' : '#fff',
-                animation: scanPhase === 'cropping' ? 'none' : 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
-              }}
-            >
-              {scanPhase === 'cropping' ? (
-                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {/* Fading background of full original photo */}
-                  <img
-                    src={originalImage}
-                    alt="Uncropped bg"
-                    style={{
-                      display: 'block',
-                      maxWidth: '100%',
-                      maxHeight: 'calc(100vh - 280px)',
-                      objectFit: 'contain',
-                      animation: 'fadeOutBackground 1.2s forwards ease-in-out',
-                    }}
+          {/* Main workspace container (overlay layout for crop alignment) */}
+          <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+            {scanPhase === 'cropping' ? (
+              <div style={{ position: 'absolute', inset: 0 }}>
+                {/* Pixel-perfect clipped sheet lifting up */}
+                <img
+                  src={originalImage}
+                  alt="Clipped sheet"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
+                    animation: 'liftSheet 1.2s forwards ease-in-out',
+                    zIndex: 3
+                  }}
+                />
+                {/* Fading green crop outline */}
+                <svg
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                    zIndex: 4
+                  }}
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                >
+                  <polygon
+                    points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+                    fill="rgba(0, 229, 160, 0.12)"
+                    stroke="#00ff80"
+                    strokeWidth="1.5"
                   />
-                  {/* Lifting clipped sheet */}
-                  <img
-                    src={originalImage}
-                    alt="Clipped sheet"
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
-                      animation: 'liftSheet 1.2s forwards ease-in-out',
-                    }}
-                  />
-                  {/* Fading green crop outline */}
-                  <svg
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      pointerEvents: 'none',
-                      animation: 'fadeOutLine 1.2s forwards ease-in-out',
-                    }}
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                  >
-                    <polygon
-                      points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                      fill="rgba(0, 229, 160, 0.15)"
-                      stroke="#00ff80"
-                      strokeWidth="1.5"
-                    />
-                  </svg>
-                </div>
-              ) : (
-                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                </svg>
+              </div>
+            ) : (
+              /* Scanning & Done: Render in central container so we can zoom/pan properly */
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px' }}>
+                <div
+                  style={{
+                    position: 'relative',
+                    maxWidth: '85%',
+                    maxHeight: '100%',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
+                    background: '#fff',
+                    animation: 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
+                  }}
+                >
                   <img
                     src={processedImage || capturedImage}
                     alt="Documento recortado"
@@ -1700,8 +1699,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                     </>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* ── Bottom: filter row + action bar (shown when done) ── */}

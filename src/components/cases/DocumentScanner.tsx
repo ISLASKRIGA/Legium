@@ -1057,7 +1057,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
           >
             {scanPhase === 'cropping' ? (
               <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {/* Fading background of full original photo */}
+                {/* Background of full original photo (remains frozen) */}
                 <img
                   src={originalImage}
                   alt="Uncropped bg"
@@ -1065,7 +1065,6 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    animation: 'fadeOutBackground 1.2s forwards ease-in-out',
                   }}
                 />
                 {/* Lifting clipped sheet */}
@@ -1081,6 +1080,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                     objectFit: 'cover',
                     clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
                     animation: 'liftSheet 1.2s forwards ease-in-out',
+                    zIndex: 3
                   }}
                 />
                 {/* Fading green crop outline */}
@@ -1093,13 +1093,14 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
                     height: '100%',
                     pointerEvents: 'none',
                     animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                    zIndex: 4
                   }}
                   viewBox="0 0 100 100"
                   preserveAspectRatio="none"
                 >
                   <polygon
                     points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                    fill="rgba(0, 229, 160, 0.15)"
+                    fill="rgba(0, 229, 160, 0.12)"
                     stroke="#00ff80"
                     strokeWidth="1.5"
                   />
@@ -1107,13 +1108,30 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               </div>
             ) : (
               <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Frozen original background image */}
+                <img
+                  src={originalImage}
+                  alt="Uncropped bg"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    opacity: 0.65,
+                    zIndex: 1
+                  }}
+                />
                 <img
                   src={capturedImage}
                   alt="Documento recortado"
                   style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
+                    position: 'relative',
+                    width: '90%',
+                    height: '90%',
+                    objectFit: 'contain',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                    zIndex: 2
                   }}
                 />
                 {/* Sweep laser line */}
