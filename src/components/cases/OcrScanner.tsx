@@ -1174,6 +1174,13 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   src={originalImage || ''}
                   alt="Uncropped bg"
                   style={{
+                                ) : scanPhase === 'straightening' ? (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
+                {/* Frozen original background image (crisp) */}
+                <img
+                  src={originalImage || ''}
+                  alt="Uncropped bg"
+                  style={{
                     position: 'absolute',
                     inset: 0,
                     width: '100%',
@@ -1182,7 +1189,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   }}
                 />
                 {/* Straightened document centered (settling with animation, no laser) */}
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
+                <div style={{ position: 'absolute', top: '54px', bottom: '140px', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 3 }}>
                   <div
                     style={{
                       position: 'relative',
@@ -1201,7 +1208,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       style={{
                         display: 'block',
                         maxWidth: '100%',
-                        maxHeight: 'calc(100vh - 280px)',
+                        maxHeight: 'calc(100vh - 210px)',
                         objectFit: 'contain',
                       }}
                     />
@@ -1223,7 +1230,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   }}
                 />
                 {/* Straightened document centered (fully straight and static, raw image) */}
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
+                <div style={{ position: 'absolute', top: '54px', bottom: '140px', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 3 }}>
                   <div
                     style={{
                       position: 'relative',
@@ -1241,7 +1248,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       style={{
                         display: 'block',
                         maxWidth: '100%',
-                        maxHeight: 'calc(100vh - 280px)',
+                        maxHeight: 'calc(100vh - 210px)',
                         objectFit: 'contain',
                       }}
                     />
@@ -1280,7 +1287,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                   }}
                 />
                 {/* Cross-fading raw and enhanced documents */}
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px 140px 20px', zIndex: 3 }}>
+                <div style={{ position: 'absolute', top: '54px', bottom: '140px', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 3 }}>
                   <div
                     style={{
                       position: 'relative',
@@ -1299,7 +1306,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                       style={{
                         display: 'block',
                         maxWidth: '100%',
-                        maxHeight: 'calc(100vh - 280px)',
+                        maxHeight: 'calc(100vh - 210px)',
                         objectFit: 'contain',
                         opacity: 0,
                         animation: 'fadeOutDoc 0.4s forwards ease-in-out',
@@ -1829,8 +1836,8 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
             <div style={{ width: 22 }} />
           </div>
 
-          {/* Main workspace container (flex child in the middle) */}
-          <div style={{ flex: 1, position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Main workspace container (overlay layout for crop alignment matching capture step bounds!) */}
+          <div style={{ position: 'absolute', top: '54px', bottom: '140px', left: 0, right: 0, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             {scanPhase === 'cropping' ? (
               <div style={{ position: 'absolute', inset: 0 }}>
                 {/* Pixel-perfect clipped sheet lifting up */}
@@ -1871,66 +1878,63 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 </svg>
               </div>
             ) : (
-              /* Scanning & Done: Render centered */
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                <div
+              /* Scanning & Done: Render centered matching capture step bounds exactly! */
+              <div
+                style={{
+                  position: 'relative',
+                  maxWidth: '85%',
+                  maxHeight: '100%',
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
+                  background: '#fff',
+                }}
+              >
+                <img
+                  src={processedImage || capturedImage}
+                  alt="Documento recortado"
                   style={{
-                    position: 'relative',
-                    maxWidth: '85%',
-                    maxHeight: '100%',
-                    borderRadius: '6px',
-                    overflow: 'hidden',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
-                    background: '#fff',
-                    animation: 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
+                    display: 'block',
+                    maxWidth: '100%',
+                    maxHeight: 'calc(100vh - 210px)',
+                    objectFit: 'contain',
+                    opacity: isEnhancing ? 0.5 : 1,
+                    transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+                    transformOrigin: 'center center',
+                    cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
+                    transition: (isPanning || touchStartDistRef.current !== null) ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    touchAction: zoomScale > 1 ? 'none' : 'auto',
                   }}
-                >
-                  <img
-                    src={processedImage || capturedImage}
-                    alt="Documento recortado"
-                    style={{
-                      display: 'block',
-                      maxWidth: '100%',
-                      maxHeight: 'calc(100vh - 280px)',
-                      objectFit: 'contain',
-                      opacity: isEnhancing ? 0.5 : 1,
-                      transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
-                      transformOrigin: 'center center',
-                      cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
-                      transition: (isPanning || touchStartDistRef.current !== null) ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                      touchAction: zoomScale > 1 ? 'none' : 'auto',
-                    }}
-                    onMouseDown={handlePointerDown}
-                    onMouseMove={handlePointerMove}
-                    onMouseUp={handlePointerUp}
-                    onMouseLeave={handlePointerUp}
-                    onTouchStart={handlePointerDown}
-                    onTouchMove={handlePointerMove}
-                    onTouchEnd={handlePointerUp}
-                    onDoubleClick={handleImageDoubleClick}
-                  />
+                  onMouseDown={handlePointerDown}
+                  onMouseMove={handlePointerMove}
+                  onMouseUp={handlePointerUp}
+                  onMouseLeave={handlePointerUp}
+                  onTouchStart={handlePointerDown}
+                  onTouchMove={handlePointerMove}
+                  onTouchEnd={handlePointerUp}
+                  onDoubleClick={handleImageDoubleClick}
+                />
 
-                  {/* ── Green laser sweep ── */}
-                  {scanPhase === 'scanning' && (
-                    <>
-                      <div style={{
-                        position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
-                        background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
-                        boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
-                        animation: 'sweepLaser 0.8s ease-in-out infinite',
-                        zIndex: 10,
-                      }} />
-                      <div style={{
-                        position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
-                        background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
-                        animation: 'sweepLaser 0.8s ease-in-out infinite',
-                        zIndex: 9, pointerEvents: 'none',
-                      }} />
-                    </>
-                  )}
-                </div>
+                {/* ── Green laser sweep ── */}
+                {scanPhase === 'scanning' && (
+                  <>
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
+                      background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
+                      boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
+                      animation: 'sweepLaser 0.8s ease-in-out infinite',
+                      zIndex: 10,
+                    }} />
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
+                      background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
+                      animation: 'sweepLaser 0.8s ease-in-out infinite',
+                      zIndex: 9, pointerEvents: 'none',
+                    }} />
+                  </>
+                )}
               </div>
             )}
           </div>
