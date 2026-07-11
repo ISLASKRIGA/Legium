@@ -373,6 +373,172 @@ export const enhanceImage = (
   });
 };
 
+export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('autoplay', 'true');
+    
+    let resolved = false;
+
+    let timeoutId = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve(false);
+      }
+    }, 1200);
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      video.removeEventListener('playing', onPlaying);
+      try {
+        video.pause();
+      } catch (e) {}
+      video.srcObject = null;
+    };
+
+    const onPlaying = () => {
+      setTimeout(() => {
+        if (resolved) return;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 8;
+          canvas.height = 8;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolved = true;
+            cleanup();
+            resolve(true);
+            return;
+          }
+          ctx.drawImage(video, 0, 0, 8, 8);
+          const data = ctx.getImageData(0, 0, 8, 8).data;
+          
+          let hasColor = false;
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i] > 5 || data[i+1] > 5 || data[i+2] > 5) {
+              hasColor = true;
+              break;
+            }
+          }
+          resolved = true;
+          cleanup();
+          resolve(hasColor);
+        } catch (e) {
+          resolved = true;
+          cleanup();
+          resolve(true);
+        }
+      }, 150);
+    };
+
+    video.addEventListener('playing', onPlaying);
+    video.play().catch(() => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve(false);
+      }
+    });
+  });
+};
+
+export const getBestCameraStream = async (): Promise<{ stream: MediaStream; width: number; height: number }> => {
+  let cached: string | null = null;
+  try {
+    cached = localStorage.getItem('legium_camera_resolution');
+  } catch (e) {}
+
+  if (cached) {
+    try {
+      const [w, h] = cached.split('x').map(Number);
+      if (w && h) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: w }, height: { ideal: h } }
+        });
+        const isWorking = await checkStreamWorking(stream);
+        if (isWorking) {
+          const track = stream.getVideoTracks()[0];
+          const settings = track.getSettings();
+          return {
+            stream,
+            width: settings.width || w,
+            height: settings.height || h
+          };
+        } else {
+          stream.getTracks().forEach(t => t.stop());
+          try {
+            localStorage.removeItem('legium_camera_resolution');
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to start camera with cached resolution:', e);
+      try {
+        localStorage.removeItem('legium_camera_resolution');
+      } catch (e) {}
+    }
+  }
+
+  const resolutions = [
+    { width: 4096, height: 3072 },
+    { width: 3264, height: 2448 },
+    { width: 2560, height: 1440 },
+    { width: 1920, height: 1080 },
+    { width: 1280, height: 720 }
+  ];
+
+  let lastError: any = null;
+
+  for (const res of resolutions) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: res.width }, height: { ideal: res.height } }
+      });
+      
+      const isWorking = await checkStreamWorking(stream);
+      if (isWorking) {
+        const track = stream.getVideoTracks()[0];
+        const settings = track.getSettings();
+        const finalW = settings.width || res.width;
+        const finalH = settings.height || res.height;
+        
+        try {
+          localStorage.setItem('legium_camera_resolution', `${finalW}x${finalH}`);
+        } catch (e) {}
+        return {
+          stream,
+          width: finalW,
+          height: finalH
+        };
+      } else {
+        stream.getTracks().forEach(t => t.stop());
+      }
+    } catch (err) {
+      console.warn(`Resolution ${res.width}x${res.height} failed:`, err);
+      lastError = err;
+    }
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    const track = stream.getVideoTracks()[0];
+    const settings = track.getSettings();
+    return {
+      stream,
+      width: settings.width || 640,
+      height: settings.height || 480
+    };
+  } catch (err) {
+    throw lastError || err;
+  }
+};
+
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
   const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'beautify' | 'ocr-processing' | 'ocr-confirm'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
@@ -508,12 +674,10 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const startCamera = async () => {
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
+      const { stream, width, height } = await getBestCameraStream();
       setCameraStream(stream);
       setHasCamera(true);
-      setScannerMsg('Encuadre el documento...');
+      setScannerMsg(`Encuadre el documento (${width}x${height})...`);
     } catch (err) {
       console.warn('Camera failed, using fallback/upload mode.', err);
       setHasCamera(false);

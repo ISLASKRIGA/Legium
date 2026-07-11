@@ -5,7 +5,7 @@ import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumen
 import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
 import { DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
-import { enhanceImage } from './OcrScanner';
+import { enhanceImage, getBestCameraStream } from './OcrScanner';
 
 interface DocumentScannerProps {
   onScanComplete: (newDoc: DocumentItem, fileBlob: Blob) => void;
@@ -133,12 +133,10 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const startCamera = async () => {
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
+      const { stream, width, height } = await getBestCameraStream();
       setCameraStream(stream);
       setHasCamera(true);
-      setScannerMsg('Encuadre el documento...');
+      setScannerMsg(`Encuadre el documento (${width}x${height})...`);
     } catch (err) {
       console.warn('No webcam access or no camera found, using file upload mode.', err);
       setHasCamera(false);
