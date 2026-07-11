@@ -1935,10 +1935,6 @@ textarea.form-control {
     padding-bottom: 64px !important;
   }
 
-  .client-mobile .sidebar {
-    display: none !important;
-  }
-
   .client-mobile .topbar {
     padding-left: 16px !important;
   }

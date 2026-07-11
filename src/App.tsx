@@ -5,7 +5,6 @@ import { LoginView } from './components/shared/LoginView';
 import { ToastContainer, ToastMessage } from './components/shared/Toast';
 import { OcrScanner } from './components/cases/OcrScanner';
 import { DocumentScanner } from './components/cases/DocumentScanner';
-import { LayoutDashboard, Briefcase, Users, Camera, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -377,12 +376,13 @@ export const App: React.FC = () => {
 
   return (
     <div className={`app-container ${currentUser.role === 'Cliente' ? 'client-mobile' : ''}`}>
-      <Navbar 
-        activeTab={activeTab} 
-        onTabChange={handleTabChange} 
-        currentUser={currentUser} 
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        currentUser={currentUser}
         mobileOpen={mobileOpen}
         onLogout={handleLogout}
+        onScannerOpen={() => setGlobalScannerOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -521,53 +521,6 @@ export const App: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Mobile Bottom Tab Bar (Only for Clients) */}
-      {currentUser.role === 'Cliente' && (
-        <div className="mobile-bottom-nav">
-          <button 
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => handleTabChange('dashboard')}
-          >
-            <LayoutDashboard size={20} />
-            <span>Inicio</span>
-          </button>
-
-          {/* Center Camera Plus Button */}
-          <button 
-            onClick={() => setGlobalScannerOpen(true)}
-            style={{
-              position: 'relative',
-              top: '-14px',
-              width: '54px',
-              height: '54px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #00ff80, #007aff)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(0, 255, 128, 0.4)',
-              border: '3px solid #fff',
-              cursor: 'pointer',
-              zIndex: 100,
-              flexShrink: 0
-            }}
-          >
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Camera size={22} style={{ strokeWidth: 2.2 }} />
-              <span style={{ position: 'absolute', right: '-4px', bottom: '-4px', fontSize: '11px', fontWeight: 900, backgroundColor: '#ff3b30', borderRadius: '50%', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.2px solid #fff' }}>+</span>
-            </div>
-          </button>
-
-          <button 
-            className="nav-item"
-            onClick={handleLogout}
-          >
-            <LogOut size={20} style={{ color: 'var(--danger)' }} />
-            <span>Salir</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 };

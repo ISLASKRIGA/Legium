@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Briefcase, Users, BarChart3, Monitor, Scale, LogOut } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Users, BarChart3, Monitor, Scale, LogOut, Camera } from 'lucide-react';
 import { User, UserRole } from '../../utils/types';
 
 interface NavbarProps {
@@ -8,21 +8,23 @@ interface NavbarProps {
   currentUser: User;
   mobileOpen: boolean;
   onLogout?: () => void;
+  onScannerOpen?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentUser, mobileOpen, onLogout }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentUser, mobileOpen, onLogout, onScannerOpen }) => {
   const isTabVisible = (tab: string) => {
     if (tab === 'logout') return true;
     const role = currentUser.role;
 
-    // Cliente solo ve su dashboard
-    if (role === 'Cliente') return tab === 'dashboard';
+    // Cliente solo ve su dashboard, escáner y salir
+    if (role === 'Cliente') return tab === 'dashboard' || tab === 'scanner' || tab === 'logout';
 
     // TI Admin solo ve dashboard e it-admin (no gestiona expedientes ni reportes)
     if (role === 'TI Administrador') return tab === 'dashboard' || tab === 'it-admin';
 
-    // it-admin es exclusivo de TI Administrador
+    // it-admin y scanner son exclusivos de sus roles
     if (tab === 'it-admin') return false;
+    if (tab === 'scanner') return false;
 
     // Reportes solo para Socio Principal
     if (tab === 'reports') return role === 'Socio Principal';
@@ -37,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentU
     { id: 'clients', label: 'Clientes', icon: <Users size={20} /> },
     { id: 'reports', label: 'Reportes', icon: <BarChart3 size={20} /> },
     { id: 'it-admin', label: 'TI Administrador', icon: <Monitor size={20} /> },
+    { id: 'scanner', label: 'Escanear', icon: <Camera size={20} /> },
     { id: 'logout', label: 'Salir', icon: <LogOut size={20} /> },
   ];
 
@@ -61,6 +64,8 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentU
               onClick={() => {
                 if (item.id === 'logout') {
                   if (onLogout) onLogout();
+                } else if (item.id === 'scanner') {
+                  if (onScannerOpen) onScannerOpen();
                 } else {
                   onTabChange(item.id);
                 }
@@ -68,10 +73,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, currentU
               style={{ cursor: 'pointer' }}
             >
               <a onClick={(e) => e.preventDefault()}>
-                <span className="menu-icon" style={{ display: 'flex', alignItems: 'center', color: item.id === 'logout' ? 'var(--danger)' : (activeTab === item.id ? 'var(--primary-blue)' : 'var(--text-secondary)') }}>
+                <span className="menu-icon" style={{ display: 'flex', alignItems: 'center', color: item.id === 'logout' ? 'var(--danger)' : item.id === 'scanner' ? 'var(--success)' : (activeTab === item.id ? 'var(--primary-blue)' : 'var(--text-secondary)') }}>
                   {item.icon}
                 </span>
-                <span style={{ color: item.id === 'logout' ? 'var(--danger)' : 'inherit' }}>{item.label}</span>
+                <span style={{ color: item.id === 'logout' ? 'var(--danger)' : item.id === 'scanner' ? 'var(--success)' : 'inherit' }}>{item.label}</span>
               </a>
             </li>
           ))}
