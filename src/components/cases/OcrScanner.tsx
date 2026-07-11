@@ -380,7 +380,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [flashActive, setFlashActive] = useState(false);
-  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'scanning' | 'enhancing' | 'done'>('idle');
+  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'cropping' | 'scanning' | 'enhancing' | 'done'>('idle');
   const capturedRawRef = useRef<string | null>(null);
   const [scannerMsg, setScannerMsg] = useState('Apunta la cámara al escrito judicial...');
   const [alignProgress, setAlignProgress] = useState(0);
@@ -555,23 +555,31 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   // Alignment process: warp immediately → show cropped doc → laser sweep → reveal action bar
   const processAlignment = async (imgDataUrl: string, quad: QuadPoints) => {
     setAlignProgress(15);
-    setScanPhase('scanning');
+    setScanPhase('cropping');
     try {
-      const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
-      // Set the cropped image immediately so it shows under the laser
-      setCapturedImage(warped.dataUrl);
-      setAlignProgress(70);
-      // Let laser sweep run for 1.8s, then reveal action bar
-      setTimeout(() => {
-        setAlignProgress(100);
-        setScanPhase('done');
-      }, 1800);
+      // 1. Let the crop & lift animation play for 1.2s
+      setTimeout(async () => {
+        try {
+          const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
+          setCapturedImage(warped.dataUrl);
+          setAlignProgress(70);
+          setScanPhase('scanning');
+
+          // 2. Let the laser sweep run for 1.5s
+          setTimeout(() => {
+            setAlignProgress(100);
+            setScanPhase('done');
+          }, 1500);
+        } catch (innerErr) {
+          console.error('Perspective warp failed inside timeout:', innerErr);
+          setCapturedImage(imgDataUrl);
+          setScanPhase('done');
+        }
+      }, 1200);
     } catch (err) {
-      console.error('Perspective warp failed:', err);
+      console.error('Perspective warp outer failed:', err);
       setCapturedImage(imgDataUrl);
-      setTimeout(() => {
-        setScanPhase('done');
-      }, 1800);
+      setScanPhase('done');
     }
   };
 
@@ -967,6 +975,31 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
   return (
     <div className="scanner-container" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', background: '#000', padding: 0, position: 'relative', overflow: 'hidden' }}>
+      <style>{`
+        @keyframes shutterFlash {
+          0% { opacity: 0; }
+          15% { opacity: 0.85; background-color: #666; }
+          100% { opacity: 0; }
+        }
+        @keyframes liftSheet {
+          0% {
+            transform: scale(1) translate(0, 0);
+            filter: drop-shadow(0 0 0 rgba(0,0,0,0));
+          }
+          100% {
+            transform: scale(1.04) translate(0, -8px);
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.65));
+          }
+        }
+        @keyframes fadeOutBackground {
+          0% { opacity: 1; filter: blur(0px); }
+          100% { opacity: 0.25; filter: blur(15px); }
+        }
+        @keyframes fadeOutLine {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.01); }
+        }
+      `}</style>
 
       {/* Hidden SVG filter definitions — legium-sharpen used by 'magic' filter */}
       <svg style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
@@ -1549,56 +1582,110 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
                 maxHeight: '100%',
                 borderRadius: '6px',
                 overflow: 'hidden',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
-                background: '#fff',
-                animation: 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
+                boxShadow: scanPhase === 'cropping' ? 'none' : '0 20px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.06)',
+                background: scanPhase === 'cropping' ? 'transparent' : '#fff',
+                animation: scanPhase === 'cropping' ? 'none' : 'slideUpDoc 0.45s cubic-bezier(0.22,1,0.36,1) both',
               }}
             >
-              {/* Show cropped image once ready, else show original */}
-               <img
-                src={processedImage || capturedImage || originalImage}
-                alt="Documento recortado"
-                style={{
-                  display: 'block',
-                  maxWidth: '100%',
-                  maxHeight: 'calc(100vh - 280px)',
-                  objectFit: 'contain',
-                  opacity: isEnhancing ? 0.5 : 1,
-                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
-                  transformOrigin: 'center center',
-                  cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
-                  transition: (isPanning || touchStartDistRef.current !== null) ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  touchAction: zoomScale > 1 ? 'none' : 'auto',
-                }}
-                onMouseDown={handlePointerDown}
-                onMouseMove={handlePointerMove}
-                onMouseUp={handlePointerUp}
-                onMouseLeave={handlePointerUp}
-                onTouchStart={handlePointerDown}
-                onTouchMove={handlePointerMove}
-                onTouchEnd={handlePointerUp}
-                onDoubleClick={handleImageDoubleClick}
-              />
+              {scanPhase === 'cropping' ? (
+                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {/* Fading background of full original photo */}
+                  <img
+                    src={originalImage}
+                    alt="Uncropped bg"
+                    style={{
+                      display: 'block',
+                      maxWidth: '100%',
+                      maxHeight: 'calc(100vh - 280px)',
+                      objectFit: 'contain',
+                      animation: 'fadeOutBackground 1.2s forwards ease-in-out',
+                    }}
+                  />
+                  {/* Lifting clipped sheet */}
+                  <img
+                    src={originalImage}
+                    alt="Clipped sheet"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
+                      animation: 'liftSheet 1.2s forwards ease-in-out',
+                    }}
+                  />
+                  {/* Fading green crop outline */}
+                  <svg
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      pointerEvents: 'none',
+                      animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                    }}
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                  >
+                    <polygon
+                      points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+                      fill="rgba(0, 229, 160, 0.15)"
+                      stroke="#00ff80"
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                </div>
+              ) : (
+                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img
+                    src={processedImage || capturedImage}
+                    alt="Documento recortado"
+                    style={{
+                      display: 'block',
+                      maxWidth: '100%',
+                      maxHeight: 'calc(100vh - 280px)',
+                      objectFit: 'contain',
+                      opacity: isEnhancing ? 0.5 : 1,
+                      transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+                      transformOrigin: 'center center',
+                      cursor: zoomScale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
+                      transition: (isPanning || touchStartDistRef.current !== null) ? 'none' : 'transform 0.2s ease-out, opacity 0.25s ease',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      touchAction: zoomScale > 1 ? 'none' : 'auto',
+                    }}
+                    onMouseDown={handlePointerDown}
+                    onMouseMove={handlePointerMove}
+                    onMouseUp={handlePointerUp}
+                    onMouseLeave={handlePointerUp}
+                    onTouchStart={handlePointerDown}
+                    onTouchMove={handlePointerMove}
+                    onTouchEnd={handlePointerUp}
+                    onDoubleClick={handleImageDoubleClick}
+                  />
 
-              {/* ── Green laser sweep ── */}
-              {scanPhase === 'scanning' && (
-                <>
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
-                    background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
-                    boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
-                    animation: 'sweepLaser 1.4s ease-in-out infinite',
-                    zIndex: 10,
-                  }} />
-                  <div style={{
-                    position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
-                    background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
-                    animation: 'sweepLaser 1.4s ease-in-out infinite',
-                    zIndex: 9, pointerEvents: 'none',
-                  }} />
-                </>
+                  {/* ── Green laser sweep ── */}
+                  {scanPhase === 'scanning' && (
+                    <>
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, width: '100%', height: '2px',
+                        background: 'linear-gradient(to right, transparent 3%, #00e5a0 35%, #ffffff 50%, #00e5a0 65%, transparent 97%)',
+                        boxShadow: '0 0 16px 5px rgba(0,229,160,0.65), 0 0 4px rgba(255,255,255,0.8)',
+                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        zIndex: 10,
+                      }} />
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, width: '100%', height: '90px',
+                        background: 'linear-gradient(to bottom, rgba(0,229,160,0.10) 0%, transparent 100%)',
+                        animation: 'sweepLaser 1.4s ease-in-out infinite',
+                        zIndex: 9, pointerEvents: 'none',
+                      }} />
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </div>

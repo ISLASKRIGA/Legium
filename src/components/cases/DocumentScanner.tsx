@@ -36,6 +36,7 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   const [sheetDetected, setSheetDetected] = useState(false);
   const [detectionConfidence, setDetectionConfidence] = useState(0);
   const [alignProgress, setAlignProgress] = useState(0);
+  const [scanPhase, setScanPhase] = useState<'idle' | 'captured' | 'cropping' | 'scanning' | 'done'>('idle');
   
   // Zoom and pan states for high-res preview
   const [zoomScale, setZoomScale] = useState(1);
@@ -176,23 +177,33 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
   // Alignment and Warping Process
   const processAlignment = async (imgDataUrl: string, quad: QuadPoints) => {
     setAlignProgress(15);
+    setScanPhase('cropping');
     try {
-      // Warp perspective to flatten/straighten sheet
-      const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
-      setAlignProgress(70);
+      // 1. Let the crop & lift animation play for 1.2s
+      setTimeout(async () => {
+        try {
+          const warped = await warpPerspective(imgDataUrl, quad, 2000, 2800);
+          setCapturedImage(warped.dataUrl);
+          setAlignProgress(70);
+          setScanPhase('scanning');
 
-      // Animation buffer
-      setTimeout(() => {
-        setCapturedImage(warped.dataUrl);
-        setAlignProgress(100);
-        setStep('beautify');
+          // 2. Let the laser sweep run for 1.5s
+          setTimeout(() => {
+            setAlignProgress(100);
+            setScanPhase('done');
+            setStep('beautify');
+          }, 1500);
+        } catch (innerErr) {
+          console.error('Perspective warp failed inside timeout:', innerErr);
+          setCapturedImage(imgDataUrl);
+          setScanPhase('done');
+          setStep('beautify');
+        }
       }, 1200);
     } catch (err) {
       console.error('Perspective warp failed:', err);
-      setTimeout(() => {
-        setCapturedImage(imgDataUrl);
-        setStep('beautify');
-      }, 1200);
+      setCapturedImage(imgDataUrl);
+      setStep('beautify');
     }
   };
 
@@ -503,6 +514,31 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
 
   return (
     <div className="scanner-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1c1c1e', padding: 0 }}>
+      <style>{`
+        @keyframes shutterFlash {
+          0% { opacity: 0; }
+          15% { opacity: 0.85; background-color: #666; }
+          100% { opacity: 0; }
+        }
+        @keyframes liftSheet {
+          0% {
+            transform: scale(1) translate(0, 0);
+            filter: drop-shadow(0 0 0 rgba(0,0,0,0));
+          }
+          100% {
+            transform: scale(1.04) translate(0, -8px);
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.65));
+          }
+        }
+        @keyframes fadeOutBackground {
+          0% { opacity: 1; filter: blur(0px); }
+          100% { opacity: 0.25; filter: blur(15px); }
+        }
+        @keyframes fadeOutLine {
+          0% { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1.01); }
+        }
+      `}</style>
        {/* Top Bar for camera */}
       {step === 'capture' && (
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px', color: '#fff', alignItems: 'center', background: '#000', height: '54px' }}>
@@ -1001,57 +1037,83 @@ export const DocumentScanner: React.FC<DocumentScannerProps> = ({ onScanComplete
               background: '#121214'
             }}
           >
-            <img 
-              src={originalImage} 
-              alt="Scan aligning"
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover',
-                opacity: 0.65
-              }} 
-            />
-            
-            {/* Outline overlay */}
-            <svg 
-              style={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
-                width: '100%', 
-                height: '100%', 
-                pointerEvents: 'none'
-              }}
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-            >
-              <polygon
-                points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
-                fill="rgba(0, 255, 128, 0.08)"
-                stroke="#00ff80"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-                style={{
-                  filter: 'drop-shadow(0 0 4px #00ff80)',
-                  animation: 'warpPulse 1.2s ease-in-out infinite'
-                }}
-              />
-            </svg>
-
-            {/* Sweep laser line */}
-            <div 
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '3px',
-                background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
-                boxShadow: '0 0 10px #00ff80, 0 0 3px #007aff',
-                animation: 'sweepLaser 1.2s ease-in-out infinite',
-                zIndex: 5
-              }}
-            />
+            {scanPhase === 'cropping' ? (
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Fading background of full original photo */}
+                <img
+                  src={originalImage}
+                  alt="Uncropped bg"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    animation: 'fadeOutBackground 1.2s forwards ease-in-out',
+                  }}
+                />
+                {/* Lifting clipped sheet */}
+                <img
+                  src={originalImage}
+                  alt="Clipped sheet"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    clipPath: `polygon(${p1.x}% ${p1.y}%, ${p2.x}% ${p2.y}%, ${p3.x}% ${p3.y}%, ${p4.x}% ${p4.y}%)`,
+                    animation: 'liftSheet 1.2s forwards ease-in-out',
+                  }}
+                />
+                {/* Fading green crop outline */}
+                <svg
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    animation: 'fadeOutLine 1.2s forwards ease-in-out',
+                  }}
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                >
+                  <polygon
+                    points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} ${p4.x},${p4.y}`}
+                    fill="rgba(0, 229, 160, 0.15)"
+                    stroke="#00ff80"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </div>
+            ) : (
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={capturedImage}
+                  alt="Documento recortado"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                {/* Sweep laser line */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '3px',
+                    background: 'linear-gradient(to right, transparent, #007aff, #00ff80, #007aff, transparent)',
+                    boxShadow: '0 0 10px #00ff80, 0 0 3px #007aff',
+                    animation: 'sweepLaser 1.2s ease-in-out infinite',
+                    zIndex: 5
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <p style={{ fontSize: '12.5px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>
