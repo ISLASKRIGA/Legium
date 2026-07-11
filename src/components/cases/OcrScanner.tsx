@@ -399,7 +399,7 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
         cleanup();
         resolve(false);
       }
-    }, 600); // 600ms is more than enough for a working stream to fire playing
+    }, 800); // 800ms is more than enough for a working stream to fire playing
 
     const cleanup = () => {
       clearTimeout(timeoutId);
@@ -414,6 +414,7 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
     };
 
     const onPlaying = () => {
+      // Wait for stream to start delivering frames
       setTimeout(() => {
         if (resolved) return;
         try {
@@ -424,29 +425,52 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
           if (!ctx) {
             resolved = true;
             cleanup();
-            resolve(true);
+            resolve(true); // Fallback
             return;
           }
-          ctx.drawImage(video, 0, 0, 8, 8);
-          const data = ctx.getImageData(0, 0, 8, 8).data;
           
-          let hasColor = false;
-          for (let i = 0; i < data.length; i += 4) {
-            // Check if pixels are not completely pitch black (R, G, B > 8)
-            if (data[i] > 8 || data[i+1] > 8 || data[i+2] > 8) {
-              hasColor = true;
-              break;
+          // Capture frame 1
+          ctx.drawImage(video, 0, 0, 8, 8);
+          const data1 = ctx.getImageData(0, 0, 8, 8).data.slice();
+          
+          // Wait 100ms and capture frame 2
+          setTimeout(() => {
+            if (resolved) return;
+            try {
+              ctx.drawImage(video, 0, 0, 8, 8);
+              const data2 = ctx.getImageData(0, 0, 8, 8).data;
+              
+              // Calculate difference and check for pitch blackness
+              let diff = 0;
+              let isPureBlack = true;
+              for (let i = 0; i < data2.length; i += 4) {
+                diff += Math.abs(data2[i] - data1[i]) + 
+                        Math.abs(data2[i+1] - data1[i+1]) + 
+                        Math.abs(data2[i+2] - data1[i+2]);
+                if (data2[i] > 3 || data2[i+1] > 3 || data2[i+2] > 3) {
+                  isPureBlack = false;
+                }
+              }
+              
+              resolved = true;
+              cleanup();
+              // It is working if:
+              // 1. It is not pure pitch black (0,0,0) AND
+              // 2. The consecutive frames have pixel differences (active noise/motion)
+              resolve(!isPureBlack && diff > 0);
+            } catch (e) {
+              resolved = true;
+              cleanup();
+              resolve(true); // Fallback
             }
-          }
-          resolved = true;
-          cleanup();
-          resolve(hasColor);
+          }, 100);
+          
         } catch (e) {
           resolved = true;
           cleanup();
-          resolve(true);
+          resolve(true); // Fallback
         }
-      }, 100);
+      }, 150);
     };
 
     video.addEventListener('playing', onPlaying);
@@ -463,7 +487,7 @@ export const checkStreamWorking = (stream: MediaStream): Promise<boolean> => {
 export const getBestCameraStream = async (): Promise<{ stream: MediaStream; width: number; height: number }> => {
   let cached: string | null = null;
   try {
-    cached = localStorage.getItem('legium_camera_res_v2');
+    cached = localStorage.getItem('legium_camera_res_v3');
   } catch (e) {}
 
   if (cached) {
@@ -485,14 +509,14 @@ export const getBestCameraStream = async (): Promise<{ stream: MediaStream; widt
         } else {
           stream.getTracks().forEach(t => t.stop());
           try {
-            localStorage.removeItem('legium_camera_res_v2');
+            localStorage.removeItem('legium_camera_res_v3');
           } catch (e) {}
         }
       }
     } catch (e) {
       console.warn('Failed to start camera with cached resolution:', e);
       try {
-        localStorage.removeItem('legium_camera_res_v2');
+        localStorage.removeItem('legium_camera_res_v3');
       } catch (e) {}
     }
   }
@@ -522,7 +546,7 @@ export const getBestCameraStream = async (): Promise<{ stream: MediaStream; widt
         const finalH = settings.height || res.height;
         
         try {
-          localStorage.setItem('legium_camera_res_v2', `${finalW}x${finalH}`);
+          localStorage.setItem('legium_camera_res_v3', `${finalW}x${finalH}`);
         } catch (e) {}
         return {
           stream,
