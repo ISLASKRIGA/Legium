@@ -26,7 +26,10 @@ export const uploadPdfToInsforge = async (
     console.error('[InsForge Storage] Upload error:', error.message);
     return null;
   }
-  return data?.url ?? null;
+  const { data: urlData } = insforge.storage
+    .from('legal-documents')
+    .getPublicUrl(path);
+  return urlData?.publicUrl ?? null;
 };
 
 export const saveCaseRecord = async (caseObj: Case): Promise<void> => {
