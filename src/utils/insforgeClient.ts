@@ -1,8 +1,8 @@
 import { createClient } from '@insforge/sdk';
 import { Case } from './types';
 
-const insforgeUrl = import.meta.env.VITE_INSFORGE_URL as string | undefined;
-const insforgeAnonKey = import.meta.env.VITE_INSFORGE_ANON_KEY as string | undefined;
+const insforgeUrl = (import.meta.env.VITE_INSFORGE_URL || import.meta.env.VITE_SUPABASE_URL) as string | undefined;
+const insforgeAnonKey = (import.meta.env.VITE_INSFORGE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string | undefined;
 
 const hasConfig = !!(insforgeUrl && insforgeAnonKey);
 
