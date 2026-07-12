@@ -4,7 +4,6 @@ import Tesseract from 'tesseract.js';
 import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob, registerPdfSession } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
-import { LegiumDB } from '../../utils/db';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
 import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord, saveNotificationRecord } from '../../utils/insforgeClient';
 
@@ -952,20 +951,29 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const caseId = existingCase ? existingCase.id : 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
       const pdfName = fileName.endsWith('.pdf') ? fileName : fileName + '.pdf';
 
-      // 1. Register ObjectURL immediately — PDF viewable right now
+      // 1. Register ObjectURL immediately — PDF viewable in this session
       registerPdfSession(docId, pdfBlob);
 
-      // 2. Save to IndexedDB (awaited — guarantees local persistence before scanner closes)
-      await savePdfBlob(docId, pdfBlob).catch(e => console.warn('[PDF] local save failed:', e));
+      // 2. Upload to InsForge cloud storage — await to get real persistent URL
+      setOcrProgress(95);
+      setOcrStatus('Subiendo a la nube...');
+      let pdfUrl: string | null = null;
+      try {
+        pdfUrl = await uploadPdfToInsforge(docId, pdfBlob, caseId);
+      } catch (e) {
+        console.warn('[InsForge] upload failed, document saved locally:', e);
+        // Fallback: save to IndexedDB so it's viewable this session
+        await savePdfBlob(docId, pdfBlob).catch(() => {});
+      }
 
-      // 3. Build case/doc with pdfUrl = null for now; cloud upload updates it in background
+      // 3. Build case/doc with real cloud pdfUrl
       const newDoc: DocumentItem = {
         id: docId,
         name: pdfName,
         size: sizeKB + ' KB',
         uploadDate,
         ocrText,
-        pdfUrl: null,
+        pdfUrl,
         storageKey: caseId + '/' + docId + '.pdf'
       };
 
@@ -995,34 +1003,23 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         };
       }
 
-      // 4. Notify UI immediately — don't wait for cloud
-      setOcrProgress(100);
-      setOcrStatus('¡Listo!');
-      onOcrComplete(finalCase, newDoc, pdfBlob);
-
-      // 5. Cloud saves fire-and-forget — run after UI is updated
-      uploadPdfToInsforge(docId, pdfBlob, caseId)
-        .then(remoteUrl => {
-          if (!remoteUrl) return;
-          // Patch pdfUrl into localStorage so it's available after reload
-          const stored = LegiumDB.get<Case[]>('cases', []);
-          const ci = stored.findIndex(c => c.id === caseId);
-          if (ci !== -1) {
-            const di = stored[ci].documents.findIndex(d => d.id === docId);
-            if (di !== -1) { stored[ci].documents[di].pdfUrl = remoteUrl; LegiumDB.set('cases', stored); }
-          }
-        })
-        .catch(e => console.warn('[InsForge] upload failed:', e));
-
-      // Case must be saved before documents/notifications (FK constraint)
-      saveCaseRecord(finalCase)
-        .then(() => Promise.all([
-          saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl: null })
+      // 4. Save to InsForge DB (FK order: case → document + notification)
+      try {
+        await saveCaseRecord(finalCase);
+        await Promise.all([
+          saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl })
             .catch(e => console.warn('[DB] doc sync failed:', e)),
           saveNotificationRecord({ id: 'noti-' + Date.now(), title: 'Nuevo PDF subido por cliente', message: `El cliente ${currentUser.name || 'Portal'} subió "${pdfName}" (expediente ${caseId}).`, date: uploadDate, read: false, caseId })
             .catch(e => console.warn('[DB] notification sync failed:', e))
-        ]))
-        .catch(e => console.warn('[DB] case sync failed:', e));
+        ]);
+      } catch (e) {
+        console.warn('[DB] case sync failed:', e);
+      }
+
+      // 5. Notify UI — case now has real cloud pdfUrl
+      setOcrProgress(100);
+      setOcrStatus('¡Listo!');
+      onOcrComplete(finalCase, newDoc, pdfBlob);
     } catch (err) {
       console.error('Error generating OCR PDF:', err);
       setOcrProgress(100);

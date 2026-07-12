@@ -8,9 +8,9 @@ import { DocumentScanner } from './components/cases/DocumentScanner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
-import { User, UserRole, Case, Client, AuditLog, Financials, Notification, DocumentItem } from './utils/types';
+import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
-import { saveCaseRecord, saveNotificationRecord, getCasesFromInsforge, getDocumentsFromInsforge } from './utils/insforgeClient';
+import { saveCaseRecord, saveNotificationRecord } from './utils/insforgeClient';
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((module) => ({ default: module.DashboardView })));
 const ClientDashboard = lazy(() => import('./components/dashboard/ClientDashboard').then((module) => ({ default: module.ClientDashboard })));
 const CasesView = lazy(() => import('./components/cases/CasesView').then((module) => ({ default: module.CasesView })));
@@ -64,23 +64,25 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Real-time synchronization / polling loop from InsForge
+  // Cloud sync: InsForge is the source of truth — load on login and poll every 10s
   useEffect(() => {
     if (!currentUser) return;
 
     let isMounted = true;
 
-    const performSync = async () => {
+    const loadFromCloud = async () => {
       try {
         const { getCasesFromInsforge, getNotificationsFromInsforge, getDocumentsFromInsforge } = await import('./utils/insforgeClient');
-        const dbCases = await getCasesFromInsforge();
-        const dbDocs = await getDocumentsFromInsforge();
-        const dbNotifications = await getNotificationsFromInsforge();
+        const [dbCases, dbDocs, dbNotifications] = await Promise.all([
+          getCasesFromInsforge(),
+          getDocumentsFromInsforge(),
+          getNotificationsFromInsforge()
+        ]);
 
         if (!isMounted) return;
 
-        // Group documents by case ID
-        const casesWithDocs = dbCases.map(c => ({
+        // Build cloud cases with their documents
+        const cloudCases = dbCases.map((c: any) => ({
           ...c,
           documents: dbDocs
             .filter((d: any) => d.case_id === c.id)
@@ -95,78 +97,43 @@ export const App: React.FC = () => {
             }))
         }));
 
-        if (casesWithDocs.length > 0 || dbDocs.length > 0) {
-          // Merge: start from local cases (preserves offline/just-scanned data)
-          const mergedCases = [...cases];
-
-          casesWithDocs.forEach(dbCase => {
-            const idx = mergedCases.findIndex(c => c.id === dbCase.id);
-            if (idx === -1) {
-              // Case exists in cloud but not locally — add it
-              mergedCases.push(dbCase);
-            } else {
-              // Case exists in both — merge docs, preferring cloud pdfUrl
-              const localDocs = [...mergedCases[idx].documents];
-              dbCase.documents.forEach((cd: DocumentItem) => {
-                const di = localDocs.findIndex(d => d.id === cd.id);
-                if (di === -1) {
-                  localDocs.push(cd);
-                } else {
-                  // Update pdfUrl from cloud if we have one
-                  if (cd.pdfUrl && !localDocs[di].pdfUrl) {
-                    localDocs[di] = { ...localDocs[di], pdfUrl: cd.pdfUrl };
-                  }
-                }
-              });
-              mergedCases[idx] = { ...mergedCases[idx], documents: localDocs };
-            }
-          });
-
-          const localCasesStr = JSON.stringify(cases);
-          const mergedCasesStr = JSON.stringify(mergedCases);
-          if (localCasesStr !== mergedCasesStr) {
-            setCases(mergedCases);
-            LegiumDB.set('cases', mergedCases);
-          }
+        if (cloudCases.length > 0) {
+          setCases(cloudCases);
+          LegiumDB.set('cases', cloudCases);
         }
 
         if (dbNotifications.length > 0) {
           const currentNotifications = LegiumDB.getNotifications();
           const newNotis = dbNotifications.filter(
-            dbNoti => 
+            (dbNoti: any) =>
               (!dbNoti.targetRole || dbNoti.targetRole === currentUser.role) &&
-              !currentNotifications.some(n => n.id === dbNoti.id)
+              !currentNotifications.some((n: any) => n.id === dbNoti.id)
           );
 
           if (newNotis.length > 0) {
-            newNotis.forEach(n => {
+            newNotis.forEach((n: any) => {
               LegiumDB.addNotification(n.title, n.message, n.caseId || '', n.targetRole);
             });
-            const updatedNotis = LegiumDB.getNotifications();
-            setNotifications(updatedNotis);
+            setNotifications(LegiumDB.getNotifications());
 
             if (currentUser.role !== 'Cliente') {
-              newNotis.forEach(n => {
-                showToast(n.title, n.message, 'info');
-              });
+              newNotis.forEach((n: any) => showToast(n.title, n.message, 'info'));
             }
           }
         }
       } catch (err) {
-        console.warn('[Sync] Failed background database sync:', err);
+        console.warn('[Sync] Failed cloud sync:', err);
       }
     };
 
-    // Run immediately on mount
-    performSync();
-
-    const interval = setInterval(performSync, 5000);
+    loadFromCloud();
+    const interval = setInterval(loadFromCloud, 10000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [currentUser, cases]);
+  }, [currentUser?.id]);
 
   // Synchronize URL hash when state activeTab changes
   const handleTabChange = (tab: string) => {
