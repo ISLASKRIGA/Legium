@@ -1402,29 +1402,31 @@ textarea.form-control {
 
   /* Disable backdrop-filter inside scrollable areas on mobile —
      Android Chrome renders GPU compositing artifacts when blur() is inside
-     a scroll container. Use opaque fallbacks with clear visual separation. */
+     a scroll container. Use solid opaque fallbacks matching the iOS look. */
   .page-container .glass-card,
   .page-container .metric-card {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: #ffffff !important;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
+    border: 1px solid rgba(0, 0, 0, 0.07) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06) !important;
   }
 
   .page-container .document-list {
-    gap: 10px !important;
     display: flex !important;
     flex-direction: column !important;
+    gap: 12px !important;
   }
 
   .page-container .document-item {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    background: #f8f8fa !important;
-    border: 1.5px solid rgba(0, 0, 0, 0.10) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
-    margin-bottom: 2px;
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.09) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    padding: 12px 14px !important;
+    margin: 0 !important;
   }
 }
 
