@@ -34,18 +34,25 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
 
 export const getPdfStorageKey = (docId: string): string => PDF_STORAGE_PREFIX + docId;
 
+// Register blob in session immediately (sync) so it's viewable right away
+export const registerPdfSession = (docId: string, blob: Blob): void => {
+  const sessionUrls = getSessionUrls();
+  const prev = sessionUrls.get(docId);
+  if (prev) URL.revokeObjectURL(prev);
+  sessionUrls.set(docId, URL.createObjectURL(blob));
+};
+
 export const savePdfBlob = async (docId: string, blob: Blob): Promise<string> => {
   const storageKey = getPdfStorageKey(docId);
-  const dataUrl = await blobToDataUrl(blob);
-  localStorage.setItem(storageKey, dataUrl);
 
-  const sessionUrls = getSessionUrls();
-  const previousUrl = sessionUrls.get(docId);
-  if (previousUrl) {
-    URL.revokeObjectURL(previousUrl);
-  }
+  // Register ObjectURL immediately so it's available before localStorage finishes
+  registerPdfSession(docId, blob);
 
-  sessionUrls.set(docId, URL.createObjectURL(blob));
+  // Persist to localStorage in background
+  blobToDataUrl(blob)
+    .then(dataUrl => localStorage.setItem(storageKey, dataUrl))
+    .catch(e => console.warn('[PDF] localStorage save failed:', e));
+
   return storageKey;
 };
 

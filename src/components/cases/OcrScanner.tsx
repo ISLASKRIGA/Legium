@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRight, Wand2, RefreshCw, Plus, Files } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
-import { getPdfStorageKey, savePdfBlob } from '../../utils/pdfStorage';
+import { getPdfStorageKey, savePdfBlob, registerPdfSession } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
 import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
@@ -955,7 +955,9 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
       const pdfName = fileName.endsWith('.pdf') ? fileName : fileName + '.pdf';
 
-      // Everything runs in background — don't block onOcrComplete
+      // Register session URL immediately so the PDF is viewable right away
+      registerPdfSession(docId, pdfBlob);
+      // Persist to localStorage and cloud in background
       savePdfBlob(docId, pdfBlob).catch(e => console.warn('[PDF] local save failed:', e));
       uploadPdfToInsforge(docId, pdfBlob, caseId).catch(e => console.warn('[InsForge] upload failed:', e));
       const pdfUrl: string | null = null;

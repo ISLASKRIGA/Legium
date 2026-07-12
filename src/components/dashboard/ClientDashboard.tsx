@@ -503,20 +503,22 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
               </p>
             ) : (
               clientDocs.map(({ doc, caseId }) => (
-                <div key={doc.id} className="document-item" style={{ padding: '8px' }}>
+                <div
+                  key={doc.id}
+                  className="document-item"
+                  onClick={() => handleViewPDF(doc.id, doc.name, doc.pdfUrl)}
+                  style={{ padding: '8px', cursor: 'pointer' }}
+                >
                   <div className="doc-icon">
                     <FileText size={16} />
                   </div>
-                  <div className="doc-info" style={{ minWidth: 0 }}>
+                  <div className="doc-info" style={{ minWidth: 0, flex: 1 }}>
                     <div className="doc-name" style={{ fontSize: '12.5px' }} title={doc.name}>{doc.name}</div>
                     <div className="doc-meta" style={{ fontSize: '10.5px' }}>
                       {doc.size} • {doc.uploadDate} <br />
                       <span style={{ color: 'var(--primary-gold)', fontSize: '9px' }}>Exp: {caseId}</span>
                     </div>
                   </div>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name, doc.pdfUrl)}>
-                    <Eye size={12} />
-                  </button>
                 </div>
               ))
             )}
