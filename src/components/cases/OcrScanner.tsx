@@ -3,7 +3,7 @@ import { Camera, FileText, X, RotateCcw, Upload, Check, Sparkles, Cpu, ChevronRi
 import Tesseract from 'tesseract.js';
 import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumentEdges, QuadPoints, DEFAULT_SCANNED_OCR_TEXT, CroppedImageResult } from '../../utils/scannerPdf';
 import { getPdfStorageKey, savePdfBlob, registerPdfSession } from '../../utils/pdfStorage';
-import { Case, User, DocumentItem } from '../../utils/types';
+import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
 import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
 
@@ -888,7 +888,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       .trim() || 'Documento legal procesado con OCR.';
 
     // ── Practice area ─────────────────────────────────────────────────
-    const practiceArea = isLaboral ? 'Laboral' : isCompraventa ? 'Inmobiliario' : isNotarial ? 'Notarial' : 'Civil';
+    const practiceArea: PracticeArea = isLaboral ? 'Laboral' : isCompraventa ? 'Inmobiliario' : isNotarial ? 'Notarial' : 'Civil';
 
     // ── Document title ────────────────────────────────────────────────
     const docTitle = isCompraventa
@@ -918,7 +918,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
 
   const autoSubmit = async (parsed: {
     name: string; amount: string; court: string; judge: string;
-    description: string; practiceArea: string; docTitle: string;
+    description: string; practiceArea: PracticeArea; docTitle: string;
     rawText: string; pages: typeof scannedPages;
   }) => {
     const { name, amount, court: parsedCourt, judge: parsedJudge, description, practiceArea, docTitle, rawText, pages: pgs } = parsed;

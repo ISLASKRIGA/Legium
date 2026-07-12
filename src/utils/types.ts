@@ -55,7 +55,7 @@ export interface DocumentItem {
 }
 
 export type CaseStatus = 'Activo' | 'En Apelación' | 'Cerrado' | 'Suspendido';
-export type PracticeArea = 'Civil' | 'Penal' | 'Laboral' | 'Tributario' | 'Corporativo';
+export type PracticeArea = 'Civil' | 'Penal' | 'Laboral' | 'Tributario' | 'Corporativo' | 'Inmobiliario' | 'Notarial';
 
 export interface Case {
   id: string;

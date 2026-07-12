@@ -139,7 +139,7 @@ export const CasesView: React.FC<CasesViewProps> = ({
   // Filter lawyers for case creation select list
   const activeLawyers = users.filter((u) => u.role !== 'TI Administrador' && u.active);
 
-  const areas: Array<PracticeArea | 'Todas'> = ['Todas', 'Civil', 'Penal', 'Laboral', 'Tributario', 'Corporativo'];
+  const areas: Array<PracticeArea | 'Todas'> = ['Todas', 'Civil', 'Penal', 'Laboral', 'Tributario', 'Corporativo', 'Inmobiliario', 'Notarial'];
   const statuses: Array<CaseStatus | 'Todos'> = ['Todos', 'Activo', 'En Apelación', 'Cerrado', 'Suspendido'];
 
   return (

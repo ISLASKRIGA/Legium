@@ -311,17 +311,6 @@ export const LegiumDB = {
   },
 
   initialize: function(): void {
-    // If any cases have non-Laboral practice areas, force override with new labor seed cases
-    const currentCases = this.get<Case[]>("cases", DEFAULT_CASES);
-    const hasNonLaboral = currentCases.some(c => c.practiceArea !== 'Laboral');
-    if (hasNonLaboral) {
-      localStorage.removeItem("legium_cases");
-      localStorage.removeItem("legium_clients");
-      localStorage.removeItem("legium_users");
-      localStorage.removeItem("legium_logs");
-      localStorage.removeItem("legium_financials");
-    }
-
     const users = this.get<User[]>("users", DEFAULT_USERS);
     // Sync default users if any are missing from pre-existing localStorage
     let usersUpdated = false;
