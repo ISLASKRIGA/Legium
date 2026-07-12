@@ -378,7 +378,7 @@ export const enhanceImage = (
 };
 
 export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose, existingCase }) => {
-  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'ocr-processing' | 'ocr-confirm'>('capture');
+  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'ocr-processing'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -468,11 +468,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatus, setOcrStatus] = useState('Iniciando OCR...');
 
-  const [workerName, setWorkerName] = useState('');
-  const [claimAmount, setClaimAmount] = useState('No mencionada');
-  const [court, setCourt] = useState('Juzgado del Trabajo');
-  const [judge, setJudge] = useState('Por designar');
-  const [description, setDescription] = useState('');
   const [fileName, setFileName] = useState('Documento_Escaneado.pdf');
 
   // Refs
@@ -904,15 +899,17 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       ? parsedName + ' — Documento Legal'
       : 'Escrito Judicial Escaneado';
 
-    setWorkerName(parsedName || 'Parte Detectada');
-    setClaimAmount(parsedAmount);
-    setCourt(parsedCourt);
-    setJudge(parsedJudge);
-    setDescription(parsedDesc);
-
-    setOcrProgress(100);
-    setOcrStatus('¡Listo!');
-    setStep('ocr-confirm');
+    autoSubmit({
+      name: parsedName || 'Parte Detectada',
+      amount: parsedAmount,
+      court: parsedCourt,
+      judge: parsedJudge,
+      description: parsedDesc,
+      practiceArea,
+      docTitle,
+      rawText,
+      pages,
+    });
   };
 
   const autoSubmit = async (parsed: {
@@ -1048,33 +1045,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     setOcrProgress(2);
     setOcrStatus('Preparando imagen...');
     await runRealOcr(pages[0].dataUrl, pages);
-  };
-
-  const handleFinalSubmit = async () => {
-    const isLaboral = /despido|trabajo|laboral|indemnizacion|patrono|salarios/i.test(ocrResultText);
-    const isCompraventa = /compraventa|inmueble|adquirente|vendedor|precio/i.test(ocrResultText);
-    const isNotarial = /notario|escritura|volumen|fe de hechos/i.test(ocrResultText);
-    const practiceArea: PracticeArea = isLaboral ? 'Laboral' : isCompraventa ? 'Inmobiliario' : isNotarial ? 'Notarial' : 'Civil';
-
-    const docTitle = isCompraventa
-      ? (workerName ? workerName + ' — Contrato de Compraventa' : 'Contrato de Compraventa')
-      : isLaboral
-      ? (workerName ? workerName + ' vs. ' + (currentUser.name || 'Empresa') : 'Demanda Laboral')
-      : workerName
-      ? workerName + ' — Documento Legal'
-      : 'Escrito Judicial Escaneado';
-
-    await autoSubmit({
-      name: workerName,
-      amount: claimAmount,
-      court: court,
-      judge: judge,
-      description: description,
-      practiceArea,
-      docTitle,
-      rawText: ocrResultText,
-      pages: scannedPages.length > 0 ? scannedPages : (processedImage || capturedImage ? [{ dataUrl: processedImage || capturedImage || '', width: 800, height: 1000 }] : []),
-    });
   };
 
   const handleImageDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -2342,113 +2312,6 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         </div>
       )}
 
-      {step === 'ocr-confirm' && (
-        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, background: '#ffffff', color: '#1c1c1e', padding: '24px', overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'rgba(52,199,89,0.15)', color: '#34c759', marginBottom: '8px' }}>
-              <Check size={24} strokeWidth={2.5} />
-            </div>
-            <h4 style={{ fontWeight: '700', color: '#1c1c1e', margin: 0, fontSize: '18px' }}>Confirmar Metadatos del Documento</h4>
-            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-              {scannedPages.length > 1 ? `${scannedPages.length} páginas • ` : ''}Revisa los campos autocompletados mediante OCR antes de guardar el expediente.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flexGrow: 1, marginBottom: '24px' }}>
-            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Trabajador Demandante (Contraparte)</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={workerName} 
-                onChange={(e) => setWorkerName(e.target.value)} 
-                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
-                required 
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Cuantía Estimada</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  value={claimAmount} 
-                  onChange={(e) => setClaimAmount(e.target.value)} 
-                  style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
-                  required 
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Área de Especialidad</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  value="Laboral" 
-                  disabled 
-                  style={{ width: '100%', background: '#e5e5ea', color: '#555', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', cursor: 'not-allowed' }}
-                />
-              </div>
-            </div>
-
-            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Tribunal / Notaría</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={court} 
-                onChange={(e) => setCourt(e.target.value)} 
-                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
-                required 
-              />
-            </div>
-
-            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Nombre del PDF a Generar</label>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={fileName} 
-                onChange={(e) => setFileName(e.target.value)} 
-                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
-                required 
-              />
-            </div>
-
-            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Resumen Fáctico de la Demanda</label>
-              <textarea 
-                className="form-control" 
-                rows={3}
-                value={description} 
-                onChange={(e) => setDescription(e.target.value)} 
-                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '13.5px', resize: 'none', minHeight: '80px' }}
-                required 
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', marginTop: 'auto' }}>
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => {
-                setStep('preview-full');
-                setScanPhase('idle');
-              }}
-              style={{ background: '#f5f5f7', color: '#333', border: '1px solid #ccc', borderRadius: '8px', padding: '12px 20px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Atrás
-            </button>
-            <button 
-              className="btn btn-primary" 
-              onClick={handleFinalSubmit}
-              style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#007aff', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px 20px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              <Check size={16} /> Confirmar e Ingresar Demanda
-            </button>
-          </div>
-        </div>
-      )}
       {step === 'ocr-processing' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', flexGrow: 1, background: '#1c1c1e', minHeight: '300px' }}>
           <div style={{ position: 'relative', width: '50px', height: '50px', marginBottom: '16px' }}>
