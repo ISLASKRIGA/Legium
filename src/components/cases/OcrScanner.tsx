@@ -5,7 +5,7 @@ import { createSearchablePdf, createMultiPagePdf, warpPerspective, detectDocumen
 import { getPdfStorageKey, savePdfBlob, registerPdfSession } from '../../utils/pdfStorage';
 import { Case, User, DocumentItem, PracticeArea } from '../../utils/types';
 import { useDocumentDetection } from '../../hooks/useDocumentDetection';
-import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
+import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord, saveNotificationRecord } from '../../utils/insforgeClient';
 
 interface OcrScannerProps {
   currentUser: User;
@@ -377,8 +377,8 @@ export const enhanceImage = (
   });
 };
 
-export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose }) => {
-  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'ocr-processing'>('capture');
+export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComplete, onClose, existingCase }) => {
+  const [step, setStep] = useState<'capture' | 'preview-full' | 'aligning' | 'decide' | 'ocr-processing' | 'ocr-confirm'>('capture');
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -468,7 +468,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatus, setOcrStatus] = useState('Iniciando OCR...');
 
-  const [fileName] = useState('Documento_Escaneado.pdf');
+  const [workerName, setWorkerName] = useState('');
+  const [claimAmount, setClaimAmount] = useState('No mencionada');
+  const [court, setCourt] = useState('Juzgado del Trabajo');
+  const [judge, setJudge] = useState('Por designar');
+  const [description, setDescription] = useState('');
+  const [fileName, setFileName] = useState('Documento_Escaneado.pdf');
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -899,21 +904,15 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       ? parsedName + ' — Documento Legal'
       : 'Escrito Judicial Escaneado';
 
-    setOcrProgress(96);
-    setOcrStatus('Generando PDF con OCR incrustado...');
+    setWorkerName(parsedName || 'Parte Detectada');
+    setClaimAmount(parsedAmount);
+    setCourt(parsedCourt);
+    setJudge(parsedJudge);
+    setDescription(parsedDesc);
 
-    // ── Auto-submit directly ──────────────────────────────────────────
-    await autoSubmit({
-      name: parsedName || 'Parte Detectada',
-      amount: parsedAmount,
-      court: parsedCourt,
-      judge: parsedJudge,
-      description: parsedDesc,
-      practiceArea,
-      docTitle,
-      rawText,
-      pages,
-    });
+    setOcrProgress(100);
+    setOcrStatus('¡Listo!');
+    setStep('ocr-confirm');
   };
 
   const autoSubmit = async (parsed: {
@@ -936,31 +935,30 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     try {
       if (pgs.length === 0) { console.error('autoSubmit: no pages'); return; }
 
-      // Downscale pages with timeout safety
-      const pdfPages = await Promise.all(
-        pgs.map(p =>
-          Promise.race([
-            downscaleImage(p.dataUrl, 1800, 0.88),
-            new Promise<{ dataUrl: string; width: number; height: number }>(r =>
-              setTimeout(() => r({ dataUrl: p.dataUrl, width: p.width || 800, height: p.height || 1000 }), 5000)
-            )
-          ])
-        )
-      );
-      const pdfBlob = createMultiPagePdf(pdfPages, ocrText);
+      const pdfBlob = createMultiPagePdf(pgs, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
       const docId = 'doc-' + Date.now();
       const uploadDate = new Date().toISOString().split('T')[0];
-      const caseId = 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
+      const caseId = existingCase ? existingCase.id : 'LEG-2026-' + Math.floor(100 + Math.random() * 900);
       const pdfName = fileName.endsWith('.pdf') ? fileName : fileName + '.pdf';
 
       // Register session URL immediately so the PDF is viewable right away
       registerPdfSession(docId, pdfBlob);
-      // Persist to localStorage and cloud in background
-      savePdfBlob(docId, pdfBlob).catch(e => console.warn('[PDF] local save failed:', e));
-      uploadPdfToInsforge(docId, pdfBlob, caseId).catch(e => console.warn('[InsForge] upload failed:', e));
-      const pdfUrl: string | null = null;
+      // Persist to localStorage
+      try {
+        await savePdfBlob(docId, pdfBlob);
+      } catch (e) {
+        console.warn('[PDF] local save failed:', e);
+      }
+
+      // Upload to InsForge Storage and await URL
+      let pdfUrl: string | null = null;
+      try {
+        pdfUrl = await uploadPdfToInsforge(docId, pdfBlob, caseId);
+      } catch (e) {
+        console.warn('[InsForge] upload failed:', e);
+      }
 
       const newDoc: DocumentItem = {
         id: docId,
@@ -972,54 +970,69 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         storageKey: caseId + '/' + docId + '.pdf'
       };
 
-      const newCase: Case = {
-        id: caseId,
-        title: docTitle,
-        clientId: currentUser.clientId || 'cli-01',
-        clientName: currentUser.name,
-        opposingParty: name,
-        opposingLawyer: 'Por determinar',
-        practiceArea,
-        status: 'Activo',
-        court: parsedCourt,
-        judge: parsedJudge,
-        assignedLawyerId: 'usr-02',
-        assignedLawyerName: 'Dra. Sofía Valenzuela',
-        startDate: uploadDate,
-        description,
-        timeline: [{
-          date: uploadDate,
-          title: 'Ingreso por Portal Cliente (OCR)',
-          desc: 'Documento escaneado y procesado automáticamente. PDF ' + (pdfUrl ? 'sincronizado en la nube.' : 'guardado localmente.'),
-          completed: true
-        }],
-        tasks: [{
-          id: 'tsk-' + Date.now().toString().slice(-4),
-          title: 'Revisar documento y asignar estrategia legal',
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          assignedTo: 'usr-02',
-          completed: false
-        }],
-        notes: [{
-          id: 'nt-' + Date.now(),
-          date: uploadDate + ' ' + new Date().toTimeString().slice(0, 5),
-          author: 'Legium OCR',
-          text: 'Extracción: Parte=' + name + ' | Monto=' + amount + ' | ' + parsedCourt,
-        }],
-        documents: [newDoc]
-      };
+      let finalCase: Case;
+      if (existingCase) {
+        finalCase = {
+          ...existingCase,
+          documents: [...existingCase.documents, newDoc]
+        };
+      } else {
+        finalCase = {
+          id: caseId,
+          title: docTitle,
+          clientId: currentUser.clientId || 'cli-01',
+          clientName: currentUser.name,
+          opposingParty: name,
+          opposingLawyer: 'Por determinar',
+          practiceArea,
+          status: 'Activo',
+          court: parsedCourt,
+          judge: parsedJudge,
+          assignedLawyerId: 'usr-02',
+          assignedLawyerName: 'Dra. Sofía Valenzuela',
+          startDate: uploadDate,
+          description,
+          timeline: [{
+            date: uploadDate,
+            title: 'Ingreso por Portal Cliente (OCR)',
+            desc: 'Documento escaneado y procesado automáticamente. PDF ' + (pdfUrl ? 'sincronizado en la nube.' : 'guardado localmente.'),
+            completed: true
+          }],
+          tasks: [{
+            id: 'tsk-' + Date.now().toString().slice(-4),
+            title: 'Revisar documento y asignar estrategia legal',
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            assignedTo: 'usr-02',
+            completed: false
+          }],
+          notes: [{
+            id: 'nt-' + Date.now(),
+            date: uploadDate + ' ' + new Date().toTimeString().slice(0, 5),
+            author: 'Legium OCR',
+            text: 'Extracción: Parte=' + name + ' | Monto=' + amount + ' | ' + parsedCourt,
+          }],
+          documents: [newDoc]
+        };
+      }
 
       // DB syncs in background — don't block onOcrComplete
-      saveCaseRecord(newCase).catch(e => console.warn('[DB] case sync failed:', e));
-      saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl: null })
+      saveCaseRecord(finalCase).catch(e => console.warn('[DB] case sync failed:', e));
+      saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl })
         .catch(e => console.warn('[DB] doc sync failed:', e));
+      saveNotificationRecord({
+        id: 'noti-' + Date.now(),
+        title: 'Nuevo PDF subido por cliente',
+        message: `El cliente ${currentUser.name || 'Portal'} ha subido el documento escaneado "${pdfName}" para el expediente ${caseId}.`,
+        date: uploadDate,
+        read: false,
+        case_id: caseId
+      }).catch(e => console.warn('[DB] notification sync failed:', e));
 
       setOcrProgress(100);
       setOcrStatus('¡Listo!');
-      onOcrComplete(newCase, newDoc, pdfBlob);
+      onOcrComplete(finalCase, newDoc, pdfBlob);
     } catch (err) {
       console.error('Error generating OCR PDF:', err);
-      // Still close the scanner even on error
       setOcrProgress(100);
       setOcrStatus('Error al generar PDF');
     }
@@ -1037,7 +1050,32 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     await runRealOcr(pages[0].dataUrl, pages);
   };
 
-  const handleFinalSubmit = startOcrProcessing;
+  const handleFinalSubmit = async () => {
+    const isLaboral = /despido|trabajo|laboral|indemnizacion|patrono|salarios/i.test(ocrResultText);
+    const isCompraventa = /compraventa|inmueble|adquirente|vendedor|precio/i.test(ocrResultText);
+    const isNotarial = /notario|escritura|volumen|fe de hechos/i.test(ocrResultText);
+    const practiceArea: PracticeArea = isLaboral ? 'Laboral' : isCompraventa ? 'Inmobiliario' : isNotarial ? 'Notarial' : 'Civil';
+
+    const docTitle = isCompraventa
+      ? (workerName ? workerName + ' — Contrato de Compraventa' : 'Contrato de Compraventa')
+      : isLaboral
+      ? (workerName ? workerName + ' vs. ' + (currentUser.name || 'Empresa') : 'Demanda Laboral')
+      : workerName
+      ? workerName + ' — Documento Legal'
+      : 'Escrito Judicial Escaneado';
+
+    await autoSubmit({
+      name: workerName,
+      amount: claimAmount,
+      court: court,
+      judge: judge,
+      description: description,
+      practiceArea,
+      docTitle,
+      rawText: ocrResultText,
+      pages: scannedPages.length > 0 ? scannedPages : (processedImage || capturedImage ? [{ dataUrl: processedImage || capturedImage || '', width: 800, height: 1000 }] : []),
+    });
+  };
 
   const handleImageDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (zoomScale > 1) {
@@ -2274,6 +2312,143 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         </div>
       )}
 
+      {step === 'ocr-processing' && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', flexGrow: 1, background: '#1c1c1e', minHeight: '300px' }}>
+          <div style={{ position: 'relative', width: '50px', height: '50px', marginBottom: '16px' }}>
+            <div className="health-indicator pulsing" style={{ width: '40px', height: '40px', backgroundColor: 'var(--primary-gold)', margin: '5px' }} />
+            <Cpu size={24} style={{ position: 'absolute', top: '13px', left: '13px', color: '#fff' }} />
+          </div>
+          
+          <h4 style={{ fontWeight: '700', marginBottom: '8px', color: '#fff' }}>Generando PDF y Procesando OCR</h4>
+          
+          <div style={{ width: '100%', maxWidth: '280px', height: '6px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
+            <div 
+              style={{ 
+                width: `${ocrProgress}%`, 
+                height: '100%', 
+                backgroundColor: 'var(--primary-blue)', 
+                borderRadius: '10px', 
+                transition: 'width 0.2s ease-out' 
+              }} 
+            />
+          </div>
+          
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#fff', marginBottom: '4px' }}>
+            {ocrProgress}% completado
+          </span>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', maxWidth: '260px' }}>
+            {ocrStatus}
+          </p>
+        </div>
+      )}
+
+      {step === 'ocr-confirm' && (
+        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, background: '#ffffff', color: '#1c1c1e', padding: '24px', overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'rgba(52,199,89,0.15)', color: '#34c759', marginBottom: '8px' }}>
+              <Check size={24} strokeWidth={2.5} />
+            </div>
+            <h4 style={{ fontWeight: '700', color: '#1c1c1e', margin: 0, fontSize: '18px' }}>Confirmar Metadatos del Documento</h4>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+              {scannedPages.length > 1 ? `${scannedPages.length} páginas • ` : ''}Revisa los campos autocompletados mediante OCR antes de guardar el expediente.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flexGrow: 1, marginBottom: '24px' }}>
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Trabajador Demandante (Contraparte)</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                value={workerName} 
+                onChange={(e) => setWorkerName(e.target.value)} 
+                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
+                required 
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Cuantía Estimada</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={claimAmount} 
+                  onChange={(e) => setClaimAmount(e.target.value)} 
+                  style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
+                  required 
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Área de Especialidad</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value="Laboral" 
+                  disabled 
+                  style={{ width: '100%', background: '#e5e5ea', color: '#555', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', cursor: 'not-allowed' }}
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Tribunal / Notaría</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                value={court} 
+                onChange={(e) => setCourt(e.target.value)} 
+                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
+                required 
+              />
+            </div>
+
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Nombre del PDF a Generar</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                value={fileName} 
+                onChange={(e) => setFileName(e.target.value)} 
+                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }}
+                required 
+              />
+            </div>
+
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '12px', color: '#444', fontWeight: 600 }}>Resumen Fáctico de la Demanda</label>
+              <textarea 
+                className="form-control" 
+                rows={3}
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)} 
+                style={{ width: '100%', background: '#f5f5f7', color: '#000', border: '1px solid #ddd', borderRadius: '8px', padding: '10px 12px', fontSize: '13.5px', resize: 'none', minHeight: '80px' }}
+                required 
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: 'auto' }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => {
+                setStep('preview-full');
+                setScanPhase('idle');
+              }}
+              style={{ background: '#f5f5f7', color: '#333', border: '1px solid #ccc', borderRadius: '8px', padding: '12px 20px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Atrás
+            </button>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleFinalSubmit}
+              style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#007aff', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px 20px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              <Check size={16} /> Confirmar e Ingresar Demanda
+            </button>
+          </div>
+        </div>
+      )}
       {step === 'ocr-processing' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', flexGrow: 1, background: '#1c1c1e', minHeight: '300px' }}>
           <div style={{ position: 'relative', width: '50px', height: '50px', marginBottom: '16px' }}>

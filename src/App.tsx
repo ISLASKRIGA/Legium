@@ -64,6 +64,76 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Real-time synchronization / polling loop from InsForge
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'Cliente') return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const { getCasesFromInsforge, getNotificationsFromInsforge, getDocumentsFromInsforge } = await import('./utils/insforgeClient');
+        const dbCases = await getCasesFromInsforge();
+        const dbDocs = await getDocumentsFromInsforge();
+        const dbNotifications = await getNotificationsFromInsforge();
+
+        if (!isMounted) return;
+
+        // Group documents by case ID
+        const casesWithDocs = dbCases.map(c => ({
+          ...c,
+          documents: dbDocs
+            .filter((d: any) => d.case_id === c.id)
+            .map((d: any) => ({
+              id: d.id,
+              name: d.name,
+              size: d.size_kb + ' KB',
+              uploadDate: d.upload_date,
+              ocrText: d.ocr_text || '',
+              pdfUrl: d.pdf_url,
+              storageKey: d.pdf_key
+            }))
+        }));
+
+        if (casesWithDocs.length > 0) {
+          const localCasesStr = JSON.stringify(cases);
+          const dbCasesStr = JSON.stringify(casesWithDocs);
+          if (localCasesStr !== dbCasesStr) {
+            setCases(casesWithDocs);
+            LegiumDB.set('cases', casesWithDocs);
+          }
+        }
+
+        if (dbNotifications.length > 0) {
+          const currentNotifications = LegiumDB.getNotifications();
+          const newNotis = dbNotifications.filter(
+            dbNoti => 
+              (!dbNoti.targetRole || dbNoti.targetRole === currentUser.role) &&
+              !currentNotifications.some(n => n.id === dbNoti.id)
+          );
+
+          if (newNotis.length > 0) {
+            newNotis.forEach(n => {
+              LegiumDB.addNotification(n.title, n.message, n.caseId || '', n.targetRole);
+            });
+            const updatedNotis = LegiumDB.getNotifications();
+            setNotifications(updatedNotis);
+
+            newNotis.forEach(n => {
+              showToast(n.title, n.message, 'info');
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[Sync] Failed background database sync:', err);
+      }
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentUser, cases]);
+
   // Synchronize URL hash when state activeTab changes
   const handleTabChange = (tab: string) => {
     // Role checks before navigating

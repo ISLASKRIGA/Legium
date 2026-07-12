@@ -97,3 +97,60 @@ export const saveNotificationRecord = async (noti: {
   }]);
   if (error) console.error('[InsForge] Notification insert error:', error.message);
 };
+
+export const getCasesFromInsforge = async (): Promise<Case[]> => {
+  if (!insforge) return [];
+  const { data, error } = await insforge.database.from('cases').select('*');
+  if (error) {
+    console.error('[InsForge] Error fetching cases:', error.message);
+    return [];
+  }
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    clientId: row.client_id,
+    clientName: row.client_name,
+    opposingParty: row.opposing_party,
+    opposingLawyer: row.opposing_lawyer,
+    practiceArea: row.practice_area,
+    status: row.status,
+    court: row.court,
+    judge: row.judge,
+    assignedLawyerId: row.assigned_lawyer_id,
+    assignedLawyerName: row.assigned_lawyer_name,
+    startDate: row.start_date,
+    description: row.description,
+    timeline: row.timeline || [],
+    tasks: row.tasks || [],
+    notes: row.notes || [],
+    documents: []
+  }));
+};
+
+export const getDocumentsFromInsforge = async (): Promise<any[]> => {
+  if (!insforge) return [];
+  const { data, error } = await insforge.database.from('documents').select('*');
+  if (error) {
+    console.error('[InsForge] Error fetching documents:', error.message);
+    return [];
+  }
+  return data || [];
+};
+
+export const getNotificationsFromInsforge = async (): Promise<any[]> => {
+  if (!insforge) return [];
+  const { data, error } = await insforge.database.from('notifications').select('*');
+  if (error) {
+    console.error('[InsForge] Error fetching notifications:', error.message);
+    return [];
+  }
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    message: row.message,
+    date: row.date,
+    read: row.read,
+    caseId: row.case_id,
+    targetRole: row.target_role
+  }));
+};

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert, Download, Upload, X } from 'lucide-react';
 import { Case, User, DocumentItem, Client } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
-import { DocumentScanner } from '../cases/DocumentScanner';
 import { getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
 import { GlassButton } from '../ui/glass-button';
 import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
@@ -591,21 +590,26 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
       {/* 1.5. CASE SPECIFIC SCANNER MODAL */}
       {activeModal === 'scanner-case' && selectedCase && (
         <div className="modal active">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
+          <div className="modal-content" style={{ maxWidth: '100vw', height: '96vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column' }}>
             <div className="ios-grabber" />
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Camera size={18} style={{ color: 'var(--primary-blue)' }} /> Escáner de Documentos Judiciales
+            <div className="modal-header" style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '16px', fontWeight: 700 }}>
+                <Camera size={18} style={{ color: 'var(--primary-blue)' }} /> Escanear Documento
               </h3>
-              <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
+              <button className="modal-close" onClick={() => setActiveModal('none')} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600 }}>✕</button>
             </div>
-            <div className="modal-body" style={{ padding: '16px' }}>
-              <DocumentScanner 
-                onScanComplete={(newDoc, blob) => {
-                  handleCaseScanComplete(newDoc, blob, selectedCase);
+            {/* Scanner body */}
+            <div style={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <OcrScanner
+                currentUser={currentUser}
+                existingCase={selectedCase}
+                onOcrComplete={(updatedCase, newDoc, fileBlob) => {
+                  onUpdateCase(updatedCase);
+                  onAddLog(`Cliente ${currentUser.name} cargó documento PDF escaneado ${newDoc.name} en expediente ${selectedCase.id}`, 'Success');
+                  onShowToast('Documento Escaneado', `El PDF escaneado ${newDoc.name} se ha guardado con éxito.`, 'success');
                   setActiveModal('none');
-                }} 
-                onClose={() => setActiveModal('none')} 
+                }}
+                onClose={() => setActiveModal('none')}
               />
             </div>
           </div>
