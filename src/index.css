@@ -103,6 +103,7 @@ a:hover {
   display: flex;
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* adjusts for Android Chrome URL bar / system nav */
   overflow: hidden;
 }
 
@@ -1314,7 +1315,7 @@ textarea.form-control {
 @media (max-width: 768px) {
   .sidebar {
     position: fixed;
-    bottom: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     left: 20px;
     right: 20px;
     width: calc(100% - 40px) !important;
@@ -1390,7 +1391,7 @@ textarea.form-control {
   }
   
   .page-container {
-    padding-bottom: 100px !important;
+    padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
   }
   
   .dashboard-layout {
@@ -1928,11 +1929,6 @@ textarea.form-control {
 
   .mobile-bottom-nav .nav-item.active {
     color: var(--primary-blue) !important;
-  }
-
-  /* Adjust main container to clear the bottom nav on mobile */
-  .app-container.client-mobile {
-    padding-bottom: 64px !important;
   }
 
   .client-mobile .topbar {
