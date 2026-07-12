@@ -242,19 +242,18 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
   };
 
   // Open PDF Viewer
-  const handleViewPDF = (docId: string, docName: string) => {
+  const handleViewPDF = async (docId: string, docName: string) => {
     setActiveDocId(docId);
     setActiveDocName(docName);
-    
-    // Check if the document has a Supabase public URL
+    setActiveDocUrl('');
+    setActiveModal('pdf');
     const doc = c.documents.find((d) => d.id === docId);
     if (doc?.pdfUrl) {
       setActiveDocUrl(doc.pdfUrl);
     } else {
-      const url = getPdfObjectUrl(docId);
+      const url = await getPdfObjectUrl(docId);
       setActiveDocUrl(url || '');
     }
-    setActiveModal('pdf');
   };
 
   // Drag and drop events
@@ -729,8 +728,9 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
                           const file = (e.target as HTMLInputElement).files?.[0];
                           if (file) {
                             if (activeDocId) {
-                              savePdfBlob(activeDocId, file).then(() => {
-                                setActiveDocUrl(getPdfObjectUrl(activeDocId) || '');
+                              savePdfBlob(activeDocId, file).then(async () => {
+                                const url = await getPdfObjectUrl(activeDocId);
+                                setActiveDocUrl(url || '');
                               });
                             }
                             onAddLog(`Recargado archivo físico para PDF '${activeDocName}' en caso ${c.id}`, 'Success');

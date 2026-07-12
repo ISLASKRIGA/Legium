@@ -899,7 +899,7 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
       ? parsedName + ' — Documento Legal'
       : 'Escrito Judicial Escaneado';
 
-    autoSubmit({
+    await autoSubmit({
       name: parsedName || 'Parte Detectada',
       amount: parsedAmount,
       court: parsedCourt,
@@ -932,7 +932,18 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
     try {
       if (pgs.length === 0) { console.error('autoSubmit: no pages'); return; }
 
-      const pdfBlob = createMultiPagePdf(pgs, ocrText);
+      // Downscale pages to max 1600px before PDF generation — keeps blobs under ~300 KB
+      const pdfPages = await Promise.all(
+        pgs.map(p =>
+          Promise.race([
+            downscaleImage(p.dataUrl, 1600, 0.88),
+            new Promise<{ dataUrl: string; width: number; height: number }>(r =>
+              setTimeout(() => r({ dataUrl: p.dataUrl, width: p.width || 800, height: p.height || 1000 }), 5000)
+            )
+          ])
+        )
+      );
+      const pdfBlob = createMultiPagePdf(pdfPages, ocrText);
       const sizeKB = (pdfBlob.size / 1024).toFixed(1);
 
       const docId = 'doc-' + Date.now();

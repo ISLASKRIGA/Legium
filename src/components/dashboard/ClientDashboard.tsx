@@ -228,11 +228,12 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
     setActiveModal('none');
   };
 
-  const handleViewPDF = (docId: string, docName: string, remotePdfUrl?: string | null) => {
+  const handleViewPDF = async (docId: string, docName: string, remotePdfUrl?: string | null) => {
     setActiveDocName(docName);
-    const localUrl = getPdfObjectUrl(docId);
-    setActiveDocUrl(localUrl || remotePdfUrl || '');
+    setActiveDocUrl('');
     setActiveModal('pdf');
+    const localUrl = await getPdfObjectUrl(docId);
+    setActiveDocUrl(localUrl || remotePdfUrl || '');
   };
 
   const selectedCase = clientCases.find(c => c.id === selectedCaseId);

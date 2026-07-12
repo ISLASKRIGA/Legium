@@ -81,11 +81,12 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
     setIsCreateModalOpen(false);
   };
 
-  const handleViewPDF = (docId: string, docName: string) => {
+  const handleViewPDF = async (docId: string, docName: string) => {
     setActiveDocName(docName);
-    const url = getPdfObjectUrl(docId);
-    setActiveDocUrl(url || '');
+    setActiveDocUrl('');
     setIsPdfModalOpen(true);
+    const url = await getPdfObjectUrl(docId);
+    setActiveDocUrl(url || '');
   };
 
   // Find selected client & associated cases/docs

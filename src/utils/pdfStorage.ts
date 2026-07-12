@@ -1,4 +1,6 @@
-﻿const PDF_STORAGE_PREFIX = 'legium_pdf_';
+const IDB_NAME = 'legium_pdfs';
+const IDB_STORE = 'pdfs';
+const PDF_STORAGE_PREFIX = 'legium_pdf_';
 
 type PdfSessionWindow = Window & {
   pdfSessionUrls?: Map<string, string>;
@@ -10,31 +12,56 @@ const getSessionUrls = (): Map<string, string> => {
   return win.pdfSessionUrls;
 };
 
-const blobToDataUrl = (blob: Blob): Promise<string> => {
+// ── IndexedDB helpers ────────────────────────────────────────────────────────
+
+let _dbPromise: Promise<IDBDatabase> | null = null;
+
+const getDB = (): Promise<IDBDatabase> => {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return _dbPromise;
+};
+
+const idbPut = async (key: string, blob: Blob): Promise<void> => {
+  const db = await getDB();
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(blob, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 };
 
-const dataUrlToBlob = (dataUrl: string): Blob => {
-  const [meta, base64] = dataUrl.split(',');
-  const mime = meta.match(/data:(.*);base64/)?.[1] || 'application/pdf';
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return new Blob([bytes], { type: mime });
+const idbGet = async (key: string): Promise<Blob | null> => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve((req.result as Blob) ?? null);
+    req.onerror = () => reject(req.error);
+  });
 };
+
+const idbDelete = async (key: string): Promise<void> => {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+};
+
+// ── Public API ───────────────────────────────────────────────────────────────
 
 export const getPdfStorageKey = (docId: string): string => PDF_STORAGE_PREFIX + docId;
 
-// Register blob in session immediately (sync) so it's viewable right away
+/** Register an in-memory ObjectURL immediately so the PDF is viewable right away. */
 export const registerPdfSession = (docId: string, blob: Blob): void => {
   const sessionUrls = getSessionUrls();
   const prev = sessionUrls.get(docId);
@@ -42,44 +69,47 @@ export const registerPdfSession = (docId: string, blob: Blob): void => {
   sessionUrls.set(docId, URL.createObjectURL(blob));
 };
 
+/**
+ * Save PDF blob to IndexedDB (persists across reloads, no size limit).
+ * Also registers an in-memory ObjectURL for immediate access.
+ * Awaiting this guarantees the blob is on disk before the caller continues.
+ */
 export const savePdfBlob = async (docId: string, blob: Blob): Promise<string> => {
   const storageKey = getPdfStorageKey(docId);
-
-  // Register ObjectURL immediately so it's viewable right away
   registerPdfSession(docId, blob);
-
-  // Persist to localStorage — must complete before returning so the caller
-  // can safely reload the page and still find the blob.
-  try {
-    const dataUrl = await blobToDataUrl(blob);
-    localStorage.setItem(storageKey, dataUrl);
-  } catch (e) {
-    console.warn('[PDF] localStorage save failed:', e);
-  }
-
+  await idbPut(storageKey, blob);
   return storageKey;
 };
 
-export const getPdfObjectUrl = (docId: string): string | null => {
+/**
+ * Returns an ObjectURL for the blob, restoring it from IndexedDB if needed.
+ * Returns null if the blob was never saved or has been deleted.
+ */
+export const getPdfObjectUrl = async (docId: string): Promise<string | null> => {
   const sessionUrls = getSessionUrls();
-  const cachedUrl = sessionUrls.get(docId);
-  if (cachedUrl) return cachedUrl;
+  const cached = sessionUrls.get(docId);
+  if (cached) return cached;
 
-  const storedDataUrl = localStorage.getItem(getPdfStorageKey(docId));
-  if (!storedDataUrl) return null;
-
-  const objectUrl = URL.createObjectURL(dataUrlToBlob(storedDataUrl));
-  sessionUrls.set(docId, objectUrl);
-  return objectUrl;
+  try {
+    const blob = await idbGet(getPdfStorageKey(docId));
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    sessionUrls.set(docId, url);
+    return url;
+  } catch (e) {
+    console.warn('[PDF] IndexedDB read failed:', e);
+    return null;
+  }
 };
 
-export const deletePdfBlob = (docId: string): void => {
+export const deletePdfBlob = async (docId: string): Promise<void> => {
   const sessionUrls = getSessionUrls();
-  const cachedUrl = sessionUrls.get(docId);
-  if (cachedUrl) {
-    URL.revokeObjectURL(cachedUrl);
+  const cached = sessionUrls.get(docId);
+  if (cached) {
+    URL.revokeObjectURL(cached);
     sessionUrls.delete(docId);
   }
+  await idbDelete(getPdfStorageKey(docId));
+  // Also clean up any old localStorage entry from the previous implementation
   localStorage.removeItem(getPdfStorageKey(docId));
 };
-
