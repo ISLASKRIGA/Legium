@@ -5,7 +5,6 @@ import path from 'path';
 const vendorChunks: Record<string, string> = {
   react: 'react',
   'react-dom': 'react',
-  '@supabase/supabase-js': 'supabase',
   'chart.js': 'charts',
   'react-chartjs-2': 'charts',
   jspdf: 'documents',

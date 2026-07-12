@@ -8,9 +8,9 @@ import { DocumentScanner } from './components/cases/DocumentScanner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
-import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
+import { User, UserRole, Case, Client, AuditLog, Financials, Notification, DocumentItem } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
-import { saveCaseRecord, saveNotificationRecord } from './utils/insforgeClient';
+import { saveCaseRecord, saveNotificationRecord, getCasesFromInsforge, getDocumentsFromInsforge } from './utils/insforgeClient';
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((module) => ({ default: module.DashboardView })));
 const ClientDashboard = lazy(() => import('./components/dashboard/ClientDashboard').then((module) => ({ default: module.ClientDashboard })));
 const CasesView = lazy(() => import('./components/cases/CasesView').then((module) => ({ default: module.CasesView })));
@@ -95,17 +95,30 @@ export const App: React.FC = () => {
             }))
         }));
 
-        if (casesWithDocs.length > 0) {
-          // Merge database cases with local cases
-          const mergedCases = cases.map(localCase => {
-            const dbCase = casesWithDocs.find(c => c.id === localCase.id);
-            return dbCase ? dbCase : localCase;
-          });
+        if (casesWithDocs.length > 0 || dbDocs.length > 0) {
+          // Merge: start from local cases (preserves offline/just-scanned data)
+          const mergedCases = [...cases];
 
-          // Also add any new cases that exist in DB but not locally
           casesWithDocs.forEach(dbCase => {
-            if (!mergedCases.some(c => c.id === dbCase.id)) {
+            const idx = mergedCases.findIndex(c => c.id === dbCase.id);
+            if (idx === -1) {
+              // Case exists in cloud but not locally — add it
               mergedCases.push(dbCase);
+            } else {
+              // Case exists in both — merge docs, preferring cloud pdfUrl
+              const localDocs = [...mergedCases[idx].documents];
+              dbCase.documents.forEach((cd: DocumentItem) => {
+                const di = localDocs.findIndex(d => d.id === cd.id);
+                if (di === -1) {
+                  localDocs.push(cd);
+                } else {
+                  // Update pdfUrl from cloud if we have one
+                  if (cd.pdfUrl && !localDocs[di].pdfUrl) {
+                    localDocs[di] = { ...localDocs[di], pdfUrl: cd.pdfUrl };
+                  }
+                }
+              });
+              mergedCases[idx] = { ...mergedCases[idx], documents: localDocs };
             }
           });
 
@@ -241,11 +254,11 @@ export const App: React.FC = () => {
     LegiumDB.set('cases', updatedCases);
     setCases(updatedCases);
 
-    // Sync case to Supabase
+    // Sync case to InsForge
     try {
       await saveCaseRecord(updatedCase);
     } catch (err) {
-      console.error('[Supabase] Failed to sync updated case:', err);
+      console.error('[InsForge] Failed to sync updated case:', err);
     }
 
     if (currentUser?.role === 'Cliente' && oldCase && updatedCase.documents.length > oldCase.documents.length) {
@@ -265,7 +278,7 @@ export const App: React.FC = () => {
       setNotifications(LegiumDB.getNotifications());
       showToast('Documento Notificado', 'Se ha notificado al equipo de Abogados Senior sobre el nuevo archivo.', 'info');
 
-      // 2. Sync notification to Supabase
+      // 2. Sync notification to InsForge
       try {
         await saveNotificationRecord({
           id: notiId,
@@ -277,7 +290,7 @@ export const App: React.FC = () => {
           targetRole: 'Abogado Senior'
         });
       } catch (err) {
-        console.error('[Supabase] Failed to sync notification:', err);
+        console.error('[InsForge] Failed to sync notification:', err);
       }
     }
   };
@@ -288,11 +301,11 @@ export const App: React.FC = () => {
     LegiumDB.set('cases', updatedCases);
     setCases(updatedCases);
 
-    // Sync case to Supabase
+    // Sync case to InsForge
     try {
       await saveCaseRecord(newCase);
     } catch (err) {
-      console.error('[Supabase] Failed to sync new case:', err);
+      console.error('[InsForge] Failed to sync new case:', err);
     }
 
     if (currentUser?.role === 'Cliente') {
@@ -311,7 +324,7 @@ export const App: React.FC = () => {
       setNotifications(LegiumDB.getNotifications());
       showToast('Demanda Notificada', 'Se ha enviado una notificación al equipo de Abogados Senior.', 'info');
 
-      // 2. Sync notification to Supabase
+      // 2. Sync notification to InsForge
       try {
         await saveNotificationRecord({
           id: notiId,
@@ -323,7 +336,7 @@ export const App: React.FC = () => {
           targetRole: 'Abogado Senior'
         });
       } catch (err) {
-        console.error('[Supabase] Failed to sync notification:', err);
+        console.error('[InsForge] Failed to sync notification:', err);
       }
     }
   };

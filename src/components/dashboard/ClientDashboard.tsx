@@ -89,7 +89,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
           caseId: caseObj.id
         });
       } catch (err) {
-        console.error('[Supabase Upload] Failed syncing case or uploading document:', err);
+        console.error('[InsForge Upload] Failed syncing case or uploading document:', err);
       }
 
       const newDoc: DocumentItem = {
@@ -134,7 +134,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
           pdfUrl
         });
       } catch (err) {
-        console.error('[Supabase Upload] Failed syncing case or uploading document:', err);
+        console.error('[InsForge Upload] Failed syncing case or uploading document:', err);
       }
 
       const newDoc: DocumentItem = {

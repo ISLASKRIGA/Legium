@@ -184,7 +184,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
     // 1. Save locally to localStorage (fallback/offline view)
     const storageKey = await savePdfBlob(docId, fileBlob);
 
-    // 2. Upload to Supabase Storage and DB (if configured)
+    // 2. Upload to InsForge Storage and DB (if configured)
     let pdfUrl: string | null = null;
     try {
       // Upsert the case record to avoid foreign key failures
@@ -204,7 +204,7 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
         pdfUrl
       });
     } catch (err) {
-      console.error('[Supabase Upload] Failed syncing case or uploading document:', err);
+      console.error('[InsForge Upload] Failed syncing case or uploading document:', err);
     }
 
     const newDoc: DocumentItem = {
