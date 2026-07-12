@@ -66,10 +66,11 @@ export const App: React.FC = () => {
 
   // Real-time synchronization / polling loop from InsForge
   useEffect(() => {
-    if (!currentUser || currentUser.role === 'Cliente') return;
+    if (!currentUser) return;
 
     let isMounted = true;
-    const interval = setInterval(async () => {
+
+    const performSync = async () => {
       try {
         const { getCasesFromInsforge, getNotificationsFromInsforge, getDocumentsFromInsforge } = await import('./utils/insforgeClient');
         const dbCases = await getCasesFromInsforge();
@@ -118,15 +119,22 @@ export const App: React.FC = () => {
             const updatedNotis = LegiumDB.getNotifications();
             setNotifications(updatedNotis);
 
-            newNotis.forEach(n => {
-              showToast(n.title, n.message, 'info');
-            });
+            if (currentUser.role !== 'Cliente') {
+              newNotis.forEach(n => {
+                showToast(n.title, n.message, 'info');
+              });
+            }
           }
         }
       } catch (err) {
         console.warn('[Sync] Failed background database sync:', err);
       }
-    }, 5000);
+    };
+
+    // Run immediately on mount
+    performSync();
+
+    const interval = setInterval(performSync, 5000);
 
     return () => {
       isMounted = false;

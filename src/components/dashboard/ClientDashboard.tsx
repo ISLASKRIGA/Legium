@@ -4,7 +4,7 @@ import { Case, User, DocumentItem, Client } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
 import { getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
 import { GlassButton } from '../ui/glass-button';
-import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
+import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord, saveNotificationRecord } from '../../utils/insforgeClient';
 
 interface ClientDashboardProps {
   currentUser: User;
@@ -79,6 +79,14 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
           uploadDate,
           ocrText: '',
           pdfUrl
+        });
+        await saveNotificationRecord({
+          id: 'noti-' + Date.now(),
+          title: 'Nuevo PDF subido por cliente',
+          message: `El cliente ${currentUser.name || 'Portal'} ha subido el documento "${file.name}" para el expediente ${caseObj.id}.`,
+          date: uploadDate,
+          read: false,
+          caseId: caseObj.id
         });
       } catch (err) {
         console.error('[Supabase Upload] Failed syncing case or uploading document:', err);
