@@ -1012,18 +1012,21 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
         };
       }
 
-      // DB syncs in background — don't block onOcrComplete
-      saveCaseRecord(finalCase).catch(e => console.warn('[DB] case sync failed:', e));
-      saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl })
-        .catch(e => console.warn('[DB] doc sync failed:', e));
-      saveNotificationRecord({
-        id: 'noti-' + Date.now(),
-        title: 'Nuevo PDF subido por cliente',
-        message: `El cliente ${currentUser.name || 'Portal'} ha subido el documento escaneado "${pdfName}" para el expediente ${caseId}.`,
-        date: uploadDate,
-        read: false,
-        case_id: caseId
-      }).catch(e => console.warn('[DB] notification sync failed:', e));
+      // Save case and document to database sequentially to avoid foreign key race conditions
+      try {
+        await saveCaseRecord(finalCase);
+        await saveDocumentRecord({ id: docId, caseId, name: pdfName, sizeKb: parseFloat(sizeKB), uploadDate, ocrText, pdfUrl });
+        await saveNotificationRecord({
+          id: 'noti-' + Date.now(),
+          title: 'Nuevo PDF subido por cliente',
+          message: `El cliente ${currentUser.name || 'Portal'} ha subido el documento escaneado "${pdfName}" para el expediente ${caseId}.`,
+          date: uploadDate,
+          read: false,
+          case_id: caseId
+        });
+      } catch (e) {
+        console.warn('[DB] Database sync failed:', e);
+      }
 
       setOcrProgress(100);
       setOcrStatus('¡Listo!');

@@ -96,11 +96,24 @@ export const App: React.FC = () => {
         }));
 
         if (casesWithDocs.length > 0) {
+          // Merge database cases with local cases
+          const mergedCases = cases.map(localCase => {
+            const dbCase = casesWithDocs.find(c => c.id === localCase.id);
+            return dbCase ? dbCase : localCase;
+          });
+
+          // Also add any new cases that exist in DB but not locally
+          casesWithDocs.forEach(dbCase => {
+            if (!mergedCases.some(c => c.id === dbCase.id)) {
+              mergedCases.push(dbCase);
+            }
+          });
+
           const localCasesStr = JSON.stringify(cases);
-          const dbCasesStr = JSON.stringify(casesWithDocs);
-          if (localCasesStr !== dbCasesStr) {
-            setCases(casesWithDocs);
-            LegiumDB.set('cases', casesWithDocs);
+          const mergedCasesStr = JSON.stringify(mergedCases);
+          if (localCasesStr !== mergedCasesStr) {
+            setCases(mergedCases);
+            LegiumDB.set('cases', mergedCases);
           }
         }
 
