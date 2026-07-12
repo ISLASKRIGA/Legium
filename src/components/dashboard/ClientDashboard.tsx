@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert, Download, Upload } from 'lucide-react';
+import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert, Download, Upload, X } from 'lucide-react';
 import { Case, User, DocumentItem, Client } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
 import { DocumentScanner } from '../cases/DocumentScanner';
@@ -221,11 +221,10 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
     setActiveModal('none');
   };
 
-  const handleViewPDF = (docId: string, docName: string) => {
+  const handleViewPDF = (docId: string, docName: string, remotePdfUrl?: string | null) => {
     setActiveDocName(docName);
-    // ✅ FIX: Use getPdfObjectUrl which reads from localStorage if session URL is gone
-    const url = getPdfObjectUrl(docId);
-    setActiveDocUrl(url || '');
+    const localUrl = getPdfObjectUrl(docId);
+    setActiveDocUrl(localUrl || remotePdfUrl || '');
     setActiveModal('pdf');
   };
 
@@ -371,7 +370,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                         <div className="doc-name">{doc.name}</div>
                         <div className="doc-meta">{doc.size} • {doc.uploadDate}</div>
                       </div>
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name)}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name, doc.pdfUrl)}>
                         Visualizar
                       </button>
                     </div>
@@ -515,7 +514,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                       <span style={{ color: 'var(--primary-gold)', fontSize: '9px' }}>Exp: {caseId}</span>
                     </div>
                   </div>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name)}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleViewPDF(doc.id, doc.name, doc.pdfUrl)}>
                     <Eye size={12} />
                   </button>
                 </div>
@@ -611,42 +610,108 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
         </div>
       )}
 
-      {/* 2. PDF VIEW MODAL */}
+      {/* 2. PDF VIEW MODAL — fullscreen */}
       {activeModal === 'pdf' && (
-        <div className="modal active">
-          <div className="modal-content" style={{ maxWidth: '820px', width: '90%' }}>
-            <div className="ios-grabber" />
-            <div className="modal-header">
-              <h3 className="modal-title">{activeDocName}</h3>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {activeDocUrl && (
-                  <a
-                    href={activeDocUrl}
-                    download={activeDocName}
-                    className="btn btn-secondary btn-sm"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
-                  >
-                    <Download size={14} /> Exportar
-                  </a>
-                )}
-                <button className="modal-close" onClick={() => setActiveModal('none')}>Cerrar</button>
-              </div>
-            </div>
-            <div className="modal-body" style={{ padding: 0 }}>
-              <div id="pdf-viewer-container" style={{ width: '100%', height: '70vh', backgroundColor: 'rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {activeDocUrl ? (
-                  <iframe src={activeDocUrl} style={{ width: '100%', height: '100%', border: 'none' }} title={activeDocName} />
-                ) : (
-                  <div id="pdf-viewer-fallback" style={{ textAlign: 'center', padding: '40px' }}>
-                    <FileText size={48} style={{ color: 'var(--primary-gold)', margin: '0 auto 12px', display: 'block' }} />
-                    <h4 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>Vista Previa de Metadatos</h4>
-                    <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '340px', margin: '0 auto 16px' }}>
-                      El archivo PDF físico ya no está cargado en la sesión del navegador. Los metadatos siguen guardados de forma segura en LocalStorage.
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: '#1c1c1e',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px',
+            background: '#2c2c2e',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            flexShrink: 0,
+          }}>
+            <button
+              onClick={() => setActiveModal('none')}
+              style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+            >
+              <X size={22} />
+            </button>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', flex: 1, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: '0 12px' }}>
+              {activeDocName}
+            </span>
+            {activeDocUrl ? (
+              <a
+                href={activeDocUrl}
+                download={activeDocName.endsWith('.pdf') ? activeDocName : activeDocName + '.pdf'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  background: 'rgba(0,122,255,0.15)', color: '#409cff',
+                  border: '1px solid rgba(0,122,255,0.3)',
+                  borderRadius: '8px', padding: '6px 12px',
+                  fontSize: '12px', fontWeight: 600, textDecoration: 'none',
+                  flexShrink: 0,
+                }}
+              >
+                <Download size={14} /> Descargar
+              </a>
+            ) : (
+              <div style={{ width: 80 }} />
+            )}
+          </div>
+
+          {/* Viewer */}
+          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+            {activeDocUrl ? (
+              <>
+                {/* Primary: object tag (renders PDF natively on desktop) */}
+                <object
+                  data={activeDocUrl}
+                  type="application/pdf"
+                  style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                >
+                  {/* Fallback for mobile browsers that can't embed PDFs */}
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    height: '100%', gap: '16px', padding: '32px', textAlign: 'center',
+                  }}>
+                    <FileText size={56} style={{ color: 'var(--primary-gold)', opacity: 0.8 }} />
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', maxWidth: '280px' }}>
+                      Tu navegador no puede mostrar el PDF integrado. Usa el botón para descargarlo o ábrelo directamente.
                     </p>
+                    <a
+                      href={activeDocUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        background: '#007aff', color: '#fff',
+                        borderRadius: '12px', padding: '12px 24px',
+                        fontSize: '14px', fontWeight: 700, textDecoration: 'none',
+                      }}
+                    >
+                      <Eye size={16} /> Abrir PDF
+                    </a>
+                    <a
+                      href={activeDocUrl}
+                      download={activeDocName.endsWith('.pdf') ? activeDocName : activeDocName + '.pdf'}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        background: 'rgba(255,255,255,0.1)', color: '#fff',
+                        borderRadius: '12px', padding: '12px 24px',
+                        fontSize: '14px', fontWeight: 600, textDecoration: 'none',
+                      }}
+                    >
+                      <Download size={16} /> Descargar PDF
+                    </a>
                   </div>
-                )}
+                </object>
+              </>
+            ) : (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                height: '100%', gap: '16px', padding: '32px', textAlign: 'center',
+              }}>
+                <FileText size={56} style={{ color: 'var(--primary-gold)', opacity: 0.6 }} />
+                <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', maxWidth: '280px' }}>
+                  El PDF no está disponible en esta sesión. Vuelve a escanear el documento para regenerarlo.
+                </p>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
