@@ -412,6 +412,8 @@ a:hover {
   padding: 24px;
   overflow-y: auto;
   background-color: var(--bg-main);
+  -webkit-overflow-scrolling: touch;
+  isolation: isolate;
 }
 
 /* View panels active state */
@@ -1393,9 +1395,19 @@ textarea.form-control {
   .page-container {
     padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important;
   }
-  
+
   .dashboard-layout {
     grid-template-columns: 1fr;
+  }
+
+  /* Disable backdrop-filter inside scrollable areas on mobile —
+     Android Chrome renders GPU artifacts when blur() is inside a scroll container */
+  .page-container .glass-card,
+  .page-container .document-item,
+  .page-container .metric-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255, 255, 255, 0.92) !important;
   }
 }
 
