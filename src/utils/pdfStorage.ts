@@ -45,13 +45,17 @@ export const registerPdfSession = (docId: string, blob: Blob): void => {
 export const savePdfBlob = async (docId: string, blob: Blob): Promise<string> => {
   const storageKey = getPdfStorageKey(docId);
 
-  // Register ObjectURL immediately so it's available before localStorage finishes
+  // Register ObjectURL immediately so it's viewable right away
   registerPdfSession(docId, blob);
 
-  // Persist to localStorage in background
-  blobToDataUrl(blob)
-    .then(dataUrl => localStorage.setItem(storageKey, dataUrl))
-    .catch(e => console.warn('[PDF] localStorage save failed:', e));
+  // Persist to localStorage — must complete before returning so the caller
+  // can safely reload the page and still find the blob.
+  try {
+    const dataUrl = await blobToDataUrl(blob);
+    localStorage.setItem(storageKey, dataUrl);
+  } catch (e) {
+    console.warn('[PDF] localStorage save failed:', e);
+  }
 
   return storageKey;
 };
