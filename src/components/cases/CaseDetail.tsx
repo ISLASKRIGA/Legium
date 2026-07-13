@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, Plus, Calendar, CheckSquare, MessageSquare, FileText, Trash2, Camera, Upload, Download } from 'lucide-react';
 import { Case, User, DocumentItem, TimelineItem, TaskItem } from '../../utils/types';
 import { DocumentScanner } from './DocumentScanner';
@@ -692,7 +693,9 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
       )}
 
       {/* 4. View PDF Modal */}
-      {activeModal === 'pdf' && (
+      {/* Portaled to <body> so it escapes page-container's stacking context
+          (isolation: isolate) and doesn't render underneath the topbar/search bar. */}
+      {activeModal === 'pdf' && createPortal(
         <div className="modal active">
           <div className="modal-content" style={{ maxWidth: '820px', width: '90%' }}>
             <div className="ios-grabber" />
@@ -752,7 +755,8 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

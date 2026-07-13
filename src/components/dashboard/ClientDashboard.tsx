@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert, Download, Upload, X } from 'lucide-react';
 import { Case, User, DocumentItem, Client } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
@@ -634,8 +635,10 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
         </div>
       )}
 
-      {/* 2. PDF VIEW MODAL — fullscreen */}
-      {activeModal === 'pdf' && (
+      {/* 2. PDF VIEW MODAL — fullscreen, portaled to <body> so it escapes the
+          page-container's stacking context (isolation: isolate) and doesn't
+          render underneath the topbar/search bar. */}
+      {activeModal === 'pdf' && createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
           background: '#1c1c1e',
@@ -737,7 +740,8 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
