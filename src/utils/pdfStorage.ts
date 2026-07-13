@@ -102,6 +102,29 @@ export const getPdfObjectUrl = async (docId: string): Promise<string | null> => 
   }
 };
 
+/**
+ * Fetches a remote PDF, re-wraps it as a Blob with the correct 'application/pdf'
+ * MIME type (InsForge storage serves uploads as 'binary/octet-stream', which stops
+ * browsers from rendering the embedded PDF viewer), and caches it locally so
+ * subsequent views are instant. Returns null if the fetch fails (e.g. offline, CORS).
+ */
+export const fetchRemotePdfAsObjectUrl = async (
+  docId: string,
+  remoteUrl: string
+): Promise<string | null> => {
+  try {
+    const response = await fetch(remoteUrl);
+    if (!response.ok) return null;
+    const rawBlob = await response.blob();
+    const pdfBlob = new Blob([rawBlob], { type: 'application/pdf' });
+    await savePdfBlob(docId, pdfBlob);
+    return await getPdfObjectUrl(docId);
+  } catch (e) {
+    console.warn('[PDF] Remote fetch failed:', e);
+    return null;
+  }
+};
+
 export const deletePdfBlob = async (docId: string): Promise<void> => {
   const sessionUrls = getSessionUrls();
   const cached = sessionUrls.get(docId);

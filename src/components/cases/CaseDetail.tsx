@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, Plus, Calendar, CheckSquare, MessageSquare, FileText, Trash2, Camera, Upload, Download } from 'lucide-react';
 import { Case, User, DocumentItem, TimelineItem, TaskItem } from '../../utils/types';
 import { DocumentScanner } from './DocumentScanner';
-import { deletePdfBlob, getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
+import { deletePdfBlob, getPdfObjectUrl, savePdfBlob, fetchRemotePdfAsObjectUrl } from '../../utils/pdfStorage';
 import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord } from '../../utils/insforgeClient';
 import { GlassButton } from '../ui/glass-button';
 
@@ -247,13 +247,18 @@ export const CaseDetail: React.FC<CaseDetailProps> = ({
     setActiveDocName(docName);
     setActiveDocUrl('');
     setActiveModal('pdf');
+    const localUrl = await getPdfObjectUrl(docId);
+    if (localUrl) {
+      setActiveDocUrl(localUrl);
+      return;
+    }
     const doc = c.documents.find((d) => d.id === docId);
     if (doc?.pdfUrl) {
-      setActiveDocUrl(doc.pdfUrl);
-    } else {
-      const url = await getPdfObjectUrl(docId);
-      setActiveDocUrl(url || '');
+      const fetchedUrl = await fetchRemotePdfAsObjectUrl(docId, doc.pdfUrl);
+      setActiveDocUrl(fetchedUrl || doc.pdfUrl);
+      return;
     }
+    setActiveDocUrl('');
   };
 
   // Drag and drop events

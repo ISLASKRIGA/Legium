@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, FileText, Briefcase, Calendar, Folder, ArrowRight, User as UserIcon, Building2, Eye, ShieldAlert, Download, Upload, X } from 'lucide-react';
 import { Case, User, DocumentItem, Client } from '../../utils/types';
 import { OcrScanner } from '../cases/OcrScanner';
-import { getPdfObjectUrl, savePdfBlob } from '../../utils/pdfStorage';
+import { getPdfObjectUrl, savePdfBlob, fetchRemotePdfAsObjectUrl } from '../../utils/pdfStorage';
 import { GlassButton } from '../ui/glass-button';
 import { uploadPdfToInsforge, saveDocumentRecord, saveCaseRecord, saveNotificationRecord } from '../../utils/insforgeClient';
 
@@ -233,7 +233,16 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
     setActiveDocUrl('');
     setActiveModal('pdf');
     const localUrl = await getPdfObjectUrl(docId);
-    setActiveDocUrl(localUrl || remotePdfUrl || '');
+    if (localUrl) {
+      setActiveDocUrl(localUrl);
+      return;
+    }
+    if (remotePdfUrl) {
+      const fetchedUrl = await fetchRemotePdfAsObjectUrl(docId, remotePdfUrl);
+      setActiveDocUrl(fetchedUrl || remotePdfUrl);
+      return;
+    }
+    setActiveDocUrl('');
   };
 
   const selectedCase = clientCases.find(c => c.id === selectedCaseId);
