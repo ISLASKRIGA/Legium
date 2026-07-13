@@ -437,10 +437,12 @@ export const LegiumDB = {
     return [];
   },
 
-  addNotification: function(title: string, message: string, caseId?: string, targetRole?: string): void {
+  addNotification: function(title: string, message: string, caseId?: string, targetRole?: string, id?: string): void {
     const notifications = this.getNotifications();
+    const noteId = id || ('noti-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
+    if (notifications.some((n) => n.id === noteId)) return; // dedupe: realtime push + poll can both deliver the same id
     const newNoti: Notification = {
-      id: 'noti-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      id: noteId,
       title,
       message,
       date: new Date().toISOString(),

@@ -129,6 +129,93 @@ export const saveNotificationRecord = async (noti: {
   if (error) console.error('[InsForge] Notification insert error:', error.message);
 };
 
+const NOTIFICATIONS_CHANNEL = 'legium-notifications';
+const NOTIFICATION_EVENT = 'notification:new';
+
+/**
+ * InsForge's realtime websocket requires a genuine InsForge Auth JWT (the
+ * anon key alone is rejected with "Invalid token") — but this app's login
+ * validates against our own `users` table, not InsForge Auth. To unlock
+ * realtime without changing the login UX, silently sign in to InsForge Auth
+ * behind the scenes using the same email/password, registering the account
+ * on first use. Failures are non-fatal: the app still works, just without
+ * push notifications (the 10s poll in App.tsx remains as a fallback).
+ */
+export const ensureRealtimeSession = async (email: string, password: string): Promise<void> => {
+  if (!insforge || !email || !password) return;
+  try {
+    const { error: signInError } = await insforge.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      await insforge.auth.signUp({ email, password, autoConfirm: true });
+    }
+  } catch (err) {
+    console.warn('[InsForge Realtime] Could not establish an auth session for realtime:', err);
+  }
+};
+
+export type RealtimeNotification = {
+  id: string;
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+  caseId?: string;
+  targetRole?: string;
+};
+
+/** Push a just-created notification to any live sessions listening on the shared channel. */
+export const publishNotificationRealtime = async (noti: RealtimeNotification): Promise<void> => {
+  if (!insforge) return;
+  try {
+    await insforge.realtime.subscribe(NOTIFICATIONS_CHANNEL);
+    await insforge.realtime.publish(NOTIFICATIONS_CHANNEL, NOTIFICATION_EVENT, noti);
+  } catch (err) {
+    console.warn('[InsForge Realtime] Publish failed:', err);
+  }
+};
+
+/**
+ * Subscribe to live notification pushes. Returns an unsubscribe function.
+ * No-op (returns a no-op cleanup) when InsForge isn't configured.
+ */
+export const subscribeToNotifications = (
+  onNotification: (noti: RealtimeNotification) => void
+): (() => void) => {
+  if (!insforge) return () => {};
+  const client = insforge;
+
+  const handler = (message: any) => {
+    // The server wraps custom publish() payloads in a SocketMessage envelope;
+    // unwrap defensively since the exact nesting isn't part of the public types.
+    const data = message && typeof message === 'object' && 'payload' in message
+      ? message.payload
+      : message;
+    if (data && typeof data === 'object' && data.id) {
+      onNotification(data as RealtimeNotification);
+    }
+  };
+
+  const trySubscribe = () => {
+    client.realtime.subscribe(NOTIFICATIONS_CHANNEL).catch((err) => {
+      console.warn('[InsForge Realtime] Subscribe failed:', err);
+    });
+  };
+
+  client.realtime.on(NOTIFICATION_EVENT, handler);
+  // Re-subscribe on every (re)connect — covers the case where the first
+  // connect attempt races ahead of ensureRealtimeSession() and gets rejected
+  // with the anon-key token; once the auth session lands, the socket
+  // reconnects with a valid token and this fires again.
+  client.realtime.on('connect', trySubscribe);
+  trySubscribe();
+
+  return () => {
+    client.realtime.off(NOTIFICATION_EVENT, handler);
+    client.realtime.off('connect', trySubscribe);
+    client.realtime.unsubscribe(NOTIFICATIONS_CHANNEL);
+  };
+};
+
 export const getCasesFromInsforge = async (): Promise<Case[]> => {
   if (!insforge) return [];
   const { data, error } = await insforge.database.from('cases').select('*');

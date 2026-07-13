@@ -10,7 +10,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
-import { saveCaseRecord, saveNotificationRecord, authenticateUserInsforge, isInsforgeConfigured } from './utils/insforgeClient';
+import { saveCaseRecord, saveNotificationRecord, authenticateUserInsforge, isInsforgeConfigured, publishNotificationRealtime, subscribeToNotifications, ensureRealtimeSession, RealtimeNotification } from './utils/insforgeClient';
+import { playNotificationSound } from './utils/notificationSound';
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((module) => ({ default: module.DashboardView })));
 const ClientDashboard = lazy(() => import('./components/dashboard/ClientDashboard').then((module) => ({ default: module.ClientDashboard })));
 const CasesView = lazy(() => import('./components/cases/CasesView').then((module) => ({ default: module.CasesView })));
@@ -69,6 +70,7 @@ export const App: React.FC = () => {
     if (!currentUser) return;
 
     let isMounted = true;
+    let isFirstSync = true; // don't toast/sound the historical backlog on initial load
 
     const loadFromCloud = async () => {
       try {
@@ -112,15 +114,19 @@ export const App: React.FC = () => {
 
           if (newNotis.length > 0) {
             newNotis.forEach((n: any) => {
-              LegiumDB.addNotification(n.title, n.message, n.caseId || '', n.targetRole);
+              LegiumDB.addNotification(n.title, n.message, n.caseId || '', n.targetRole, n.id);
             });
             setNotifications(LegiumDB.getNotifications());
 
-            if (currentUser.role !== 'Cliente') {
+            // Skip toast/sound for the initial catch-up sync (pre-existing backlog) —
+            // only genuinely new arrivals (this poll onward, or realtime) should alert.
+            if (!isFirstSync && currentUser.role !== 'Cliente') {
               newNotis.forEach((n: any) => showToast(n.title, n.message, 'info'));
+              playNotificationSound();
             }
           }
         }
+        isFirstSync = false;
       } catch (err) {
         console.warn('[Sync] Failed cloud sync:', err);
       }
@@ -133,6 +139,22 @@ export const App: React.FC = () => {
       isMounted = false;
       clearInterval(interval);
     };
+  }, [currentUser?.id]);
+
+  // Realtime notifications: instant delivery + sound while the tab is open,
+  // on top of the 10s poll above (which stays as a reconciliation fallback).
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'Cliente') return;
+
+    const unsubscribe = subscribeToNotifications((noti: RealtimeNotification) => {
+      if (noti.targetRole && noti.targetRole !== currentUser.role) return;
+      LegiumDB.addNotification(noti.title, noti.message, noti.caseId || '', noti.targetRole, noti.id);
+      setNotifications(LegiumDB.getNotifications());
+      showToast(noti.title, noti.message, 'info');
+      playNotificationSound();
+    });
+
+    return unsubscribe;
   }, [currentUser?.id]);
 
   // Synchronize URL hash when state activeTab changes
@@ -235,27 +257,31 @@ export const App: React.FC = () => {
       const notiTitle = 'Nuevo Documento Adjuntado';
       const notiMsg = `El cliente ${currentUser.name} ha subido el documento "${addedDoc.name}" en el expediente ${updatedCase.id}.`;
 
-      // 1. Add notification locally
+      // 1. Add notification locally (same id used for the InsForge record below,
+      // so the poll/realtime dedup can recognize it as already-seen)
       LegiumDB.addNotification(
         notiTitle,
         notiMsg,
         updatedCase.id,
-        'Abogado Senior'
+        'Socio Principal',
+        notiId
       );
       setNotifications(LegiumDB.getNotifications());
-      showToast('Documento Notificado', 'Se ha notificado al equipo de Abogados Senior sobre el nuevo archivo.', 'info');
+      showToast('Documento Notificado', 'Se ha notificado al abogado sobre el nuevo archivo.', 'info');
 
-      // 2. Sync notification to InsForge
+      // 2. Sync notification to InsForge + push it live to any open lawyer session
+      const notiPayload = {
+        id: notiId,
+        title: notiTitle,
+        message: notiMsg,
+        date: notiDate,
+        read: false,
+        caseId: updatedCase.id,
+        targetRole: 'Socio Principal'
+      };
       try {
-        await saveNotificationRecord({
-          id: notiId,
-          title: notiTitle,
-          message: notiMsg,
-          date: notiDate,
-          read: false,
-          caseId: updatedCase.id,
-          targetRole: 'Abogado Senior'
-        });
+        await saveNotificationRecord(notiPayload);
+        await publishNotificationRealtime(notiPayload);
       } catch (err) {
         console.error('[InsForge] Failed to sync notification:', err);
       }
@@ -281,27 +307,31 @@ export const App: React.FC = () => {
       const notiTitle = 'Nueva Demanda Recibida';
       const notiMsg = `El cliente ${currentUser.name} ha subido una nueva demanda: ${newCase.title}. Extracción OCR y PDF realizados.`;
 
-      // 1. Add notification locally
+      // 1. Add notification locally (same id used for the InsForge record below,
+      // so the poll/realtime dedup can recognize it as already-seen)
       LegiumDB.addNotification(
         notiTitle,
         notiMsg,
         newCase.id,
-        'Abogado Senior'
+        'Socio Principal',
+        notiId
       );
       setNotifications(LegiumDB.getNotifications());
-      showToast('Demanda Notificada', 'Se ha enviado una notificación al equipo de Abogados Senior.', 'info');
+      showToast('Demanda Notificada', 'Se ha enviado una notificación al abogado.', 'info');
 
-      // 2. Sync notification to InsForge
+      // 2. Sync notification to InsForge + push it live to any open lawyer session
+      const notiPayload = {
+        id: notiId,
+        title: notiTitle,
+        message: notiMsg,
+        date: notiDate,
+        read: false,
+        caseId: newCase.id,
+        targetRole: 'Socio Principal'
+      };
       try {
-        await saveNotificationRecord({
-          id: notiId,
-          title: notiTitle,
-          message: notiMsg,
-          date: notiDate,
-          read: false,
-          caseId: newCase.id,
-          targetRole: 'Abogado Senior'
-        });
+        await saveNotificationRecord(notiPayload);
+        await publishNotificationRealtime(notiPayload);
       } catch (err) {
         console.error('[InsForge] Failed to sync notification:', err);
       }
@@ -444,6 +474,13 @@ export const App: React.FC = () => {
     }
     if (!matched) {
       return { success: false, error: 'Usuario o contraseña incorrectos.' };
+    }
+
+    // Best-effort: unlocks realtime push notifications (see ensureRealtimeSession's
+    // docstring). Awaited so the first subscribe attempt right after login already
+    // has a valid token; failures never block login itself.
+    if (isInsforgeConfigured() && matched.email) {
+      await ensureRealtimeSession(matched.email, password);
     }
 
     // Never persist the password in localStorage / React state.
