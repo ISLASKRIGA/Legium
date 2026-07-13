@@ -992,12 +992,12 @@ export const OcrScanner: React.FC<OcrScannerProps> = ({ currentUser, onOcrComple
           status: 'Activo',
           court: parsedCourt,
           judge: parsedJudge,
-          assignedLawyerId: 'usr-02',
-          assignedLawyerName: 'Dra. Sofía Valenzuela',
+          assignedLawyerId: 'usr-01',
+          assignedLawyerName: 'Dr. Carlos Mendoza',
           startDate: uploadDate,
           description,
           timeline: [{ date: uploadDate, title: 'Ingreso por Portal Cliente (OCR)', desc: 'Documento escaneado y procesado automáticamente.', completed: true }],
-          tasks: [{ id: 'tsk-' + Date.now().toString().slice(-4), title: 'Revisar documento y asignar estrategia legal', dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], assignedTo: 'usr-02', completed: false }],
+          tasks: [{ id: 'tsk-' + Date.now().toString().slice(-4), title: 'Revisar documento y asignar estrategia legal', dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], assignedTo: 'usr-01', completed: false }],
           notes: [{ id: 'nt-' + Date.now(), date: uploadDate + ' ' + new Date().toTimeString().slice(0, 5), author: 'Legium OCR', text: 'Extracción: Parte=' + name + ' | Monto=' + amount + ' | ' + parsedCourt }],
           documents: [newDoc]
         };

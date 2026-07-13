@@ -1,5 +1,5 @@
 import { createClient } from '@insforge/sdk';
-import { Case } from './types';
+import { Case, User } from './types';
 
 const insforgeUrl = import.meta.env.VITE_INSFORGE_URL as string | undefined;
 const insforgeAnonKey = import.meta.env.VITE_INSFORGE_ANON_KEY as string | undefined;
@@ -30,6 +30,34 @@ export const uploadPdfToInsforge = async (
     .from('legal-documents')
     .getPublicUrl(path);
   return urlData?.publicUrl ?? null;
+};
+
+export const authenticateUserInsforge = async (
+  username: string,
+  password: string
+): Promise<User | null> => {
+  if (!insforge) return null;
+  const { data, error } = await insforge.database
+    .from('users')
+    .select('*')
+    .eq('username', username)
+    .eq('password', password);
+  if (error) {
+    console.error('[InsForge] Auth query error:', error.message);
+    return null;
+  }
+  const row = (data || [])[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    active: row.active,
+    avatar: row.avatar,
+    clientId: row.client_id || undefined,
+    username: row.username,
+  };
 };
 
 export const saveCaseRecord = async (caseObj: Case): Promise<void> => {

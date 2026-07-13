@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { User, UserRole, Case, Client, AuditLog, Financials, Notification } from './utils/types';
 import { LegiumDB, DEFAULT_USERS, DEFAULT_CASES, DEFAULT_CLIENTS, DEFAULT_AUDIT_LOGS, DEFAULT_FINANCIALS } from './utils/db';
-import { saveCaseRecord, saveNotificationRecord } from './utils/insforgeClient';
+import { saveCaseRecord, saveNotificationRecord, authenticateUserInsforge, isInsforgeConfigured } from './utils/insforgeClient';
 const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((module) => ({ default: module.DashboardView })));
 const ClientDashboard = lazy(() => import('./components/dashboard/ClientDashboard').then((module) => ({ default: module.ClientDashboard })));
 const CasesView = lazy(() => import('./components/cases/CasesView').then((module) => ({ default: module.CasesView })));
@@ -429,20 +429,37 @@ export const App: React.FC = () => {
     handleTabChange('cases');
   };
 
+  const handleAuthenticate = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    if (!username || !password) {
+      return { success: false, error: 'Ingresa usuario y contraseña.' };
+    }
+
+    let matched: User | null = null;
+    if (isInsforgeConfigured()) {
+      matched = await authenticateUserInsforge(username, password);
+    }
+    if (!matched) {
+      const localUsers = LegiumDB.get<User[]>('users', DEFAULT_USERS);
+      matched = localUsers.find((u) => u.username === username && u.password === password) || null;
+    }
+    if (!matched) {
+      return { success: false, error: 'Usuario o contraseña incorrectos.' };
+    }
+
+    // Never persist the password in localStorage / React state.
+    const { password: _pw, ...safeUser } = matched;
+
+    LegiumDB.setCurrentUser(safeUser as User);
+    setCurrentUser(safeUser as User);
+    setNotifications(LegiumDB.getNotifications());
+    // Siempre arrancar en dashboard para mostrar el correcto según el rol
+    window.location.hash = 'dashboard';
+    setActiveTab('dashboard');
+    return { success: true };
+  };
+
   if (!currentUser) {
-    return (
-      <LoginView 
-        users={users} 
-        onLogin={(user) => {
-          LegiumDB.setCurrentUser(user);
-          setCurrentUser(user);
-          setNotifications(LegiumDB.getNotifications());
-          // Siempre arrancar en dashboard para mostrar el correcto según el rol
-          window.location.hash = 'dashboard';
-          setActiveTab('dashboard');
-        }}
-      />
-    );
+    return <LoginView onLogin={handleAuthenticate} />;
   }
 
   return (

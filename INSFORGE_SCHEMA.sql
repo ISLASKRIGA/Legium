@@ -79,3 +79,37 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public select notifications" ON public.notifications FOR SELECT USING (true);
 CREATE POLICY "Allow public insert notifications" ON public.notifications FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update notifications" ON public.notifications FOR UPDATE USING (true);
+
+
+-- 4. CREACIÓN DE LA TABLA DE USUARIOS (USERS) — login de la aplicación
+-- NOTA: prototipo sin hashing, password en texto plano, RLS abierta con anon key
+-- pública (mismo patrón/limitación que cases/documents/notifications).
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    role TEXT NOT NULL,
+    active BOOLEAN DEFAULT true NOT NULL,
+    avatar TEXT,
+    client_id TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public select users" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Allow public insert users" ON public.users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update users" ON public.users FOR UPDATE USING (true);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON public.users(username);
+
+INSERT INTO public.users (id, username, password, name, email, role, active, avatar, client_id)
+VALUES
+  ('usr-01', 'abogado', 'abogado', 'Dr. Carlos Mendoza', 'carlos.mendoza@legium.law', 'Socio Principal', true, 'CM', NULL),
+  ('usr-06', 'cliente', 'cliente', 'Ing. Luis Fuentes', 'lfuentes@constructoraalfa.com', 'Cliente', true, 'LF', 'cli-01')
+ON CONFLICT (id) DO UPDATE SET
+  username = EXCLUDED.username, password = EXCLUDED.password, name = EXCLUDED.name,
+  email = EXCLUDED.email, role = EXCLUDED.role, active = EXCLUDED.active,
+  avatar = EXCLUDED.avatar, client_id = EXCLUDED.client_id;

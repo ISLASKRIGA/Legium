@@ -8,6 +8,8 @@ export interface User {
   active: boolean;
   avatar: string;
   clientId?: string;
+  username?: string;
+  password?: string; // nunca debe persistirse en currentUser/localStorage — ver App.tsx
 }
 
 export type ClientType = 'Corporativo' | 'Individual';

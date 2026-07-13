@@ -1,13 +1,11 @@
 import { User, Client, Case, AuditLog, Financials, Notification } from './types';
 
 export const DEFAULT_USERS: User[] = [
-  { id: "usr-01", name: "Dr. Carlos Mendoza", email: "carlos.mendoza@legium.law", role: "Socio Principal", active: true, avatar: "CM" },
-  { id: "usr-02", name: "Dra. Sofía Valenzuela", email: "sofia.valenzuela@legium.law", role: "Abogado Senior", active: true, avatar: "SV" },
-  { id: "usr-03", name: "Lic. Mateo Ríos", email: "mateo.rios@legium.law", role: "Abogado Junior", active: true, avatar: "MR" },
-  { id: "usr-04", name: "Ing. Alejandro Torres", email: "alejandro.torres@legium.law", role: "TI Administrador", active: true, avatar: "AT" },
-  { id: "usr-05", name: "Dra. Valentina Paz", email: "valentina.paz@legium.law", role: "Abogado Senior", active: false, avatar: "VP" },
-  { id: "usr-06", name: "Ing. Luis Fuentes", email: "lfuentes@constructoraalfa.com", role: "Cliente", active: true, avatar: "LF", clientId: "cli-01" }
+  { id: "usr-01", name: "Dr. Carlos Mendoza", email: "carlos.mendoza@legium.law", role: "Socio Principal", active: true, avatar: "CM", username: "abogado", password: "abogado" },
+  { id: "usr-06", name: "Ing. Luis Fuentes", email: "lfuentes@constructoraalfa.com", role: "Cliente", active: true, avatar: "LF", clientId: "cli-01", username: "cliente", password: "cliente" }
 ];
+
+const USER_SEED_VERSION = "login-v2-abogado-cliente";
 
 export const DEFAULT_CLIENTS: Client[] = [
   { id: "cli-01", name: "Constructora Alfa S.A.", email: "legal@constructoraalfa.com", phone: "+56 9 8765 4321", type: "Corporativo", rfc: "CALF900812-A10", contactPerson: "Ing. Luis Fuentes" },
@@ -311,6 +309,14 @@ export const LegiumDB = {
   },
 
   initialize: function(): void {
+    // One-time migration: collapse any pre-existing (older) user list down to
+    // the current DEFAULT_USERS set whenever the seed version changes, since
+    // the merge-by-id logic below only ever adds users, never removes them.
+    if (localStorage.getItem("legium_user_seed_version") !== USER_SEED_VERSION) {
+      this.set("users", DEFAULT_USERS);
+      localStorage.setItem("legium_user_seed_version", USER_SEED_VERSION);
+    }
+
     const users = this.get<User[]>("users", DEFAULT_USERS);
     // Sync default users if any are missing from pre-existing localStorage
     let usersUpdated = false;
