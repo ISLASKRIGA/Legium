@@ -702,8 +702,6 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                     </p>
                     <a
                       href={activeDocUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
                         background: '#007aff', color: '#fff',
